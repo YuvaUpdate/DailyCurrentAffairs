@@ -1,0 +1,15 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "exclude": [
+    "**/*.backup.*",
+    "**/*_backup.*",
+    "**/App_backup.tsx",
+    "**/*.tmp.*",
+    "node_modules",
+    "android",
+    "ios"
+  ]
+}
