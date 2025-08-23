@@ -1,4 +1,5 @@
 import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 import { Platform } from 'react-native';
 import { NewsArticle } from './types';
 
@@ -20,9 +21,7 @@ export interface PlaybackState {
 
 class AudioService {
   private sound: Audio.Sound | null = null;
-  // Minimal runtime-safe Speech module surface. We load expo-speech only when available.
-  private Speech: any | null = null;
-  private speechOptions: any = {
+  private speechOptions: Speech.SpeechOptions = {
     language: 'en-US',
     pitch: 1.0,
     rate: 0.8,
@@ -86,52 +85,44 @@ class AudioService {
       // Prepare text for speech
       const textToSpeak = this.prepareTextForSpeech(article);
 
-      // Try to load expo-speech dynamically. If it's not available, gracefully degrade.
-      if (!this.Speech) {
-        try {
-          // dynamic require prevents bundler from failing when package isn't installed
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          this.Speech = require('expo-speech');
-        } catch (e) {
-          this.Speech = null;
-        }
+      // Check if speech is available
+      const isAvailable = await Speech.isSpeakingAsync();
+      if (isAvailable) {
+        await Speech.stop();
       }
 
-      if (this.Speech && typeof this.Speech.speak === 'function') {
-        try {
-          const isAvailable = typeof this.Speech.isSpeakingAsync === 'function'
-            ? await this.Speech.isSpeakingAsync()
-            : false;
-          if (isAvailable && typeof this.Speech.stop === 'function') {
-            await this.Speech.stop();
-          }
-
-          await this.Speech.speak(textToSpeak, {
-            ...this.speechOptions,
-            onStart: () => {
-              this.updatePlaybackState({ isPlaying: true, isLoading: false, isPaused: false });
-            },
-            onDone: () => {
-              this.updatePlaybackState({ isPlaying: false, isPaused: false, progress: 100 });
-            },
-            onStopped: () => {
-              this.updatePlaybackState({ isPlaying: false, isPaused: false });
-            },
-            onError: (error: any) => {
-              console.error('❌ Speech error:', error);
-              this.updatePlaybackState({ isPlaying: false, isLoading: false, isPaused: false });
-            }
+      // Start speaking
+      await Speech.speak(textToSpeak, {
+        ...this.speechOptions,
+        onStart: () => {
+          this.updatePlaybackState({
+            isPlaying: true,
+            isLoading: false,
+            isPaused: false
           });
-        } catch (err) {
-          console.error('❌ Error using Speech module:', err);
-          this.Speech = null;
-          // Fallthrough to no-op below
+        },
+        onDone: () => {
+          this.updatePlaybackState({
+            isPlaying: false,
+            isPaused: false,
+            progress: 100
+          });
+        },
+        onStopped: () => {
+          this.updatePlaybackState({
+            isPlaying: false,
+            isPaused: false
+          });
+        },
+        onError: (error) => {
+          console.error('❌ Speech error:', error);
+          this.updatePlaybackState({
+            isPlaying: false,
+            isLoading: false,
+            isPaused: false
+          });
         }
-      } else {
-        // No native speech available. As a safe fallback, update state as if playback finished.
-        console.warn('⚠️ expo-speech not available. Skipping TTS.');
-        this.updatePlaybackState({ isPlaying: false, isLoading: false, isPaused: false, progress: 100 });
-      }
+      });
 
       console.log('✅ Article audio playback started');
     } catch (error) {
@@ -149,13 +140,11 @@ class AudioService {
   async pauseAudio(): Promise<void> {
     try {
       if (this.playbackState.isPlaying) {
-        if (!this.Speech) {
-          try { this.Speech = require('expo-speech'); } catch { this.Speech = null; }
-        }
-        if (this.Speech && typeof this.Speech.stop === 'function') {
-          await this.Speech.stop();
-        }
-        this.updatePlaybackState({ isPlaying: false, isPaused: true });
+        await Speech.stop();
+        this.updatePlaybackState({
+          isPlaying: false,
+          isPaused: true
+        });
         console.log('✅ Audio paused');
       }
     } catch (error) {
@@ -178,14 +167,9 @@ class AudioService {
   // Stop audio playback
   async stopAudio(): Promise<void> {
     try {
-      if (!this.Speech) {
-        try { this.Speech = require('expo-speech'); } catch { this.Speech = null; }
-      }
-      if (this.Speech && typeof this.Speech.isSpeakingAsync === 'function') {
-        const isPlaying = await this.Speech.isSpeakingAsync();
-        if (isPlaying && typeof this.Speech.stop === 'function') {
-          await this.Speech.stop();
-        }
+      const isPlaying = await Speech.isSpeakingAsync();
+      if (isPlaying) {
+        await Speech.stop();
       }
 
       if (this.sound) {
@@ -221,16 +205,10 @@ class AudioService {
   }
 
   // Get available voices
-  async getAvailableVoices(): Promise<any[]> {
+  async getAvailableVoices(): Promise<Speech.Voice[]> {
     try {
-      if (!this.Speech) {
-        try { this.Speech = require('expo-speech'); } catch { this.Speech = null; }
-      }
-      if (this.Speech && typeof this.Speech.getAvailableVoicesAsync === 'function') {
-        const voices = await this.Speech.getAvailableVoicesAsync();
-        return voices;
-      }
-      return [];
+      const voices = await Speech.getAvailableVoicesAsync();
+      return voices;
     } catch (error) {
       console.error('❌ Error getting available voices:', error);
       return [];
@@ -241,8 +219,8 @@ class AudioService {
   async isSpeechSupported(): Promise<boolean> {
     try {
       // Try to get available voices as a test
-  const voices = await this.getAvailableVoices();
-  return voices.length > 0;
+      const voices = await this.getAvailableVoices();
+      return voices.length > 0;
     } catch (error) {
       console.error('❌ Speech not supported:', error);
       return false;

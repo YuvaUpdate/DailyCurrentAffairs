@@ -49,46 +49,15 @@ const LoadingDots = () => {
   );
 };
 
-import { getTheme } from './theme';
-
 export default function AppWrapper() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showAuth, setShowAuth] = useState(false);
   const [isFirstLaunch, setIsFirstLaunch] = useState(false);
-  const [isDarkMode] = useState(false);
-
-  const theme = getTheme(isDarkMode);
 
   useEffect(() => {
     checkFirstLaunch();
-    
-    // Set up Firebase auth state listener
-    const unsubscribe = authService.onAuthStateChanged((firebaseUser) => {
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('🔥 Firebase auth state changed:', firebaseUser ? { email: firebaseUser.email, uid: firebaseUser.uid } : 'null');
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('🔥 Current states - user:', !!user, 'showAuth:', showAuth, 'loading:', loading);
-      
-      if (firebaseUser) {
-        // User is logged in - save auth state to AsyncStorage as backup
-        saveAuthState(firebaseUser);
-        setUser(firebaseUser);
-        setShowAuth(false);
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[SUCCESS] User authenticated, hiding auth screen');
-      } else {
-        // User is logged out - clear auth state from AsyncStorage
-        clearAuthState();
-        setUser(null);
-        setShowAuth(true);
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[INFO] User logged out, showing auth screen');
-      }
-      setLoading(false);
-      
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('🔥 After update - user:', !!firebaseUser, 'showAuth:', !firebaseUser);
-    });
-
-    // Cleanup listener on unmount
-    return () => unsubscribe();
   }, []);
 
   const checkFirstLaunch = async () => {
@@ -98,58 +67,31 @@ export default function AppWrapper() {
         setIsFirstLaunch(true);
         setShowAuth(true); // Force authentication on first launch
         await AsyncStorage.setItem('hasLaunchedBefore', 'true');
-        if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('🆕 First launch detected, showing auth screen');
-      } else {
-        if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('🔄 Not first launch, auth state will be handled by listener');
       }
+      checkAuthState();
     } catch (error) {
-      if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[ERROR] Error checking first launch:', error);
-    }
-  };
-
-  // Save auth state to AsyncStorage as backup
-  const saveAuthState = async (user: any) => {
-    try {
-      await AsyncStorage.setItem('authState', JSON.stringify({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        timestamp: Date.now()
-      }));
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('💾 Auth state saved to AsyncStorage');
-    } catch (error) {
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[ERROR] Error saving auth state:', error);
-    }
-  };
-
-  // Clear auth state from AsyncStorage
-  const clearAuthState = async () => {
-    try {
-      await AsyncStorage.removeItem('authState');
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('🗑️ Auth state cleared from AsyncStorage');
-    } catch (error) {
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[ERROR] Error clearing auth state:', error);
+      console.log('Error checking first launch:', error);
+      checkAuthState();
     }
   };
 
   const checkAuthState = async () => {
     try {
-      const currentUser = authService.getCurrentUser();
-  if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('[DEBUG] AppWrapper - checkAuthState - currentUser:', currentUser);
+      const currentUser = await authService.getCurrentUser();
       setUser(currentUser);
       
-      // If no user is logged in, show auth screen
-      if (!currentUser) {
+      // If it's first launch and no user is logged in, keep showing auth
+      if (isFirstLaunch && !currentUser) {
         setShowAuth(true);
-        if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('👤 No user found, showing auth screen');
-      } else {
-        setShowAuth(false);
-        if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('✅ User found, hiding auth screen');
       }
     } catch (error) {
-      if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('❌ Error checking auth state:', error);
+      console.log('No user logged in');
       setUser(null);
-      setShowAuth(true); // Always show auth on error
+      
+      // If it's first launch, force login
+      if (isFirstLaunch) {
+        setShowAuth(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -172,22 +114,9 @@ export default function AppWrapper() {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('🔄 Starting logout process...');
-              
-              // Clear auth state from AsyncStorage first
-              await clearAuthState();
-              
-              // Then logout from Firebase
               await authService.logout();
-              
-              // Force update the UI state immediately
               setUser(null);
-              setShowAuth(true);
-              
-              if (typeof __DEV__ !== 'undefined' && __DEV__) console.log('✅ Firebase logout completed, forced UI update');
-              // Auth state listener will also handle UI updates
             } catch (error: any) {
-              console.error('❌ Logout error:', error);
               Alert.alert('Error', error.message || 'Failed to logout');
             }
           }
@@ -199,13 +128,9 @@ export default function AppWrapper() {
   if (loading) {
     return (
       <SafeAreaProvider>
-        <SafeAreaView style={[styles.loadingContainer, { backgroundColor: theme.background }] }>
-          <View style={[styles.brandCard, { backgroundColor: theme.surface, shadowColor: theme.subtleShadow }]}> 
-            <Text style={[styles.brandTitle, { color: theme.text }]}>YuvaUpdate</Text>
-            <Text style={[styles.brandSubtitle, { color: theme.subText }]}>Latest news, simply delivered</Text>
-          </View>
+        <SafeAreaView style={styles.loadingContainer}>
           <LoadingDots />
-          <Text style={[styles.loadingText, { color: theme.subText }]}>Loading YuvaUpdate...</Text>
+          <Text style={styles.loadingText}>Loading YuvaUpdate...</Text>
         </SafeAreaView>
       </SafeAreaProvider>
     );
@@ -214,11 +139,13 @@ export default function AppWrapper() {
   if (showAuth) {
     return (
       <SafeAreaProvider>
-        <View style={[styles.authContainer, { backgroundColor: theme.background }] }>
+        <View style={styles.authContainer}>
           {isFirstLaunch && (
-            <View style={[styles.welcomeMessage, { backgroundColor: theme.accent }] }>
-              <Text style={[styles.welcomeTitle, { color: '#fff' }]}>Welcome to YuvaUpdate!</Text>
-              <Text style={[styles.welcomeText, { color: '#fff' }]}>Please create an account or login to get started with the latest news and updates.</Text>
+            <View style={styles.welcomeMessage}>
+              <Text style={styles.welcomeTitle}>Welcome to YuvaUpdate!</Text>
+              <Text style={styles.welcomeText}>
+                Please create an account or login to get started with the latest news and updates.
+              </Text>
             </View>
           )}
           <AuthScreen
@@ -233,9 +160,9 @@ export default function AppWrapper() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-  {/* Main App - Pass user and logout function */}
-  <App currentUser={user} onLogout={handleLogout} />
+      <SafeAreaView style={styles.container}>
+      {/* Main App - No user header */}
+      <App currentUser={user} />
     </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -360,22 +287,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
-    opacity: 0.9,
-  },
-  brandCard: {
-    padding: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 20,
-    width: '80%'
-  },
-  brandTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  brandSubtitle: {
-    fontSize: 14,
     opacity: 0.9,
   },
 });

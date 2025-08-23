@@ -8,7 +8,6 @@ import {
   Share,
   Platform
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NewsArticle } from './types';
 import { authService } from './AuthService';
 import { userService } from './UserService';
@@ -22,7 +21,6 @@ interface ArticleActionsProps {
 }
 
 export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkMode = false, currentTheme, currentUser: propCurrentUser }) => {
-  const insets = useSafeAreaInsets();
   const [currentUser, setCurrentUser] = useState<any>(propCurrentUser);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -59,7 +57,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
     
     try {
       const bookmarks = await userService.getUserBookmarks(currentUser.uid);
-      const isArticleBookmarked = bookmarks.some((bookmark: any) => {
+      const isArticleBookmarked = bookmarks.some(bookmark => {
         // Convert both to numbers for comparison
         const bookmarkArticleId = parseInt(bookmark.articleId.toString());
         const currentArticleId = parseInt(article.id.toString());
@@ -78,14 +76,12 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
     }
 
     try {
-      // Use the toggleBookmark API which returns the new bookmark state
-      const newState = await userService.toggleBookmark(currentUser.uid, article.id);
-      setIsBookmarked(newState);
-      if (newState) {
-        Alert.alert('Saved', 'Article bookmarked successfully');
-      } else {
-        Alert.alert('Removed', 'Article removed from bookmarks');
-      }
+      const isNowBookmarked = await userService.toggleBookmark(currentUser.uid, article.id);
+      setIsBookmarked(isNowBookmarked);
+      Alert.alert(
+        isNowBookmarked ? 'Saved' : 'Removed', 
+        isNowBookmarked ? 'Article bookmarked successfully' : 'Article removed from bookmarks'
+      );
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update bookmark');
     }
@@ -95,7 +91,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
     try {
       const shareContent = {
         message: `Check out this article: ${article.headline}\n\n${article.description.substring(0, 100)}...`,
-        url: article.image, // You might want to use a proper article URL here
+        url: article.image,
       };
 
       if (Platform.OS === 'ios') {
@@ -134,8 +130,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
     surface: '#FFFFFF',
     text: '#000000',
     subText: '#666666',
-    accent: '#000000',
-
+    accent: '#2563EB',
     success: '#10B981',
     background: '#FFFFFF',
     border: '#E5E7EB'
@@ -144,7 +139,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
   const theme = currentTheme || defaultTheme;
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background, borderTopColor: theme.border, paddingBottom: 16 + Math.max(0, insets.bottom) }]}>
+    <View style={[styles.container, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
       <View style={styles.actionsRow}>
         {/* Bookmark Button */}
         <TouchableOpacity
@@ -223,9 +218,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-  paddingBottom: 20,
-  paddingTop: 16,
-  paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 16,
+    paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
@@ -233,22 +228,17 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   actionsRow: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  justifyContent: 'space-between',
-  alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
   },
   actionButton: {
-  alignItems: 'center',
-  paddingVertical: 8,
-  paddingHorizontal: 12,
-  borderRadius: 12,
-  flex: 1,
-  marginHorizontal: 6,
-  marginVertical: 6,
-  minWidth: 56,
-  maxWidth: 160,
-  backgroundColor: '#F8F9FA',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    minWidth: 60,
+    backgroundColor: '#F8F9FA',
   },
   actionIcon: {
     fontSize: 20,

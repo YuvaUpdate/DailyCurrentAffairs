@@ -1,18 +1,16 @@
-// types.tsx - Inshorts-style news article definition
+// types.tsx - Shared type definitions
 export interface NewsArticle {
-  id: string | number; // Accept string (Firebase IDs) or numeric IDs used in examples
-  headline: string; // Main news headline (admin written)
-  description: string; // Short summary (admin written, 2-3 lines max)
-  image: string; // Featured image URL
+  id: number;
+  headline: string;
+  description: string;
+  image: string;
   imageUrl?: string; // Alternative image URL
-  sourceUrl?: string; // External news website link (optional)
-  category: string; // News category (Politics, Sports, etc.)
-  readTime: string; // Estimated read time (e.g., "2 min read")
-  timestamp: string; // When news was added
+  link?: string; // External news link
+  category: string;
+  readTime: string;
+  timestamp: string;
   mediaType?: 'image' | 'video'; // Type of media content
-  mediaPath?: string; // Firebase storage path
-  // Removed fullText - we only store headline + summary like Inshorts
-  link?: string; // Alternative to sourceUrl for compatibility
+  mediaPath?: string; // Firebase storage path for potential deletion
 }
 
 // User related types
@@ -44,7 +42,7 @@ export interface AudioSettings {
 // Comment related types
 export interface Comment {
   id: string;
-  articleId: string | number;
+  articleId: number;
   userId: string;
   userName: string;
   userAvatar?: string;
@@ -61,7 +59,7 @@ export interface Comment {
 export interface Bookmark {
   id: string;
   userId: string;
-  articleId: string | number;
+  articleId: number;
   timestamp: string;
   category?: string;
 }

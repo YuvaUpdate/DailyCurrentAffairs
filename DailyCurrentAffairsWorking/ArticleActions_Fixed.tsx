@@ -76,13 +76,14 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
     }
 
     try {
-      // Use the toggleBookmark API which returns the new bookmark state
-      const newState = await userService.toggleBookmark(currentUser.uid, article.id);
-      setIsBookmarked(newState);
-      if (newState) {
-        Alert.alert('Saved', 'Article bookmarked successfully');
-      } else {
+      if (isBookmarked) {
+        await userService.removeBookmark(currentUser.uid, article.id);
+        setIsBookmarked(false);
         Alert.alert('Removed', 'Article removed from bookmarks');
+      } else {
+        await userService.addBookmark(currentUser.uid, article);
+        setIsBookmarked(true);
+        Alert.alert('Saved', 'Article bookmarked successfully');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update bookmark');
@@ -132,8 +133,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
     surface: '#FFFFFF',
     text: '#000000',
     subText: '#666666',
-  accent: '#000000',
-
+    accent: '#2563EB',
     success: '#10B981',
     background: '#FFFFFF',
     border: '#E5E7EB'
@@ -205,7 +205,6 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
           article={article} 
           onClose={() => setShowComments(false)}
           currentUser={currentUser}
-          visible={showComments}
         />
       )}
     </View>
@@ -231,17 +230,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   actionsRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-around',
-  alignItems: 'center',
-  flexWrap: 'wrap',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
   },
   actionButton: {
     alignItems: 'center',
     paddingVertical: 8,
-  paddingHorizontal: 12,
+    paddingHorizontal: 16,
     borderRadius: 12,
-  minWidth: Platform.select({ web: 60, default: 48 }),
+    minWidth: 60,
     backgroundColor: '#F8F9FA',
   },
   actionIcon: {

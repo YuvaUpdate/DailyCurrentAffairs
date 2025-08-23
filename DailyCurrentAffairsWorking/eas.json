@@ -14,13 +14,6 @@
         "buildType": "apk"
       }
     },
-    "client-apk": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleRelease"
-      }
-    },
     "production": {
       "autoIncrement": true,
       "android": {

@@ -16,7 +16,6 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VideoView } from 'expo-video';
 import AdminPanel from './AdminPanel';
 import Sidebar from './Sidebar';
@@ -26,43 +25,18 @@ import { firebaseNewsService } from './FirebaseNewsService';
 import { notificationService } from './NotificationService';
 import { ArticleActions } from './ArticleActions';
 import { authService, UserProfile } from './AuthService';
-import { LoadingSpinner } from './LoadingSpinner';
-import { Toast } from './Toast';
-import SwipeIndicator from './SwipeIndicator';
-import ErrorBoundary from './ErrorBoundary';
-import FloatingActionButton from './FloatingActionButton';
-import { ArticleSkeleton } from './ArticleSkeleton';
-import NewsFeed from './NewsFeed';
 
 const { height, width } = Dimensions.get('screen');
 
 interface AppProps {
   currentUser?: any;
-  onLogout?: () => Promise<void>;
 }
 
-export default function App({ currentUser, onLogout }: AppProps) {
+export default function App({ currentUser }: AppProps) {
   // Theme state - Default to dark mode
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [screenData, setScreenData] = useState(Dimensions.get('screen'));
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  
-  // Debug logging for authentication state (guarded and size-limited)
-  if (__DEV__) {
-    try {
-      console.log('[DEBUG] App - currentUser:', currentUser ? { uid: currentUser.uid, email: currentUser.email } : null);
-      console.log('[DEBUG] App - userProfile:', userProfile ? { uid: (userProfile as any)?.uid, displayName: (userProfile as any)?.displayName } : null);
-    } catch (e) {
-      // Safe guard in case shape is unexpected
-      console.log('[DEBUG] App - user info logging failed');
-    }
-  }
-  
-  // Toast state
-  const [toast, setToast] = useState({ visible: false, message: '', type: 'info' as 'success' | 'error' | 'info' | 'warning' });
-  
-  // Loading states
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
   
   // Theme colors
   const theme = {
@@ -81,16 +55,15 @@ export default function App({ currentUser, onLogout }: AppProps) {
       warning: '#D97706'
     },
     dark: {
-  background: '#000000',
-  surface: '#000000',
+      background: '#0F172A',
+      surface: '#1E293B',
       text: '#F8FAFC',
       subText: '#94A3B8',
-  // Visible accent for dark mode (was black which made action text invisible)
-  accent: '#2563EB',
-  border: '#334155',
-  headerBg: '#000000',
-  buttonBg: '#000000',
-  buttonText: '#FFFFFF',
+      accent: '#3B82F6',
+      border: '#334155',
+      headerBg: '#1E293B',
+      buttonBg: '#3B82F6',
+      buttonText: '#FFFFFF',
       success: '#10B981',
       error: '#EF4444',
       warning: '#F59E0B'
@@ -102,107 +75,64 @@ export default function App({ currentUser, onLogout }: AppProps) {
   // Initial mock news data
   const [newsData, setNewsData] = useState<NewsArticle[]>([
     {
-      id: "1",
+      id: 1,
       headline: "Breaking: Major Tech Breakthrough Announced",
       description: "Scientists have developed a revolutionary new technology that could change the way we interact with digital devices forever. This breakthrough promises to make technology more accessible and intuitive for users worldwide.",
       image: "https://via.placeholder.com/400x300/667eea/ffffff?text=Tech+News",
       category: "Technology",
       readTime: "2 min read",
-      timestamp: "2 hours ago",
-      sourceUrl: "https://techcrunch.com/tech-breakthrough"
+      timestamp: "2 hours ago"
     },
     {
-      id: "2",
+      id: 2,
       headline: "Sports: Championship Finals This Weekend",
       description: "The most anticipated sporting event of the year is set to take place this weekend. Teams have been preparing for months, and fans are eagerly waiting for what promises to be an unforgettable match.",
       image: "https://via.placeholder.com/400x300/f093fb/ffffff?text=Sports+News",
       category: "Sports",
       readTime: "1 min read",
-      timestamp: "4 hours ago",
-      sourceUrl: "https://espn.com/championship-finals"
+      timestamp: "4 hours ago"
     },
     {
-      id: "3",
+      id: 3,
       headline: "Business: Market Reaches All-Time High",
       description: "Stock markets around the world have reached unprecedented levels today, driven by positive economic indicators and investor confidence. Analysts are optimistic about continued growth in the coming quarters.",
       image: "https://via.placeholder.com/400x300/4ade80/ffffff?text=Business+News",
       category: "Business",
       readTime: "3 min read",
-      timestamp: "6 hours ago",
-      sourceUrl: "https://bloomberg.com/market-high"
+      timestamp: "6 hours ago"
     },
     {
-      id: "4",
+      id: 4,
       headline: "Health: New Medical Discovery Shows Promise",
       description: "Researchers have made a significant breakthrough in medical science that could lead to better treatment options for millions of patients worldwide. Clinical trials are showing very promising results.",
       image: "https://via.placeholder.com/400x300/fb7185/ffffff?text=Health+News",
       category: "Health",
       readTime: "2 min read",
-      timestamp: "8 hours ago",
-      sourceUrl: "https://medicalnews.com/breakthrough"
+      timestamp: "8 hours ago"
     },
     {
-      id: "5",
+      id: 5,
       headline: "Environment: Climate Action Summit Begins",
       description: "World leaders have gathered for the annual climate summit to discuss urgent environmental challenges and potential solutions. New commitments are expected to be announced throughout the week.",
       image: "https://via.placeholder.com/400x300/34d399/ffffff?text=Environment",
       category: "Environment",
       readTime: "4 min read",
-      timestamp: "10 hours ago",
-      sourceUrl: "https://climatenews.com/summit"
+      timestamp: "10 hours ago"
     }
   ]);
 
-  const [bookmarkedItems, setBookmarkedItems] = useState<string[]>([]);
+  const [bookmarkedItems, setBookmarkedItems] = useState<number[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [adminVisible, setAdminVisible] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
   const [articleModalVisible, setArticleModalVisible] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [categoryBarBottom, setCategoryBarBottom] = useState<number | null>(null);
   const [filteredNews, setFilteredNews] = useState<NewsArticle[]>(newsData); // Initialize with newsData
   const [refreshing, setRefreshing] = useState(false);
   const [lastArticleCount, setLastArticleCount] = useState(0);
   const [autoRefreshing, setAutoRefreshing] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
-
-  // Enhanced UI state
-  const [swipeIndicator, setSwipeIndicator] = useState({ visible: false, direction: 'up' as 'up' | 'down' });
-  const [transitionDirection, setTransitionDirection] = useState<'up' | 'down' | 'none'>('none');
-  const [error, setError] = useState<string | null>(null);
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
-  const [scrollTimer, setScrollTimer] = useState<NodeJS.Timeout | null>(null);
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const [scrollStartY, setScrollStartY] = useState(0);
-  const [isScrolling, setIsScrolling] = useState(false);
-
-  // Bookmark persistence functions
-  const saveBookmarks = async (bookmarks: string[]) => {
-    try {
-      await AsyncStorage.setItem('bookmarkedArticles', JSON.stringify(bookmarks));
-    } catch (error) {
-      console.error('Error saving bookmarks:', error);
-    }
-  };
-
-  const loadBookmarks = async () => {
-    try {
-      const saved = await AsyncStorage.getItem('bookmarkedArticles');
-      if (saved) {
-        const bookmarks = JSON.parse(saved);
-        setBookmarkedItems(bookmarks);
-  if (__DEV__) console.log('📚 Loaded bookmarks:', bookmarks.length);
-      }
-    } catch (error) {
-      console.error('Error loading bookmarks:', error);
-    }
-  };
-
-  // Load bookmarks on app start
-  useEffect(() => {
-    loadBookmarks();
-  }, []);
 
   // Firebase real-time subscription with auto-refresh
   useEffect(() => {
@@ -210,70 +140,40 @@ export default function App({ currentUser, onLogout }: AppProps) {
     let refreshInterval: NodeJS.Timeout | null = null;
 
     const setupFirebaseSubscription = () => {
-      try {
-        unsubscribe = firebaseNewsService.subscribeToArticles((articles: NewsArticle[]) => {
-          if (__DEV__) console.log('📡 Received articles from Firebase:', articles.length);
-          
-          // Clear any previous errors
-          setError(null);
-          
-          // Check for new articles (notifications are sent centrally by FirebaseNewsService)
-          if (articles.length > lastArticleCount && lastArticleCount > 0) {
-            const newArticles = articles.slice(0, articles.length - lastArticleCount);
-            if (__DEV__) console.log('🔔 New articles detected (notifications sent by FirebaseNewsService):', newArticles.map(a => a.id));
-          }
-          
-          setNewsData(articles);
-          setLastArticleCount(articles.length);
-          applyFilter(articles, selectedCategory);
-          
-          // Hide initial loading after first data load
-          if (isInitialLoading) {
-            setIsInitialLoading(false);
-          }
-        });
-      } catch (error) {
-        console.error('[ERROR] Firebase setup error:', error);
-        setError('Failed to connect to news service. Please try again.');
-        setIsInitialLoading(false);
-      }
+      unsubscribe = firebaseNewsService.subscribeToArticles((articles: NewsArticle[]) => {
+        console.log('📡 Received articles from Firebase:', articles.length);
+        
+        // Check for new articles and send notifications
+        if (articles.length > lastArticleCount && lastArticleCount > 0) {
+          const newArticles = articles.slice(0, articles.length - lastArticleCount);
+          newArticles.forEach((article: NewsArticle) => {
+            notificationService.sendNewArticleNotification(article);
+          });
+        }
+        
+        setNewsData(articles);
+        setLastArticleCount(articles.length);
+        applyFilter(articles, selectedCategory);
+      });
     };
 
-    // Auto-refresh function with enhanced error handling
+    // Auto-refresh function
     const autoRefresh = () => {
-  if (__DEV__) console.log('🔄 Auto-refresh triggered');
+      console.log('🔄 Auto-refreshing articles...');
       setAutoRefreshing(true);
-
-      // Re-fetch articles (less frequent on-device to avoid JS work)
+      
+      // Re-fetch articles every 10 seconds
       firebaseNewsService.getArticles().then((articles) => {
-  if (__DEV__) console.log('🔄 Auto-refresh: Received', articles.length, 'articles');
-
-        // Lightweight change detection: compare lengths and edge ids only
-        const hasChanges = articles.length !== newsData.length || (
-          articles.length > 0 && newsData.length > 0 && (
-            articles[0].id !== newsData[0].id ||
-            articles[articles.length - 1].id !== newsData[newsData.length - 1].id
-          )
-        );
-
-        if (hasChanges) {
-          setNewsData(articles);
-          applyFilter(articles, selectedCategory);
-          if (__DEV__) console.log('📰 Articles updated with new content');
-        }
-
+        console.log('🔄 Auto-refresh: Received', articles.length, 'articles');
+        setNewsData(articles);
+        applyFilter(articles, selectedCategory);
         setAutoRefreshing(false);
-        setError(null); // Clear any previous errors
       }).catch((error) => {
         console.error('🔄 Auto-refresh error:', error);
         setAutoRefreshing(false);
-
         // Show error to user only if it's a network or significant error
-        if ((error as any)?.code === 'network-request-failed' || (error as any)?.code === 'unavailable') {
-          setError('Connection lost. Trying to reconnect...');
-          showToast('Connection issues detected', 'warning');
-        } else {
-          setError('Unable to refresh articles. Please try again.');
+        if (error.code === 'network-request-failed' || error.code === 'unavailable') {
+          Alert.alert('Connection Error', 'Unable to refresh articles. Please check your internet connection.');
         }
       });
     };
@@ -284,8 +184,8 @@ export default function App({ currentUser, onLogout }: AppProps) {
     // Setup Firebase subscription
     setupFirebaseSubscription();
 
-  // Setup auto-refresh interval: 60s on-device to reduce JS work
-  refreshInterval = setInterval(autoRefresh, 60000);
+    // Setup auto-refresh interval (10 seconds)
+    refreshInterval = setInterval(autoRefresh, 10000);
 
     // Cleanup subscription on unmount
     return () => {
@@ -294,9 +194,6 @@ export default function App({ currentUser, onLogout }: AppProps) {
       }
       if (refreshInterval) {
         clearInterval(refreshInterval);
-      }
-      if (scrollTimer) {
-        clearTimeout(scrollTimer);
       }
     };
   }, [lastArticleCount, selectedCategory]);
@@ -312,16 +209,8 @@ export default function App({ currentUser, onLogout }: AppProps) {
 
   // Reset current index when filtered news changes
   useEffect(() => {
-    if (filteredNews.length > 0) {
-      if (currentIndex >= filteredNews.length) {
-        setCurrentIndex(0);
-        // Ensure we scroll to the first article
-        setTimeout(() => {
-          if (scrollViewRef.current) {
-            scrollViewRef.current.scrollTo({ y: 0, animated: false });
-          }
-        }, 100);
-      }
+    if (filteredNews.length > 0 && currentIndex >= filteredNews.length) {
+      setCurrentIndex(0);
     }
   }, [filteredNews.length, currentIndex]);
 
@@ -339,9 +228,9 @@ export default function App({ currentUser, onLogout }: AppProps) {
         try {
           const profile = await authService.getUserProfile(currentUser.uid);
           setUserProfile(profile);
-            if (__DEV__) console.log('[SUCCESS] User profile loaded:', profile);
+          console.log('✅ User profile loaded:', profile);
         } catch (error) {
-          console.error('[ERROR] Error loading user profile:', error);
+          console.error('❌ Error loading user profile:', error);
           setUserProfile(null);
           // Only show alert for critical profile loading errors
           Alert.alert('Profile Error', 'Unable to load your profile. Some features may be limited.');
@@ -364,71 +253,11 @@ export default function App({ currentUser, onLogout }: AppProps) {
     }
   };
 
-  // Show toast helper
-  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    setToast({ visible: true, message, type });
-  };
-
-  // Hide toast
-  const hideToast = () => {
-    setToast(prev => ({ ...prev, visible: false }));
-  };
-
-  // Retry function for error boundary
-  const handleRetry = () => {
-    setError(null);
-    setIsInitialLoading(true);
-    
-    // Retry Firebase connection
-    firebaseNewsService.getArticles()
-      .then((articles) => {
-        setNewsData(articles);
-        applyFilter(articles, selectedCategory);
-        setIsInitialLoading(false);
-        showToast('Successfully reconnected!', 'success');
-      })
-      .catch((error) => {
-        console.error('Retry failed:', error);
-        setError('Still unable to connect. Please check your internet and try again.');
-        setIsInitialLoading(false);
-      });
-  };
-
-  // Scroll to top function
-  const scrollToTop = () => {
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ y: 0, animated: true });
-      setCurrentIndex(0);
-      showToast('Scrolled to top!', 'info');
-    }
-  };
-
-  // Navigate to specific article function with perfect alignment
-  const scrollToArticle = (index: number) => {
-    if (scrollViewRef.current && index >= 0 && index < filteredNews.length) {
-      const articleHeight = screenData.height - 80;
-      const targetY = index * articleHeight;
-      scrollViewRef.current.scrollTo({ y: targetY, animated: true });
-      setCurrentIndex(index);
-    }
-  };
-
-  // Force snap to current or nearest article (utility function)
-  const forceSnapToArticle = () => {
-    if (scrollViewRef.current) {
-      const articleHeight = screenData.height - 80;
-      const targetY = currentIndex * articleHeight;
-      scrollViewRef.current.scrollTo({ y: targetY, animated: true });
-    }
-  };
-
-  // Enhanced snap function to prevent middle stops
   // Handle category selection
   const handleCategorySelect = (category: string | null) => {
     setSelectedCategory(category);
     applyFilter(newsData, category);
     setCurrentIndex(0);
-    // Use the new scroll function for perfect alignment
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ y: 0, animated: true });
     }
@@ -441,11 +270,10 @@ export default function App({ currentUser, onLogout }: AppProps) {
       const articles = await firebaseNewsService.getArticles();
       setNewsData(articles);
       applyFilter(articles, selectedCategory);
-  if (__DEV__) console.log('🔄 Refreshed articles:', articles.length);
-      showToast('Articles refreshed successfully!', 'success');
+      console.log('🔄 Refreshed articles:', articles.length);
     } catch (error) {
       console.error('Error refreshing articles:', error);
-      showToast('Failed to refresh articles', 'error');
+      Alert.alert('Error', 'Failed to refresh articles');
     }
     setRefreshing(false);
   };
@@ -467,65 +295,23 @@ export default function App({ currentUser, onLogout }: AppProps) {
     }
   };
 
-  const handleMainLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (onLogout) {
-                await onLogout();
-                showToast('Logged out successfully', 'success');
-              } else {
-                showToast('Logout function not available', 'error');
-              }
-            } catch (error: any) {
-              console.error('[ERROR] Main logout error:', error);
-              showToast('Failed to logout', 'error');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleAdminLogout = async () => {
-    try {
-      if (onLogout) {
-        await onLogout();
-  if (__DEV__) console.log('[SUCCESS] Admin logout completed');
-      } else {
-        showToast('Logout function not available', 'error');
-      }
-    } catch (error: any) {
-      console.error('[ERROR] Admin logout error:', error);
-      showToast('Failed to logout', 'error');
-    }
+  const handleAdminLogout = () => {
     setAdminVisible(false);
   };
 
-  const toggleBookmark = (id: string | number) => {
-    const key = String(id);
-    const updatedBookmarks = bookmarkedItems.includes(key)
-      ? bookmarkedItems.filter(item => item !== key)
-      : [...bookmarkedItems, key];
-
-    setBookmarkedItems(updatedBookmarks);
-    saveBookmarks(updatedBookmarks); // Persist to storage
-
-    const article = newsData.find(item => String(item.id) === key);
+  const toggleBookmark = (id: number) => {
+    setBookmarkedItems(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id)
+        : [...prev, id]
+    );
+    
+    const article = newsData.find(item => item.id === id);
     if (article) {
-      const isBookmarking = !bookmarkedItems.includes(key);
-      showToast(
-        isBookmarking
-          ? `[SAVED] "${article.headline}" bookmarked!`
-          : `[REMOVED] Bookmark removed`,
-        isBookmarking ? 'success' : 'info'
+      const isBookmarking = !bookmarkedItems.includes(id);
+      Alert.alert(
+        isBookmarking ? 'Bookmarked!' : 'Removed from bookmarks',
+        `"${article.headline}" ${isBookmarking ? 'saved for later reading' : 'removed from your bookmarks'}`
       );
     }
   };
@@ -536,9 +322,8 @@ export default function App({ currentUser, onLogout }: AppProps) {
         message: `${article.headline}\n\n${article.description}\n\nShared via YuvaUpdate`,
         title: article.headline,
       });
-      showToast('Article shared successfully! 📤', 'success');
     } catch (error) {
-      showToast('Could not share article', 'error');
+      Alert.alert('Error', 'Could not share article');
     }
   };
 
@@ -554,53 +339,76 @@ export default function App({ currentUser, onLogout }: AppProps) {
   };
 
   const handleAddNews = (newArticle: Omit<NewsArticle, 'id' | 'timestamp'>) => {
-  if (__DEV__) console.log('🔄 Starting to add article:', newArticle);
-  if (__DEV__) console.log('🔄 Platform:', Platform.OS);
-  if (__DEV__) console.log('User Agent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A');
+    console.log('🔄 Starting to add article:', newArticle);
+    console.log('🔄 Platform:', Platform.OS);
+    console.log('User Agent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A');
     
-    // Return the promise so callers can await and handle errors
-    return firebaseNewsService.addArticle(newArticle)
+    // Add to Firebase
+    firebaseNewsService.addArticle(newArticle)
       .then((docId: string) => {
-  if (__DEV__) console.log('[SUCCESS] Article added to Firebase with ID:', docId);
-        showToast('📰 News article added successfully!', 'success');
-        return docId;
+        console.log('✅ Article added to Firebase with ID:', docId);
+        Alert.alert('Success', 'News article added successfully!');
       })
       .catch((error: any) => {
-        console.error('[ERROR] Detailed Error adding article:', error);
-        console.error('[ERROR] Error code:', error.code);
-        console.error('[ERROR] Error message:', error.message);
-        console.error('[ERROR] Error stack:', error.stack);
-        console.error('[ERROR] Platform:', Platform.OS);
-
-        // Re-throw so callers can react
-        throw error;
+        console.error('❌ Detailed Error adding article:', error);
+        console.error('❌ Error code:', error.code);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Error stack:', error.stack);
+        console.error('❌ Platform:', Platform.OS);
+        
+        let errorMessage = 'Failed to add article';
+        
+        // Platform-specific error handling
+        if (Platform.OS === 'web') {
+          errorMessage += '\n\n🌐 Web Platform Issue:';
+          if (error.code === 'permission-denied') {
+            errorMessage += '\n• Check Firestore rules';
+            errorMessage += '\n• Verify web domain in Firebase settings';
+          } else if (error.message?.includes('CORS')) {
+            errorMessage += '\n• CORS policy blocking request';
+            errorMessage += '\n• Check Firebase domain configuration';
+          } else if (error.message?.includes('network')) {
+            errorMessage += '\n• Network connectivity issue';
+            errorMessage += '\n• Check internet connection';
+          }
+          errorMessage += '\n\n💡 Try opening browser console (F12) for more details';
+        } else {
+          errorMessage += '\n\n📱 Mobile Platform Issue:';
+          if (error.code) {
+            errorMessage += `\nError: ${error.code}`;
+          }
+        }
+        
+        if (error.message) {
+          errorMessage += `\nDetails: ${error.message}`;
+        }
+        
+        Alert.alert('Error', errorMessage);
       });
   };
 
   const handleBulkAddNews = (articles: NewsArticle[]) => {
-    // Return the promise so callers can await completion
-    return Promise.all(
+    // Add multiple articles to Firebase
+    Promise.all(
       articles.map(article => 
         firebaseNewsService.addArticle({
           headline: article.headline,
           description: article.description,
           image: article.image,
           category: article.category,
-          readTime: article.readTime,
-          sourceUrl: article.sourceUrl
+          readTime: article.readTime
         })
       )
     ).then(() => {
-  if (__DEV__) console.log('[SUCCESS] Bulk articles added to Firebase');
-      showToast(`📚 ${articles.length} articles added successfully!`, 'success');
+      console.log('✅ Bulk articles added to Firebase');
+      Alert.alert('Success', `${articles.length} articles added successfully!`);
     }).catch((error: any) => {
-      console.error('[ERROR] Error adding bulk articles:', error);
-      showToast('Failed to add some articles', 'error');
-      throw error;
+      console.error('❌ Error adding bulk articles:', error);
+      Alert.alert('Error', 'Failed to add some articles');
     });
   };
 
-  const openArticleModal = (article: NewsArticle) => {
+  const handleArticlePress = (article: NewsArticle) => {
     setSelectedArticle(article);
     setArticleModalVisible(true);
   };
@@ -611,139 +419,134 @@ export default function App({ currentUser, onLogout }: AppProps) {
   };
 
   const renderNewsCard = (article: NewsArticle, index: number) => {
-  const isBookmarked = bookmarkedItems.includes(String(article.id));
-    const cardHeight = screenData.height - 80; // Account for status bar
-    const imageHeight = cardHeight * 0.42; // 42% of screen height
+    const isBookmarked = bookmarkedItems.includes(article.id);
     
     return (
-      <View key={`${article.id}-${index}`} style={[styles.inshortsCard, { height: cardHeight }]}>
-        {/* Main Card Container */}
-        <View style={styles.inshortsCardContainer}>
-          {/* Top Image Section */}
-          <TouchableOpacity 
-            style={[styles.inshortsImageContainer, { height: imageHeight }]}
-            onPress={() => openArticleModal(article)}
-            activeOpacity={0.9}
-          >
-            <Image
-              source={{ uri: article.image || 'https://via.placeholder.com/400x200?text=News' }}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
+      <View key={article.id} style={[
+        styles.cardContainer, 
+        { 
+          backgroundColor: currentTheme.surface,
+          height: screenData.height - 80 // Full screen height for reels-style
+        }
+      ]}>
+        {/* Full-screen Reels-style Layout */}
+        <View style={styles.reelsCard}>
+          {/* Large Background Image */}
+          <View style={styles.fullImageContainer}>
+            {article.mediaType === 'video' ? (
+              <VideoPlayerComponent
+                videoUrl={article.image}
+                style={styles.fullScreenImage}
+                showControls={true}
+                autoPlay={false}
+              />
+            ) : (
+              <Image 
+                source={{ uri: article.image }} 
+                style={styles.fullScreenImage}
+                resizeMode="cover"
+                onError={(error) => console.log('Image loading error:', error)}
+                onLoad={() => console.log('Image loaded successfully:', article.image)}
+              />
+            )}
             
-            {/* Bookmark overlay removed from front page; saving is available inside article modal */}
-          </TouchableOpacity>
-          
-          {/* Content Section */}
-          <TouchableOpacity 
-            style={styles.contentSection}
-            onPress={() => openArticleModal(article)}
-            activeOpacity={0.9}
-          >
-            {/* Headline */}
-            <Text style={styles.inshortsHeadline} numberOfLines={2}>
-              {article.headline}
-            </Text>
-            
-            {/* Description */}
-            <Text style={styles.inshortsDescription} numberOfLines={4}>
-              {article.description || 'No description available.'}
-            </Text>
-            
-            {/* Metadata Row */}
-            <View style={styles.metadataRow}>
-              <Text style={styles.metadataText}>
-                {article.timestamp} • {article.readTime} • {article.category}
-              </Text>
+            {/* Category Badge */}
+            <View style={styles.reelsCategoryBadge}>
+              <Text style={styles.reelsCategoryText}>{article.category}</Text>
             </View>
-          </TouchableOpacity>
-          
-          {/* Share Icon */}
-          <TouchableOpacity
-            style={styles.shareIcon}
-            onPress={() => shareArticle(article)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.shareText}>📤</Text>
-          </TouchableOpacity>
+            
+            {/* Video Badge for videos */}
+            {article.mediaType === 'video' && (
+              <View style={styles.reelsVideoBadge}>
+                <Text style={styles.reelsVideoBadgeText}>VIDEO</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Content Overlay at Bottom */}
+          <View style={styles.contentOverlay}>
+            <TouchableOpacity 
+              onPress={() => handleArticlePress(article)}
+              activeOpacity={0.7}
+              style={styles.contentTouchArea}
+            >
+              {/* Headline */}
+              <Text style={[styles.reelsHeadline, { color: '#FFFFFF' }]} numberOfLines={3}>
+                {article.headline}
+              </Text>
+              
+              {/* Short summary */}
+              <Text style={[styles.reelsDescription, { color: 'rgba(255,255,255,0.9)' }]} numberOfLines={2}>
+                {article.description.length > 100 
+                  ? article.description.substring(0, 100) + "..."
+                  : article.description
+                }
+              </Text>
+              
+              {/* Meta Information */}
+              <View style={styles.reelsMetaContainer}>
+                <Text style={[styles.reelsMetaText, { color: 'rgba(255,255,255,0.8)' }]}>
+                  {article.readTime}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* "Tap to know more" Section */}
+            <TouchableOpacity 
+              style={styles.reelsTapButton}
+              onPress={() => handleArticlePress(article)}
+            >
+              <Text style={styles.reelsTapText}>
+                Tap to know more
+              </Text>
+              <Text style={styles.reelsTapIcon}>
+                →
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
   };
 
-  // compute a responsive vertical offset for the floating category indicator
-  const indicatorTop = Math.round(screenData.height * 0.13);
-
   return (
-    <ErrorBoundary error={error} onRetry={handleRetry}>
-      <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
-        <StatusBar 
-          barStyle={isDarkMode ? "light-content" : "dark-content"}
-          backgroundColor={currentTheme.headerBg}
-          translucent={false}
-        />
-        
-        {/* Swipe Indicator */}
-        <SwipeIndicator 
-          visible={swipeIndicator.visible} 
-          direction={swipeIndicator.direction} 
-        />
+    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
+      <StatusBar 
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
+        backgroundColor={currentTheme.headerBg}
+        translucent={false}
+      />
       {/* Header */}
-      <View style={[
-        styles.header,
-        {
-          backgroundColor: currentTheme.headerBg,
-          borderBottomColor: currentTheme.border,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 6,
-          elevation: 3,
-        }
-      ]}>
-          <View style={styles.headerLeft}>
-          <View style={styles.headerLogoContainer}>
-            <Image source={require('./assets/yuvaupdate.png')} style={styles.headerLogo} accessibilityLabel="YuvaUpdate logo" />
+      <View style={[styles.header, { backgroundColor: currentTheme.headerBg, borderBottomColor: currentTheme.border }]}>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.headerTitle, { color: currentTheme.text }]}>YuvaUpdate</Text>
+          {/* Auto-refresh indicator */}
+          <View style={styles.autoRefreshIndicator}>
+            <Text style={[styles.autoRefreshText, { color: currentTheme.accent }]}>
+              {autoRefreshing ? 'Refreshing...' : 'Auto-refresh'}
+            </Text>
           </View>
-          <View style={[styles.headerPill, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}> 
-            <Text style={[styles.headerPillText, { color: currentTheme.text }]}>YuvaUpdate</Text>
-          </View>
-          {/* Auto-refresh indicator - render only when active to avoid an empty blue pill */}
-          {autoRefreshing && (
-            <View style={styles.autoRefreshIndicator}>
-              <LoadingSpinner size="small" color={currentTheme.text} />
-            </View>
-          )}
         </View>
         <View style={styles.headerButtons}>
           <TouchableOpacity 
-            style={[styles.menuButton, { backgroundColor: isDarkMode ? currentTheme.surface : currentTheme.accent, borderRadius: 10, paddingHorizontal: 12 }]}
+            style={[styles.menuButton, { backgroundColor: currentTheme.accent }]}
             onPress={() => setSidebarVisible(true)}
           >
-            <Text style={[styles.menuButtonText, { color: isDarkMode ? currentTheme.text : '#FFFFFF' }]}>≡</Text>
+            <Text style={[styles.menuButtonText, { color: '#FFFFFF' }]}>≡</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.themeButton, { backgroundColor: currentTheme.surface, borderRadius: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: currentTheme.border }]}
+            style={[styles.themeButton, { backgroundColor: currentTheme.accent }]}
             onPress={() => setIsDarkMode(!isDarkMode)}
           >
-            <Text style={[styles.themeButtonText, { color: currentTheme.text }]}>{isDarkMode ? '☀' : '☽'}</Text>
+            <Text style={[styles.themeButtonText, { color: '#FFFFFF' }]}>{isDarkMode ? '☀' : '☽'}</Text>
           </TouchableOpacity>
-          {/* Logout Button - Always visible for authenticated users */}
-          {currentUser && (
-            <TouchableOpacity 
-              style={[styles.logoutButton, { backgroundColor: '#dc2626', borderRadius: 10, paddingHorizontal: 14 }]}
-              onPress={handleMainLogout}
-            >
-              <Text style={[styles.logoutButtonText, { color: '#FFFFFF', fontWeight: '700' }]}>Logout</Text>
-            </TouchableOpacity>
-          )}
           {/* Admin Button - Only visible for admin users */}
           {userProfile && authService.isAdminUser(userProfile) && (
             <TouchableOpacity 
-              style={[styles.adminButton, { backgroundColor: isDarkMode ? currentTheme.surface : currentTheme.accent }]}
+              style={[styles.adminButton, { backgroundColor: currentTheme.accent }]}
               onPress={handleAdminAccess}
             >
-              <Text style={[styles.adminButtonText, { color: isDarkMode ? currentTheme.text : '#FFFFFF' }]}> 
+              <Text style={[styles.adminButtonText, { color: '#FFFFFF' }]}>
                 Admin
               </Text>
             </TouchableOpacity>
@@ -751,23 +554,91 @@ export default function App({ currentUser, onLogout }: AppProps) {
         </View>
       </View>
 
-      {/* Instagram Reels-like Feed - NEW IMPLEMENTATION */}
-      <NewsFeed
-        articles={filteredNews}
-        onRefresh={onRefresh}
-        refreshing={refreshing}
-        onBookmarkToggle={toggleBookmark}
-        bookmarkedArticles={new Set(bookmarkedItems)}
-  isDarkMode={isDarkMode}
-  immersive={true}
-  onCategoryBarLayout={({ y, height }) => {
-    // compute bottom position of the bar (y is relative to the feed's root).
-    // store it so the App can position the modal/pill directly below it.
-    setCategoryBarBottom(y + height);
-  }}
-      />
+      {/* Instagram-like Vertical Scroll Feed */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        pagingEnabled={true}
+        snapToInterval={screenData.height - 80}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={currentTheme.accent}
+            colors={[currentTheme.accent]}
+          />
+        }
+        onScroll={(event) => {
+          // Real-time scroll tracking for smoother dot updates
+          const scrollY = event.nativeEvent.contentOffset.y;
+          const screenHeight = screenData.height - 80;
+          const newIndex = Math.round(scrollY / screenHeight);
+          
+          if (newIndex !== currentIndex && newIndex >= 0 && newIndex < filteredNews.length) {
+            console.log(`Scroll: ${scrollY}px, Screen: ${screenHeight}px, Index: ${currentIndex} → ${newIndex}, Total: ${filteredNews.length}`);
+            setCurrentIndex(newIndex);
+          }
+        }}
+        onMomentumScrollEnd={(event) => {
+          // Final scroll position tracking
+          const scrollY = event.nativeEvent.contentOffset.y;
+          const screenHeight = screenData.height - 80;
+          const newIndex = Math.round(scrollY / screenHeight);
+          const finalIndex = Math.max(0, Math.min(newIndex, filteredNews.length - 1));
+          console.log(`Scroll End: ${scrollY}px, Screen: ${screenHeight}px, Final Index: ${finalIndex}, Total: ${filteredNews.length}`);
+          setCurrentIndex(finalIndex);
+        }}
+        scrollEventThrottle={16}
+      >
+        {filteredNews.length === 0 ? (
+          <View style={[styles.emptyContainer, { height: screenData.height - 80 }]}>
+            <Text style={[styles.emptyText, { color: currentTheme.text }]}>
+              {selectedCategory ? `No articles found in "${selectedCategory}" category` : 'No articles available'}
+            </Text>
+            <Text style={[styles.emptySubtext, { color: currentTheme.subText }]}>
+              Pull down to refresh or check your internet connection
+            </Text>
+          </View>
+        ) : (
+          filteredNews.map((article, index) => renderNewsCard(article, index))
+        )}
+      </ScrollView>
 
-  {/* Category indicator removed per user request */}
+      {/* Page Indicator */}
+      <View style={[styles.pageIndicator, { backgroundColor: 'rgba(0,0,0,0.1)' }]}>
+        {filteredNews.map((_, index) => {
+          const isActive = index === currentIndex;
+          return (
+            <View
+              key={index}
+              style={[
+                styles.dot,
+                { 
+                  backgroundColor: isActive
+                    ? currentTheme.accent 
+                    : isDarkMode 
+                      ? 'rgba(255,255,255,0.4)' 
+                      : 'rgba(0,0,0,0.3)',
+                  transform: [{ scale: isActive ? 1.2 : 1 }]
+                }
+              ]}
+            />
+          );
+        })}
+      </View>
+
+      {/* Category Filter Indicator */}
+      {selectedCategory && (
+        <View style={[styles.categoryIndicator, { backgroundColor: currentTheme.accent }]}>
+          <Text style={styles.categoryIndicatorText}>📁 {selectedCategory}</Text>
+          <TouchableOpacity onPress={() => handleCategorySelect(null)}>
+            <Text style={styles.categoryIndicatorClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Bottom Navigation Hint - Hidden as requested */}
       {/* 
@@ -780,7 +651,7 @@ export default function App({ currentUser, onLogout }: AppProps) {
       <Sidebar
         visible={sidebarVisible}
         onClose={() => setSidebarVisible(false)}
-  bookmarkedArticles={newsData.filter(article => bookmarkedItems.includes(String(article.id)))}
+        bookmarkedArticles={newsData.filter(article => bookmarkedItems.includes(article.id))}
         onCategorySelect={handleCategorySelect}
         onArticleSelect={(article) => {
           setSelectedArticle(article);
@@ -806,21 +677,11 @@ export default function App({ currentUser, onLogout }: AppProps) {
       <Modal
         visible={articleModalVisible}
         animationType="slide"
-        presentationStyle="fullScreen"
+        presentationStyle="pageSheet"
         onRequestClose={closeArticleModal}
-        statusBarTranslucent={false}
-        supportedOrientations={['portrait']}
-        hardwareAccelerated={true}
-        transparent={false}
       >
-        <View style={[styles.modalContainer, { backgroundColor: currentTheme.background }]}>
-          <SafeAreaView style={{ flex: 1 }}>
-            <StatusBar 
-              barStyle={isDarkMode ? "light-content" : "dark-content"}
-              backgroundColor={currentTheme.headerBg}
-              translucent={false}
-            />
-            {/* Modal Header */}
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: currentTheme.background }]}>
+          {/* Modal Header */}
           <View style={[styles.modalHeader, { backgroundColor: currentTheme.headerBg, borderBottomColor: currentTheme.border }]}>
             <TouchableOpacity onPress={closeArticleModal} style={styles.closeButton}>
               <Text style={[styles.closeButtonText, { color: currentTheme.text }]}>✕</Text>
@@ -875,6 +736,20 @@ export default function App({ currentUser, onLogout }: AppProps) {
                     {selectedArticle.description}
                   </Text>
 
+                  {/* Extended content for a more realistic article view */}
+                  <Text style={[styles.modalDescription, { color: currentTheme.text }]}>
+                    {'\n'}This story continues to develop as more information becomes available. 
+                    Our team of journalists is working around the clock to bring you the most 
+                    accurate and up-to-date information on this important topic.
+                    {'\n\n'}
+                    The implications of this development could be far-reaching, affecting various 
+                    sectors and communities. Experts are analyzing the situation and providing 
+                    insights into what this means for the future.
+                    {'\n\n'}
+                    Stay tuned for more updates as this story unfolds. We will continue to monitor 
+                    the situation and provide comprehensive coverage of all related developments.
+                  </Text>
+
                   {/* Add extra space at bottom so content doesn't get hidden behind fixed buttons */}
                   <View style={{ height: 100 }} />
                 </View>
@@ -891,29 +766,9 @@ export default function App({ currentUser, onLogout }: AppProps) {
               </View>
             </View>
           )}
-          </SafeAreaView>
-        </View>
+        </SafeAreaView>
       </Modal>
-      
-      {/* Toast Notifications */}
-      <Toast
-        message={toast.message}
-        type={toast.type}
-        visible={toast.visible}
-        onHide={hideToast}
-      />
-
-      {/* Floating Action Button - Scroll to Top */}
-      <FloatingActionButton
-        onPress={scrollToTop}
-        icon="↑"
-        visible={showScrollToTop}
-        backgroundColor={currentTheme.accent}
-        bottom={120}
-        right={20}
-      />
     </SafeAreaView>
-    </ErrorBoundary>
   );
 }
 
@@ -922,7 +777,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-  backgroundColor: '#f5f5f5', // Light gray background for Inshorts style
+    backgroundColor: '#000000',
     margin: 0,
     padding: 0,
   },
@@ -930,49 +785,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 8,
-     borderBottomWidth: 1,
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.1,
-     shadowRadius: 4,
-     elevation: 3,
-   },
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
     letterSpacing: 0.3,
-  },
-  headerLogo: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain'
-  },
-  headerLogoContainer: {
-    backgroundColor: '#FFFFFF',
-    padding: 4,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 4,
-    marginRight: 8,
-  },
-  headerPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    alignSelf: 'center',
-    marginRight: 8,
-  },
-  headerPillText: {
-    fontSize: 14,
-    fontWeight: '700',
   },
   headerButtons: {
     flexDirection: 'row',
@@ -983,7 +809,7 @@ const styles = StyleSheet.create({
   },
   themeButton: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 8,
     minWidth: 40,
     alignItems: 'center',
@@ -994,7 +820,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   themeButtonText: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '600',
   },
   adminButton: {
@@ -1012,36 +838,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  logoutButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginLeft: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  logoutButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     flex: 2,
   },
   autoRefreshIndicator: {
     backgroundColor: 'rgba(37, 99, 235, 0.1)',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(37, 99, 235, 0.2)',
-    marginLeft: 6,
-    marginTop: 0,
+    marginTop: 2,
   },
   autoRefreshText: {
     fontSize: 8,
@@ -1051,12 +860,12 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
     marginTop: 0,
-    paddingTop: 0,
+    paddingTop: 8,
     width: '100%',
     overflow: 'hidden',
   },
   cardContainer: {
-    marginBottom: 0,
+    marginBottom: 8,
     display: 'flex',
     flexDirection: 'column',
     borderRadius: 0,
@@ -1122,6 +931,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 34,
     letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   description: {
     fontSize: 16, // Increased from 15 to 16
@@ -1295,7 +1107,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 20, // Add bottom padding for safe area
     borderTopWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
@@ -1323,8 +1134,26 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  /* page indicator removed; feed now renders its own progress UI */
+  pageIndicator: {
+    position: 'absolute',
+    right: 15,
+    top: '50%',
+    transform: [{ translateY: -50 }],
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginVertical: 5,
+  },
   bottomHint: {
     position: 'absolute',
     bottom: 30,
@@ -1404,9 +1233,6 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
-    width: '100%',
-    height: '100%',
-    position: 'relative',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1572,7 +1398,7 @@ const styles = StyleSheet.create({
   },
   menuButtonText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   // Empty State Styles
@@ -1596,7 +1422,7 @@ const styles = StyleSheet.create({
   // Category Indicator Styles
   categoryIndicator: {
     position: 'absolute',
-    top: 200,
+    top: 120,
     left: 20,
     right: 20,
     flexDirection: 'row',
@@ -1605,8 +1431,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
-    zIndex: 999,
-    elevation: 12, // Android stacking
+    zIndex: 10,
   },
   categoryIndicatorText: {
     color: '#ffffff',
@@ -1651,22 +1476,6 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
-  reelsHeaderSection: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 16,
-    paddingTop: 20,
-  },
-  reelsHeaderTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    lineHeight: 26,
-    marginTop: 12,
-  },
   fullImageContainer: {
     flex: 1,
     position: 'relative',
@@ -1679,12 +1488,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   reelsCategoryBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.9)',
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    backgroundColor: 'rgba(0,0,0,0.8)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 4,
+    borderRadius: 20,
   },
   reelsCategoryText: {
     color: '#FFFFFF',
@@ -1693,12 +1503,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   reelsVideoBadge: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
     backgroundColor: 'rgba(220, 38, 38, 0.9)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-end',
-    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   reelsVideoBadgeText: {
     color: '#FFFFFF',
@@ -1710,18 +1521,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     padding: 20,
     paddingBottom: 30,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 10,
   },
   contentTouchArea: {
     marginBottom: 16,
@@ -1776,144 +1578,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     // @ts-ignore - React Native Web supports CSS shadow
     textShadow: '1px 1px 3px rgba(0,0,0,0.8)',
-  },
-  // Tap Overlay Styles
-  tapOverlay: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -75 }, { translateY: -30 }],
-    zIndex: 10,
-  },
-  tapIndicator: {
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    borderRadius: 25,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
-    shadowColor: '#fff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 15,
-  },
-  tapIndicatorIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  tapIndicatorText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    marginRight: 12,
-    letterSpacing: 0.5,
-  },
-  tapIndicatorArrow: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#fff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  tapArrowText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  
-  // Inshorts-style Card Styles
-  inshortsCard: {
-    paddingHorizontal: 16, // 32px margin total (16px each side)
-    paddingVertical: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  inshortsCardContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    overflow: 'hidden',
-    width: '100%',
-    flex: 1,
-    maxHeight: '90%',
-  },
-  
-  inshortsImageContainer: {
-    position: 'relative',
-    width: '100%',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    overflow: 'hidden',
-  },
-  
-  cardImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f5f5f5',
-  },
-  
-  
-  contentSection: {
-    padding: 16,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  
-  inshortsHeadline: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    lineHeight: 26,
-    marginBottom: 8,
-  },
-  
-  inshortsDescription: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: '#666666',
-    lineHeight: 22,
-    marginBottom: 12,
-    flex: 1,
-  },
-  
-  metadataRow: {
-    marginTop: 'auto',
-  },
-  
-  metadataText: {
-    fontSize: 12,
-    color: '#999999',
-    fontWeight: '400',
-  },
-  
-  shareIcon: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  shareText: {
-    fontSize: 18,
   },
 });

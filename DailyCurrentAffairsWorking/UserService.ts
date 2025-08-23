@@ -42,7 +42,7 @@ export interface UserPreferences {
 
 class UserService {
   // Bookmark/Unbookmark article
-  async toggleBookmark(userId: string, articleId: string | number): Promise<boolean> {
+  async toggleBookmark(userId: string, articleId: number): Promise<boolean> {
     try {
       const bookmarkId = `${userId}_${articleId}`;
       const bookmarkRef = doc(db, 'bookmarks', bookmarkId);
@@ -109,7 +109,7 @@ class UserService {
   }
 
   // Check if article is bookmarked
-  async isArticleBookmarked(userId: string, articleId: string | number): Promise<boolean> {
+  async isArticleBookmarked(userId: string, articleId: string): Promise<boolean> {
     try {
       const q = query(
         collection(db, 'bookmarks'),
@@ -197,7 +197,7 @@ class UserService {
   }
 
   // Track article read
-  async trackArticleRead(userId: string, articleId: string | number): Promise<void> {
+  async trackArticleRead(userId: string, articleId: string): Promise<void> {
     try {
       const readId = `${userId}_${articleId}`;
       await setDoc(doc(db, 'readArticles', readId), {

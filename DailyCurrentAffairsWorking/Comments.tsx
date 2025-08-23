@@ -2,27 +2,17 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Modal,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   FlatList,
-  TextInput,
+  Alert,
   ActivityIndicator,
-  Animated
+  Modal
 } from 'react-native';
-import { NewsArticle } from './types';
-
-interface Comment {
-  id: string;
-  articleId: number;
-  userId: string;
-  userName: string;
-  content: string;
-  parentId?: string | null;
-  likedBy: string[];
-  replies?: Comment[];
-}
+import { commentService } from './CommentService';
+import { authService } from './AuthService';
+import { Comment, NewsArticle } from './types';
 
 interface CommentsProps {
   article: NewsArticle;
@@ -30,9 +20,6 @@ interface CommentsProps {
   onClose: () => void;
   currentUser?: any;
 }
-
-// Animated wrapper for FlatList to safely support native driver onScroll when used elsewhere
-const AnimatedFlatList = Animated.createAnimatedComponent(FlatList as any);
 
 export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, currentUser: propCurrentUser }) => {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -52,14 +39,20 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
         getCurrentUser();
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, article.id, propCurrentUser]);
 
   const loadComments = async () => {
     setLoading(true);
     try {
-      setComments([]);
-      setLoading(false);
+      const unsubscribe = commentService.subscribeToComments(
+        article.id,
+        (updatedComments) => {
+          setComments(updatedComments);
+          setLoading(false);
+        }
+      );
+
+      return unsubscribe;
     } catch (error) {
       console.error('Error loading comments:', error);
       setLoading(false);
@@ -68,7 +61,8 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
 
   const getCurrentUser = async () => {
     try {
-      // placeholder
+      const user = await authService.getCurrentUser();
+      setCurrentUser(user);
     } catch (error) {
       console.error('Error getting current user:', error);
     }
@@ -87,6 +81,14 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
 
     setSubmitting(true);
     try {
+      await commentService.addComment({
+        articleId: article.id,
+        userId: currentUser.uid,
+        userName: currentUser.displayName || 'Anonymous User',
+        content: newComment.trim(),
+        parentId: replyingTo || undefined
+      });
+
       setNewComment('');
       setReplyingTo(null);
     } catch (error: any) {
@@ -103,7 +105,7 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
     }
 
     try {
-      // placeholder
+      await commentService.likeComment(commentId, currentUser.uid);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to like comment');
     }
@@ -124,7 +126,7 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
           style: 'destructive',
           onPress: async () => {
             try {
-              // placeholder
+              await commentService.deleteComment(commentId, currentUser?.uid || '');
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to delete comment');
             }
@@ -135,17 +137,23 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
   };
 
   const renderComment = ({ item }: { item: Comment }) => {
-    const isLiked = item.likedBy?.includes(currentUser?.uid || '');
+    const isLiked = item.likedBy.includes(currentUser?.uid || '');
     const canDelete = currentUser?.uid === item.userId;
 
     return (
       <View style={[styles.commentContainer, item.parentId && styles.replyContainer]}>
         <View style={styles.commentHeader}>
           <View style={styles.userInfo}>
-            <View style={styles.avatar} />
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {item.userName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
             <View>
               <Text style={styles.userName}>{item.userName}</Text>
-              <Text style={styles.timestamp}>{/* timestamp placeholder */}</Text>
+              <Text style={styles.timestamp}>
+                {new Date(item.timestamp).toLocaleDateString()}
+              </Text>
             </View>
           </View>
           {canDelete && (
@@ -165,7 +173,9 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
             style={[styles.actionButton, isLiked && styles.actionButtonLiked]}
             onPress={() => handleLikeComment(item.id)}
           >
-            <Text style={[styles.actionText, isLiked && styles.actionTextLiked]}>♥</Text>
+            <Text style={[styles.actionText, isLiked && styles.actionTextLiked]}>
+              ♥ {item.likes}
+            </Text>
           </TouchableOpacity>
 
           {!item.parentId && (
@@ -190,7 +200,10 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
             <View style={styles.replyActions}>
               <TouchableOpacity
                 style={styles.cancelReplyButton}
-                onPress={() => { setReplyingTo(null); setNewComment(''); }}
+                onPress={() => {
+                  setReplyingTo(null);
+                  setNewComment('');
+                }}
               >
                 <Text style={styles.cancelReplyText}>Cancel</Text>
               </TouchableOpacity>
@@ -199,7 +212,11 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
                 onPress={handleSubmitComment}
                 disabled={submitting}
               >
-                <Text style={styles.submitReplyText}>Reply</Text>
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitReplyText}>Reply</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -235,9 +252,9 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
           </View>
         ) : (
           <>
-            <AnimatedFlatList
+            <FlatList
               data={comments.filter(comment => !comment.parentId)}
-              keyExtractor={(item: Comment) => item.id}
+              keyExtractor={(item) => item.id}
               renderItem={renderComment}
               style={styles.commentsList}
               contentContainerStyle={styles.commentsContent}
@@ -245,7 +262,7 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>No comments yet</Text>
-                  <Text style={styles.emptySubtext}>Be the first to comment</Text>
+                  <Text style={styles.emptySubtext}>Be the first to share your thoughts!</Text>
                 </View>
               }
             />
@@ -261,18 +278,24 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
                   maxLength={500}
                 />
                 <TouchableOpacity
-                  style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+                  style={[styles.submitButton, !newComment.trim() && styles.submitButtonDisabled]}
                   onPress={handleSubmitComment}
-                  disabled={submitting}
+                  disabled={submitting || !newComment.trim()}
                 >
-                  <Text style={styles.submitButtonText}>{submitting ? 'Posting...' : 'Post'}</Text>
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Post</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             )}
 
             {!currentUser && (
               <View style={styles.loginPrompt}>
-                <Text style={styles.loginPromptText}>Login to post comments</Text>
+                <Text style={styles.loginPromptText}>
+                  Please login to join the conversation
+                </Text>
               </View>
             )}
           </>
@@ -281,7 +304,6 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
     </Modal>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
