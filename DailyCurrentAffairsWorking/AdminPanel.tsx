@@ -27,8 +27,8 @@ const { width } = Dimensions.get('window');
 interface AdminPanelProps {
   visible: boolean;
   onClose: () => void;
-  onAddNews: (article: Omit<NewsArticle, 'id' | 'timestamp'>) => Promise<string | void>;
-  onBulkAddNews?: (articles: NewsArticle[]) => Promise<void>;
+  onAddNews: (article: Omit<NewsArticle, 'id' | 'timestamp'>) => void;
+  onBulkAddNews?: (articles: NewsArticle[]) => void;
   onLogout?: () => void;
   currentUser?: UserProfile | null;
 }
@@ -39,49 +39,19 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   const [imageUrl, setImageUrl] = useState('');
   const [category, setCategory] = useState('');
   const [readTime, setReadTime] = useState('');
-  const [sourceUrl, setSourceUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'api'>('manual');
   
   // File upload states
   const [uploadedMedia, setUploadedMedia] = useState<UploadResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [mediaSource, setMediaSource] = useState<'url' | 'upload'>('url');
 
-  // Category management states
-  const [categories, setCategories] = useState(['Breaking', 'Business', 'Entertainment', 'General', 'Health', 'Science', 'Sports', 'Technology']);
-  const [newCategory, setNewCategory] = useState('');
-  
-  // News management states
-  const [allNews, setAllNews] = useState<NewsArticle[]>([]);
-  const [editingNews, setEditingNews] = useState<NewsArticle | null>(null);
-  const [isLoadingNews, setIsLoadingNews] = useState(false);
+  const categories = ['Breaking', 'Business', 'Entertainment', 'General', 'Health', 'Science', 'Sports', 'Technology'];
 
-  // Load categories from Firebase on component mount
-  React.useEffect(() => {
-    loadCategoriesFromFirebase();
-  }, []);
-
-  const loadCategoriesFromFirebase = async () => {
-    try {
-      const firebaseCategories = await firebaseNewsService.getCategories();
-      setCategories(firebaseCategories);
-    } catch (error) {
-      console.error('Error loading categories from Firebase:', error);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!headline || !description || !category || !sourceUrl) {
-      Alert.alert('Error', 'Please fill in all required fields (Headline, Description, Category, and External Link)');
-      return;
-    }
-
-    // Validate URL format
-    try {
-      new URL(sourceUrl);
-    } catch (error) {
-      Alert.alert('Error', 'Please enter a valid URL for the external link (e.g., https://example.com/article)');
+  const handleSubmit = () => {
+    if (!headline || !description || !category) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -99,157 +69,25 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       image: mediaUrl,
       category,
       readTime: readTime || '2 min read',
-      sourceUrl,
       mediaType: uploadedMedia?.type || 'image', // Add media type info
       mediaPath: uploadedMedia?.path, // Store path for potential deletion
     };
 
-    try {
-      let result;
-      if (editingNews) {
-        // Update existing article
-        await firebaseNewsService.updateArticle(editingNews.id, newArticle);
-        result = editingNews.id;
-        Alert.alert('Success', 'News article updated successfully!');
-      } else {
-        // Add new article
-        result = await onAddNews(newArticle);
-        Alert.alert('Success', 'News article added successfully!');
-      }
-      
-      // Reset form only after successful persistence
-      setHeadline('');
-      setDescription('');
-      setImageUrl('');
-      setCategory('');
-      setReadTime('');
-      setSourceUrl('');
-      setUploadedMedia(null);
-      setMediaSource('url');
-      setEditingNews(null); // Clear editing state
-
-      console.log('AdminPanel: Operation result:', result);
-    } catch (error) {
-      console.error('AdminPanel: Error with article operation:', error);
-      Alert.alert('Error', `Failed to ${editingNews ? 'update' : 'add'} article. See console for details.`);
-    }
-  };
-
-  // Category Management Functions
-  const handleAddCategory = async () => {
-    if (!newCategory.trim()) {
-      Alert.alert('Error', 'Please enter a category name');
-      return;
-    }
-    if (categories.includes(newCategory.trim())) {
-      Alert.alert('Error', 'Category already exists');
-      return;
-    }
+    onAddNews(newArticle);
     
-    try {
-      const updatedCategories = [...categories, newCategory.trim()];
-      await firebaseNewsService.saveCategories(updatedCategories);
-      setCategories(updatedCategories);
-      setNewCategory('');
-      Alert.alert('Success', `Category "${newCategory.trim()}" added successfully!`);
-    } catch (error) {
-      console.error('Error adding category:', error);
-      Alert.alert('Error', 'Failed to add category to Firebase');
-    }
-  };
-
-  const handleRemoveCategory = (categoryToRemove: string) => {
-    Alert.alert(
-      'Confirm Delete',
-      `Are you sure you want to delete the category "${categoryToRemove}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const updatedCategories = categories.filter(cat => cat !== categoryToRemove);
-              await firebaseNewsService.saveCategories(updatedCategories);
-              setCategories(updatedCategories);
-              Alert.alert('Success', `Category "${categoryToRemove}" deleted successfully!`);
-            } catch (error) {
-              console.error('Error removing category:', error);
-              Alert.alert('Error', 'Failed to remove category from Firebase');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  // News Management Functions
-  const loadAllNews = async () => {
-    try {
-      setIsLoadingNews(true);
-      const news = await firebaseNewsService.getArticlesWithDocIds();
-      console.log('Loaded news articles:', news.length);
-      setAllNews(news);
-      
-      if (news.length === 0) {
-        Alert.alert('Info', 'No news articles found in Firebase');
-      } else {
-        Alert.alert('Success', `Loaded ${news.length} news articles successfully!`);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load news articles');
-      console.error('Error loading news:', error);
-    } finally {
-      setIsLoadingNews(false);
-    }
-  };
-
-  const handleEditNews = (article: NewsArticle) => {
-    setEditingNews(article);
-    setHeadline(article.headline);
-    setDescription(article.description);
-    setImageUrl(article.image);
-    setCategory(article.category);
-    setReadTime(article.readTime || '');
-    setSourceUrl(article.sourceUrl || '');
-    setActiveTab('manual');
-    Alert.alert('Info', 'Article loaded for editing. You can now modify it in the "Add News" tab.');
-  };
-
-  const handleDeleteNews = (article: NewsArticle) => {
-    console.log('🗑️ Delete button clicked for article:', article.headline, 'ID:', article.id);
+    // Reset form
+    setHeadline('');
+    setDescription('');
+    setImageUrl('');
+    setCategory('');
+    setReadTime('');
+    setUploadedMedia(null);
+    setMediaSource('url');
     
-    // TEMPORARY: Skip Alert.alert for debugging
-    console.log('🗑️ [DEBUG] Bypassing Alert.alert for testing...');
-    performDelete(article);
+    Alert.alert('Success', 'News article added successfully!');
   };
 
-  const performDelete = async (article: NewsArticle) => {
-    try {
-      console.log('🗑️ Starting delete operation for article ID:', article.id);
-      console.log('🗑️ About to call firebaseNewsService.deleteArticle...');
-      
-      await firebaseNewsService.deleteArticle(article.id);
-      console.log('🗑️ Delete operation completed, reloading articles from Firebase');
-      
-      // Reload articles from Firebase to ensure sync
-      const updatedNews = await firebaseNewsService.getArticlesWithDocIds();
-      setAllNews(updatedNews);
-      
-      Alert.alert('Success', 'News article deleted successfully!');
-      console.log('🗑️ Articles reloaded, current count:', updatedNews.length);
-    } catch (error: any) {
-      console.error('🗑️ Error deleting news:', error);
-      console.error('🗑️ Error details:', {
-        message: error?.message,
-        code: error?.code,
-        stack: error?.stack
-      });
-      Alert.alert('Error', `Failed to delete news article: ${error?.message || 'Unknown error'}`);
-    }
-  };
-
-  const handleQuickAdd = async (type: string) => {
+  const handleQuickAdd = (type: string) => {
     let quickArticle;
     
     switch (type) {
@@ -284,16 +122,10 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     const article = {
       ...quickArticle,
       image: `https://via.placeholder.com/400x300/667eea/ffffff?text=${encodeURIComponent(quickArticle.category)}`,
-      sourceUrl: `https://example.com/news/${quickArticle.headline.replace(/\s+/g, '-').toLowerCase()}`,
     };
 
-    try {
-      await onAddNews(article);
-      Alert.alert('Success', `${type.charAt(0).toUpperCase() + type.slice(1)} news added!`);
-    } catch (error) {
-      console.error('AdminPanel: Quick add failed:', error);
-      Alert.alert('Error', 'Failed to add quick article');
-    }
+    onAddNews(article);
+    Alert.alert('Success', `${type.charAt(0).toUpperCase() + type.slice(1)} news added!`);
   };
 
   // File Upload Functions
@@ -344,13 +176,8 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       const articles = await newsService.fetchLatestNews(category);
       
       if (onBulkAddNews && articles.length > 0) {
-        try {
-          await onBulkAddNews(articles);
-          Alert.alert('Success', `Added ${articles.length} news articles from API!`);
-        } catch (error) {
-          console.error('AdminPanel: Bulk add failed:', error);
-          Alert.alert('Error', 'Failed to add bulk articles. See console for details.');
-        }
+        onBulkAddNews(articles);
+        Alert.alert('Success', `Added ${articles.length} news articles from API!`);
       } else {
         Alert.alert('Info', 'No new articles found for this category. Try a different category or check your internet connection.');
       }
@@ -391,7 +218,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-            <TouchableOpacity 
+          <TouchableOpacity 
             onPress={() => {
               if (onLogout) {
                 Alert.alert(
@@ -406,11 +233,11 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
             }}
             style={styles.logoutButton}
           >
-            <Text style={styles.logoutButtonText}>Logout</Text>
+            <Text style={styles.logoutButtonText}>🔓 Logout</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Admin Panel</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>Close</Text>
+            <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
         </View>
 
@@ -420,28 +247,13 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
             style={[styles.tab, activeTab === 'manual' && styles.activeTab]}
             onPress={() => setActiveTab('manual')}
           >
-            <Text style={[styles.tabText, activeTab === 'manual' && styles.activeTabText]}>Add News</Text>
+            <Text style={[styles.tabText, activeTab === 'manual' && styles.activeTabText]}>Manual Entry</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.tab, activeTab === 'api' && styles.activeTab]}
             onPress={() => setActiveTab('api')}
           >
-            <Text style={[styles.tabText, activeTab === 'api' && styles.activeTabText]}>API Import</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'manage' && styles.activeTab]}
-            onPress={() => {
-              setActiveTab('manage');
-              loadAllNews();
-            }}
-          >
-            <Text style={[styles.tabText, activeTab === 'manage' && styles.activeTabText]}>Manage News</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'categories' && styles.activeTab]}
-            onPress={() => setActiveTab('categories')}
-          >
-            <Text style={[styles.tabText, activeTab === 'categories' && styles.activeTabText]}>Categories</Text>
+            <Text style={[styles.tabText, activeTab === 'api' && styles.activeTabText]}>API Integration</Text>
           </TouchableOpacity>
         </View>
 
@@ -483,9 +295,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                 try {
                   checkStorageConfig();
                   await testFirebaseStorage();
-                  Alert.alert('[SUCCESS]', 'Firebase Storage is working correctly!');
+                  Alert.alert('✅ Success', 'Firebase Storage is working correctly!');
                 } catch (error) {
-                  Alert.alert('[ERROR] Storage Error', 'Firebase Storage is not configured. Please follow the setup guide.');
+                  Alert.alert('❌ Storage Error', 'Firebase Storage is not configured. Please follow the setup guide.');
                 }
               }}
             >
@@ -513,20 +325,16 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
               multiline
             />
 
-            <Text style={styles.label}>Description * (Detailed summary: 300-600 characters recommended)</Text>
+            <Text style={styles.label}>Description *</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Enter comprehensive news summary (300-600 chars recommended)..."
+              placeholder="Enter news description..."
               placeholderTextColor="rgba(255,255,255,0.5)"
               multiline
-              numberOfLines={6}
-              maxLength={800} // Much higher limit for detailed content
+              numberOfLines={4}
             />
-            <Text style={[styles.characterCount, { color: description.length > 600 ? '#ff6b6b' : 'rgba(255,255,255,0.6)' }]}>
-              {description.length}/800 characters
-            </Text>
 
             <Text style={styles.label}>Category *</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
@@ -548,14 +356,14 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
             
             {/* Media Source Toggle */}
             <View style={styles.mediaSourceToggle}>
-                <TouchableOpacity
+              <TouchableOpacity
                 style={[
                   styles.toggleButton,
                   { backgroundColor: mediaSource === 'url' ? '#667eea' : 'rgba(255,255,255,0.1)' }
                 ]}
                 onPress={() => setMediaSource('url')}
               >
-                <Text style={styles.toggleButtonText}>URL</Text>
+                <Text style={styles.toggleButtonText}>🔗 URL</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
@@ -564,7 +372,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                 ]}
                 onPress={() => setMediaSource('upload')}
               >
-                <Text style={styles.toggleButtonText}>Upload</Text>
+                <Text style={styles.toggleButtonText}>📁 Upload</Text>
               </TouchableOpacity>
             </View>
 
@@ -588,7 +396,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                       <ActivityIndicator color="#fff" />
                     ) : (
                       <>
-                        <Text style={styles.uploadButtonText}>Choose Media</Text>
+                        <Text style={styles.uploadButtonText}>📷 Choose Media</Text>
                         <Text style={styles.uploadButtonSubtext}>Images, Videos supported</Text>
                       </>
                     )}
@@ -603,14 +411,14 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                           source={{ uri: uploadedMedia.url }} 
                           style={styles.uploadedVideo}
                         />
-                        <Text style={styles.videoLabel}>Video uploaded</Text>
+                        <Text style={styles.videoLabel}>📹 Video uploaded</Text>
                       </View>
                     )}
-                        <TouchableOpacity
+                    <TouchableOpacity
                       style={styles.removeMediaButton}
                       onPress={handleRemoveUploadedMedia}
                     >
-                      <Text style={styles.removeMediaText}>Remove</Text>
+                      <Text style={styles.removeMediaText}>✕ Remove</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -624,17 +432,6 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
               onChangeText={setReadTime}
               placeholder="2 min read"
               placeholderTextColor="rgba(255,255,255,0.5)"
-            />
-
-            <Text style={styles.label}>External Link (for "Read full story") *</Text>
-            <TextInput
-              style={styles.input}
-              value={sourceUrl}
-              onChangeText={setSourceUrl}
-              placeholder="https://example.com/full-article"
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              autoCapitalize="none"
-              keyboardType="url"
             />
 
             {/* Preview */}
@@ -653,7 +450,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                               source={{ uri: uploadedMedia.url }} 
                               style={styles.previewImage}
                             />
-                            <Text style={styles.videoLabel}>Video Preview</Text>
+                            <Text style={styles.videoLabel}>📹 Video Preview</Text>
                           </View>
                         )
                       ) : (
@@ -680,9 +477,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
             )}
 
             <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-              <Text style={styles.submitButtonText}>
-                {editingNews ? 'Update News' : 'Publish News'}
-              </Text>
+              <Text style={styles.submitButtonText}>Publish News</Text>
             </TouchableOpacity>
           </View>
 
@@ -705,7 +500,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
             </View>
           </View>
           </>
-          ) : activeTab === 'api' ? (
+          ) : (
             // API Integration Tab Content
             <>
               {/* API Integration Section */}
@@ -770,107 +565,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                 </View>
               )}
             </>
-          ) : activeTab === 'manage' ? (
-            // News Management Tab Content
-            <>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Manage Posted News</Text>
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: '#10b981' }]}
-                  onPress={loadAllNews}
-                  disabled={isLoadingNews}
-                >
-                  {isLoadingNews ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.actionButtonText}>Refresh News List</Text>
-                  )}
-                </TouchableOpacity>
-                
-                {isLoadingNews ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#667eea" />
-                    <Text style={styles.loadingText}>Loading news articles...</Text>
-                  </View>
-                ) : allNews.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyStateText}>No news articles found</Text>
-                    <Text style={styles.emptyStateSubtext}>Click "Refresh News List" to load your articles</Text>
-                  </View>
-                ) : (
-                  <ScrollView style={styles.newsList}>
-                    {allNews.map((article, index) => (
-                      <View key={article.id || index} style={styles.newsItem}>
-                        <View style={styles.newsItemHeader}>
-                          <Text style={styles.newsItemTitle} numberOfLines={2}>
-                            {article.headline}
-                          </Text>
-                          <Text style={styles.newsItemCategory}>{article.category}</Text>
-                        </View>
-                        <Text style={styles.newsItemDescription} numberOfLines={3}>
-                          {article.description}
-                        </Text>
-                        <View style={styles.newsItemActions}>
-                          <TouchableOpacity 
-                            style={[styles.newsActionButton, { backgroundColor: '#3b82f6' }]}
-                            onPress={() => handleEditNews(article)}
-                          >
-                            <Text style={styles.newsActionText}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity 
-                            style={[styles.newsActionButton, { backgroundColor: '#ef4444' }]}
-                            onPress={() => handleDeleteNews(article)}
-                          >
-                            <Text style={styles.newsActionText}>Delete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            </>
-          ) : activeTab === 'categories' ? (
-            // Category Management Tab Content
-            <>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Manage Categories</Text>
-                
-                {/* Add New Category */}
-                <View style={styles.categoryInputContainer}>
-                  <TextInput
-                    style={styles.categoryInput}
-                    value={newCategory}
-                    onChangeText={setNewCategory}
-                    placeholder="Enter new category name..."
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                  />
-                  <TouchableOpacity 
-                    style={styles.addCategoryButton}
-                    onPress={handleAddCategory}
-                  >
-                    <Text style={styles.addCategoryText}>Add</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                {/* Current Categories List */}
-                <Text style={[styles.label, { marginTop: 20, marginBottom: 10 }]}>Current Categories:</Text>
-                <ScrollView style={styles.categoriesList}>
-                  {categories.map((cat, index) => (
-                    <View key={index} style={styles.categoryItem}>
-                      <Text style={styles.categoryName}>{cat}</Text>
-                      <TouchableOpacity 
-                        style={styles.removeCategoryButton}
-                        onPress={() => handleRemoveCategory(cat)}
-                      >
-                        <Text style={styles.removeCategoryText}>Remove</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            </>
-          ) : null}
+          )}
         </ScrollView>
       </View>
     </Modal>
@@ -1209,156 +904,6 @@ const styles = StyleSheet.create({
   removeMediaText: {
     color: '#FF3B30',
     fontSize: 12,
-    fontWeight: '600',
-  },
-  characterCount: {
-    fontSize: 11,
-    marginTop: 4,
-    marginBottom: 12,
-    textAlign: 'right',
-    fontWeight: '500',
-  },
-  // News Management Styles
-  newsList: {
-    maxHeight: 400,
-  },
-  newsItem: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  newsItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  newsItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    flex: 1,
-    marginRight: 10,
-  },
-  newsItemCategory: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#667eea',
-    backgroundColor: 'rgba(102, 126, 234, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  newsItemDescription: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  newsItemActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  newsActionButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 6,
-    flex: 1,
-    alignItems: 'center',
-  },
-  newsActionText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  actionButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  actionButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
-    textAlign: 'center',
-  },
-  // Category Management Styles
-  categoryInputContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  categoryInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#ffffff',
-  },
-  addCategoryButton: {
-    backgroundColor: '#10b981',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addCategoryText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  categoriesList: {
-    maxHeight: 300,
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  categoryName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  removeCategoryButton: {
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  removeCategoryText: {
-    color: '#ffffff',
-    fontSize: 14,
     fontWeight: '600',
   },
 });

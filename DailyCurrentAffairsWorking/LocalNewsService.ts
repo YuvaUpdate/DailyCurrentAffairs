@@ -7,14 +7,14 @@ export class LocalNewsService {
   private lastIdKey = 'yuva_update_last_id';
 
   // Generate unique ID
-  private async generateId(): Promise<string> {
+  private async generateId(): Promise<number> {
     try {
       const lastId = await AsyncStorage.getItem(this.lastIdKey);
       const newId = lastId ? parseInt(lastId) + 1 : 1;
       await AsyncStorage.setItem(this.lastIdKey, newId.toString());
-      return newId.toString(); // Return as string
+      return newId;
     } catch (error) {
-      return Date.now().toString(); // Fallback to timestamp as string
+      return Date.now(); // Fallback to timestamp
     }
   }
 
@@ -26,8 +26,8 @@ export class LocalNewsService {
       
       const newArticle: NewsArticle = {
         ...article,
-        id: newId, // newId is now a string
-        timestamp: "Just now" // Use relative time format
+        id: newId,
+        timestamp: new Date().toLocaleDateString()
       };
 
       const updatedArticles = [newArticle, ...articles];
@@ -39,7 +39,7 @@ export class LocalNewsService {
       // Simulate real-time update
       this.notifySubscribers(updatedArticles);
       
-      return newId; // Already a string now
+      return newId.toString();
     } catch (error) {
       console.error('Error adding article:', error);
       throw error;
@@ -125,34 +125,31 @@ export class LocalNewsService {
   private getDefaultArticles(): NewsArticle[] {
     return [
       {
-        id: "1",
+        id: 1,
         headline: "Welcome to YuvaUpdate!",
         description: "Stay updated with the latest news and current affairs. This is your personalized news feed where you can read, save, and share articles that matter to you.",
         image: "https://via.placeholder.com/400x300/667eea/ffffff?text=Welcome",
         category: "General",
         readTime: "2 min read",
-        timestamp: "5 min ago",
-        sourceUrl: "https://yuvaupdate.com/welcome"
+        timestamp: new Date().toLocaleDateString()
       },
       {
-        id: "2",
+        id: 2,
         headline: "How to Use YuvaUpdate",
         description: "Swipe up and down to browse articles. Use the menu (☰) to filter by categories or view your saved articles. Tap the floating buttons to save, share, or listen to articles.",
         image: "https://via.placeholder.com/400x300/4ade80/ffffff?text=Tutorial",
         category: "Tutorial",
         readTime: "3 min read",
-        timestamp: "10 min ago",
-        sourceUrl: "https://yuvaupdate.com/tutorial"
+        timestamp: new Date().toLocaleDateString()
       },
       {
-        id: "3",
+        id: 3,
         headline: "Admin Panel Available",
         description: "Content creators can access the admin panel by tapping the 🔒 Admin button. Use password 'admin123' to add new articles and manage content.",
         image: "https://via.placeholder.com/400x300/f59e0b/ffffff?text=Admin",
         category: "Info",
         readTime: "1 min read",
-        timestamp: "15 min ago",
-        sourceUrl: "https://yuvaupdate.com/admin-guide"
+        timestamp: new Date().toLocaleDateString()
       }
     ];
   }

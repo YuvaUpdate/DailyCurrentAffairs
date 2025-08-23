@@ -5,27 +5,26 @@ import { firebaseNewsService } from './FirebaseNewsService';
 export default function FirebaseTest() {
   const testFirebaseConnection = async () => {
     try {
-      console.log('[TESTING] Testing Firebase connection...');
+      console.log('🔄 Testing Firebase connection...');
       
       const testArticle = {
         headline: 'Test Article',
         description: 'This is a test article to verify Firebase connection',
         image: 'https://via.placeholder.com/400x300/667eea/ffffff?text=Test',
         category: 'General',
-        readTime: '1 min read',
-        sourceUrl: 'https://example.com/test-article'
+        readTime: '1 min read'
       };
       
-      console.log('[TESTING] Attempting to add test article:', testArticle);
+      console.log('🔄 Attempting to add test article:', testArticle);
       
       const docId = await firebaseNewsService.addArticle(testArticle);
       
-      console.log('[SUCCESS] Test article added successfully with ID:', docId);
-      Alert.alert('[SUCCESS]', `Firebase is working! Document ID: ${docId}`);
+      console.log('✅ Test article added successfully with ID:', docId);
+      Alert.alert('✅ Success', `Firebase is working! Document ID: ${docId}`);
       
     } catch (error: any) {
-      console.error('[ERROR] Firebase test failed:', error);
-      Alert.alert('[ERROR]', `Firebase test failed: ${error.message || error.toString()}`);
+      console.error('❌ Firebase test failed:', error);
+      Alert.alert('❌ Error', `Firebase test failed: ${error.message || error.toString()}`);
     }
   };
 

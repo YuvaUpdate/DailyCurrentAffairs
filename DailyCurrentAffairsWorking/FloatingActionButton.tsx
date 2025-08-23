@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated } from 'react-native';
 
 interface FloatingActionButtonProps {
   onPress: () => void;
@@ -16,7 +16,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   onPress,
   icon = '↑',
   color = '#fff',
-  backgroundColor = '#111111',
+  backgroundColor = '#3B82F6',
   size = 56,
   bottom = 100,
   right = 20,
@@ -100,13 +100,25 @@ const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     elevation: 8,
-  ...Platform.select({ web: { boxShadow: '0 6px 18px rgba(0,0,0,0.18)' } }),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   button: {
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
-  ...Platform.select({ web: { boxShadow: '0 4px 12px rgba(0,0,0,0.14)' } }),
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   icon: {
     fontWeight: 'bold',

@@ -100,17 +100,11 @@ class AuthService {
   // Logout user
   async logout(): Promise<void> {
     try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        console.log('🔄 Logging out user:', currentUser.email);
-        await signOut(auth);
-        console.log('✅ User logged out successfully');
-      } else {
-        console.log('⚠️ No user was logged in');
-      }
+      await signOut(auth);
+      console.log('✅ User logged out successfully');
     } catch (error: any) {
       console.error('❌ Logout error:', error);
-      throw new Error('Failed to logout: ' + (error.message || 'Unknown error'));
+      throw new Error('Failed to logout');
     }
   }
 

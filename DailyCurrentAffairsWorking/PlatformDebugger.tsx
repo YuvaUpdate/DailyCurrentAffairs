@@ -17,7 +17,7 @@ export default function PlatformDebugger() {
     setDebugInfo(JSON.stringify(info, null, 2));
     
     Alert.alert(
-      '[DEBUG] Platform Info', 
+      '🔍 Platform Info', 
       `Platform: ${info.platform}\nIs Web: ${info.isWeb}\nCheck console for full details`
     );
   };
@@ -29,7 +29,7 @@ export default function PlatformDebugger() {
     console.debug('🔵 DEBUG: This is a debug log');
     
     Alert.alert(
-      '[LOG] Console Test', 
+      '📝 Console Test', 
       'Check your browser console (F12) or terminal for colored log messages!'
     );
   };
@@ -55,34 +55,34 @@ export default function PlatformDebugger() {
         console.log('🌐 Web Features Available:', webFeatures);
         
         Alert.alert(
-          '[WEB] Web Features',
+          '🌐 Web Features',
           `File: ${hasFile}\nFileReader: ${hasFileReader}\nFormData: ${hasFormData}\nBlob: ${hasBlob}`
         );
         
       } catch (error) {
         console.error('❌ Web feature test error:', error);
-        Alert.alert('[ERROR]', 'Web feature test failed - check console');
+        Alert.alert('❌ Error', 'Web feature test failed - check console');
       }
     } else {
-      Alert.alert('[MOBILE] Mobile Platform', 'This test is for web platform only');
+      Alert.alert('📱 Mobile Platform', 'This test is for web platform only');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>[DEBUG] Platform Debugger</Text>
+      <Text style={styles.title}>🔍 Platform Debugger</Text>
       
       <TouchableOpacity style={styles.button} onPress={runPlatformTest}>
-        <Text style={styles.buttonText}>[DEBUG] Test Platform Info</Text>
+        <Text style={styles.buttonText}>🔍 Test Platform Info</Text>
       </TouchableOpacity>
       
       <TouchableOpacity style={[styles.button, styles.warningButton]} onPress={testConsoleLogging}>
-        <Text style={styles.buttonText}>[LOG] Test Console Logs</Text>
+        <Text style={styles.buttonText}>📝 Test Console Logs</Text>
       </TouchableOpacity>
       
       {Platform.OS === 'web' && (
         <TouchableOpacity style={[styles.button, styles.webButton]} onPress={testWebSpecificFeatures}>
-          <Text style={styles.buttonText}>[WEB] Test Web Features</Text>
+          <Text style={styles.buttonText}>🌐 Test Web Features</Text>
         </TouchableOpacity>
       )}
       

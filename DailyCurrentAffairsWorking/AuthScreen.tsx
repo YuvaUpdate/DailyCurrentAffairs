@@ -13,9 +13,6 @@ import {
   SafeAreaView
 } from 'react-native';
 import { authService } from './AuthService';
-import { getTheme } from './theme';
-
-const theme = getTheme(false);
 
 interface AuthScreenProps {
   onAuthSuccess: () => void;
@@ -118,17 +115,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardContainer}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>
+            <Text style={styles.title}>
               {mode === 'login' ? 'Welcome Back' : 'Create Account'}
             </Text>
-            <Text style={[styles.subtitle, { color: theme.subText }]}>
+            <Text style={styles.subtitle}>
               {mode === 'login' 
                 ? 'Sign in to continue reading' 
                 : 'Join YuvaUpdate community'
@@ -136,12 +133,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </Text>
           </View>
 
-          <View style={[styles.form, { backgroundColor: theme.surface, borderColor: theme.border, shadowColor: theme.subtleShadow }] }>
+          <View style={styles.form}>
             {mode === 'register' && (
               <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: theme.text }]}>Full Name</Text>
+                <Text style={styles.label}>Full Name</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: '#fff' }]}
+                  style={styles.input}
                   placeholder="Enter your full name"
                   value={formData.displayName}
                   onChangeText={(text) => setFormData(prev => ({ ...prev, displayName: text }))}
@@ -152,9 +149,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             )}
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: theme.text }]}>Email</Text>
+              <Text style={styles.label}>Email</Text>
               <TextInput
-                style={[styles.input, { backgroundColor: '#fff' }]}
+                style={styles.input}
                 placeholder="Enter your email"
                 value={formData.email}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, email: text.toLowerCase().trim() }))}
@@ -165,8 +162,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: theme.text }]}>Password</Text>
-              <View style={[styles.passwordContainer, { backgroundColor: '#fff' }]}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="Enter your password"
@@ -180,16 +177,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   style={styles.showPasswordButton}
                   onPress={() => setShowPassword(!showPassword)}
                 >
-                  <Text style={[styles.showPasswordText, { color: theme.accent }]}> {showPassword ? 'Hide' : 'Show'}</Text>
+                  <Text style={styles.showPasswordText}>
+                    {showPassword ? 'Hide' : 'Show'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             {mode === 'register' && (
               <View style={styles.inputContainer}>
-                <Text style={[styles.label, { color: theme.text }]}>Confirm Password</Text>
+                <Text style={styles.label}>Confirm Password</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: '#fff' }]}
+                  style={styles.input}
                   placeholder="Confirm your password"
                   value={formData.confirmPassword}
                   onChangeText={(text) => setFormData(prev => ({ ...prev, confirmPassword: text }))}
@@ -201,14 +200,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             )}
 
             <TouchableOpacity
-              style={[styles.authButton, loading && styles.authButtonDisabled, { backgroundColor: theme.buttonBg }]}
+              style={[styles.authButton, loading && styles.authButtonDisabled]}
               onPress={handleAuth}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color={theme.buttonText} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={[styles.authButtonText, { color: theme.buttonText }]}> {mode === 'login' ? 'Sign In' : 'Create Account'}</Text>
+                <Text style={styles.authButtonText}>
+                  {mode === 'login' ? 'Sign In' : 'Create Account'}
+                </Text>
               )}
             </TouchableOpacity>
 
@@ -217,13 +218,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 style={styles.forgotPasswordButton}
                 onPress={handleForgotPassword}
               >
-                <Text style={[styles.forgotPasswordText, { color: theme.accent }]}>Forgot Password?</Text>
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.footer}>
-            <Text style={[styles.switchText, { color: theme.subText }]}>
+            <Text style={styles.switchText}>
               {mode === 'login' 
                 ? "Don't have an account? " 
                 : "Already have an account? "
@@ -232,7 +233,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             <TouchableOpacity
               onPress={() => onSwitchMode(mode === 'login' ? 'register' : 'login')}
             >
-              <Text style={[styles.switchButtonText, { color: theme.accent }]}>
+              <Text style={styles.switchButtonText}>
                 {mode === 'login' ? 'Sign Up' : 'Sign In'}
               </Text>
             </TouchableOpacity>

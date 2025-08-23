@@ -64,7 +64,7 @@ const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({ error, onRetry, children 
         ]}
       >
         <View style={styles.errorContent}>
-          <Text style={styles.errorIcon}>[!]</Text>
+          <Text style={styles.errorIcon}>⚠️</Text>
           <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
           <Text style={styles.errorMessage}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={onRetry}>

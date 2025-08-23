@@ -8,7 +8,6 @@ import {
   Modal,
   SafeAreaView,
   FlatList,
-  Animated,
 } from 'react-native';
 import { NewsArticle } from './types';
 import { firebaseNewsService } from './FirebaseNewsService';
@@ -38,11 +37,11 @@ export default function Sidebar({
   const [activeTab, setActiveTab] = useState<'categories' | 'bookmarks'>('categories');
 
   const theme = {
-  background: isDarkMode ? '#000000' : '#ffffff',
-  surface: isDarkMode ? '#000000' : '#f5f5f5',
+    background: isDarkMode ? '#1a1a1a' : '#ffffff',
+    surface: isDarkMode ? '#2d2d2d' : '#f5f5f5',
     text: isDarkMode ? '#ffffff' : '#000000',
     subText: isDarkMode ? '#cccccc' : '#666666',
-  accent: isDarkMode ? '#000000' : '#667eea',
+    accent: '#667eea',
     border: isDarkMode ? '#444444' : '#e0e0e0',
     overlay: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)'
   };
@@ -82,6 +81,12 @@ export default function Sidebar({
       ]}>
         {item}
       </Text>
+      <Text style={[
+        styles.categoryIcon,
+        { color: selectedCategory === item ? '#ffffff' : theme.subText }
+      ]}>
+        •
+      </Text>
     </TouchableOpacity>
   );
 
@@ -116,9 +121,7 @@ export default function Sidebar({
         <SafeAreaView style={[styles.sidebar, { backgroundColor: theme.background }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
-            <View style={[styles.headerPill, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}> 
-              <Text style={[styles.headerTitle, { color: theme.text }]}>Menu</Text>
-            </View>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>Menu</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <Text style={[styles.closeButtonText, { color: theme.text }]}>×</Text>
             </TouchableOpacity>
@@ -205,12 +208,18 @@ export default function Sidebar({
                   ]}>
                     All Articles
                   </Text>
+                  <Text style={[
+                    styles.categoryIcon,
+                    { color: selectedCategory === null ? '#ffffff' : theme.subText }
+                  ]}>
+                    📋
+                  </Text>
                 </TouchableOpacity>
                 
-                <AnimatedFlatList
+                <FlatList
                   data={categories}
                   renderItem={renderCategoryItem}
-                  keyExtractor={(item: string) => item}
+                  keyExtractor={(item) => item}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.categoryList}
                 />
@@ -219,17 +228,17 @@ export default function Sidebar({
               <View style={styles.bookmarksContainer}>
                 {bookmarkedArticles.length === 0 ? (
                   <View style={styles.emptyState}>
-                    <Text style={[styles.emptyIcon, { color: theme.subText }]}>[ ]</Text>
+                    <Text style={[styles.emptyIcon, { color: theme.subText }]}>📖</Text>
                     <Text style={[styles.emptyTitle, { color: theme.text }]}>No Saved Articles</Text>
                     <Text style={[styles.emptySubtitle, { color: theme.subText }]}>
                       Articles you save will appear here
                     </Text>
                   </View>
                 ) : (
-                  <AnimatedFlatList
+                  <FlatList
                     data={bookmarkedArticles}
                     renderItem={renderBookmarkItem}
-                    keyExtractor={(item: NewsArticle) => item.id.toString()}
+                    keyExtractor={(item) => item.id.toString()}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.bookmarkList}
                   />
@@ -250,9 +259,6 @@ export default function Sidebar({
   );
 }
 
-// Animated wrapper for FlatList to safely support native driver onScroll when used elsewhere
-const AnimatedFlatList = Animated.createAnimatedComponent(FlatList as any);
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -262,7 +268,10 @@ const styles = StyleSheet.create({
     width: '80%',
     maxWidth: 320,
     height: '100%',
-    boxShadow: '2px 0 10px rgba(0, 0, 0, 0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 10,
   },
   backgroundOverlay: {
@@ -279,13 +288,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-  },
-  headerPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    alignSelf: 'flex-start',
-    marginRight: 8,
   },
   closeButton: {
     width: 30,

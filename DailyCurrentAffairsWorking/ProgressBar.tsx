@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, Animated, Dimensions } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -14,7 +14,7 @@ interface ProgressBarProps {
 
 const ProgressBar: React.FC<ProgressBarProps> = ({
   progress,
-  color = '#111111',
+  color = '#3B82F6',
   backgroundColor = 'rgba(255, 255, 255, 0.2)',
   height = 4,
   borderRadius = 2,
@@ -97,8 +97,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
-  elevation: 4,
-  ...Platform.select({ web: { boxShadow: '0 2px 4px rgba(0,0,0,0.12)' }, default: {} }),
+    shadowColor: '#3B82F6',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
 

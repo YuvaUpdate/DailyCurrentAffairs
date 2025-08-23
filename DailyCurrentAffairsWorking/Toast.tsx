@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, Text, Animated, StyleSheet, Dimensions } from 'react-native';
 
 interface ToastProps {
   message: string;
@@ -66,13 +66,13 @@ export const Toast: React.FC<ToastProps> = ({
   const getToastStyle = () => {
     switch (type) {
       case 'success':
-        return { backgroundColor: '#059669', icon: '[✓]' };
+        return { backgroundColor: '#059669', icon: '✅' };
       case 'error':
-        return { backgroundColor: '#dc2626', icon: '[✗]' };
+        return { backgroundColor: '#dc2626', icon: '❌' };
       case 'warning':
-        return { backgroundColor: '#d97706', icon: '[!]' };
+        return { backgroundColor: '#d97706', icon: '⚠️' };
       default:
-  return { backgroundColor: '#111111', icon: 'ℹ️' };
+        return { backgroundColor: '#2563eb', icon: 'ℹ️' };
     }
   };
 
@@ -108,12 +108,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    // Use platform-specific shadows: keep elevation for native; use boxShadow on web
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 8,
-    ...Platform.select({
-      web: { boxShadow: '0 4px 8px rgba(0,0,0,0.3)' },
-      default: {},
-    }),
     zIndex: 1000,
   },
   icon: {

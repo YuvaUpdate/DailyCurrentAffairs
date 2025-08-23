@@ -18,20 +18,9 @@ export default function VideoPlayerComponent({
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   
   const player = useVideoPlayer(videoUrl, (player) => {
-    player.loop = true; // Enable looping for auto-play videos
-    if (autoPlay) {
-      player.play();
-      setIsPlaying(true);
-    }
+    player.loop = false;
+    player.play();
   });
-
-  // Auto-play when component mounts if autoPlay is true
-  React.useEffect(() => {
-    if (autoPlay && player) {
-      player.play();
-      setIsPlaying(true);
-    }
-  }, [autoPlay, player]);
 
   return (
     <View style={[styles.container, style]}>
