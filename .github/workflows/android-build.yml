@@ -6,7 +6,7 @@ on:
     branches: [ main ]
 
 env:
-  ANDROID_SDK_ROOT: /usr/local/android-sdk
+  ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
 
 jobs:
   build:
