@@ -34,14 +34,19 @@ jobs:
           unzip -q /tmp/cmdline.zip -d $ANDROID_SDK_ROOT/cmdline-tools
           mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
           mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest/
-          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
         shell: bash
 
       - name: Verify Java & Android SDK
         run: |
           java -version
-          ls -la $ANDROID_SDK_ROOT
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --list
         shell: bash
 
       - name: Set up Node.js 18
@@ -64,7 +69,7 @@ jobs:
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android-apks
+          name: android-build
           path: |
-            android/app/build/outputs/**/*.apk
-            android/app/build/outputs/**/*.aab
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
