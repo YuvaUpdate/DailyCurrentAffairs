@@ -1,4 +1,4 @@
-package com.nareshkumarbalamurugan.YuvaUpdate
+package com.nareshkumarbalamurugan.yuvaupdate
 
 import android.os.Build
 import android.os.Bundle

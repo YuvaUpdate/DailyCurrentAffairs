@@ -1,4 +1,4 @@
-package com.nareshkumarbalamurugan.YuvaUpdate
+package com.nareshkumarbalamurugan.yuvaupdate
 
 import android.app.Application
 import android.content.res.Configuration
