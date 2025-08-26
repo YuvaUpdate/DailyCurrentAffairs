@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import FastTouchable from './FastTouchable';
 import VideoPlayerComponent from './VideoPlayerComponent';
 import { newsService } from './NewsService';
 import { firebaseNewsService } from './FirebaseNewsService';
+import { getDocs, collection, query, where } from 'firebase/firestore';
+import { db } from './firebase.config';
 import { fileUploadService, UploadResult } from './FileUploadService';
 import { testFirebaseStorage, checkStorageConfig } from './StorageTest';
 import FirebaseTest from './FirebaseTest';
@@ -62,6 +64,25 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   const [editingNews, setEditingNews] = useState<NewsArticle | null>(null);
   const [isLoadingNews, setIsLoadingNews] = useState(false);
 
+  // Analytics states
+  const [analytics, setAnalytics] = useState({
+    articles: 0,
+    categories: 0,
+    users: 0,
+    comments: 0,
+    uploads: 0,
+  });
+  const [isRefreshingAnalytics, setIsRefreshingAnalytics] = useState(false);
+
+  const isSmallScreen = width && width < 420;
+
+  useEffect(() => {
+    // Load analytics when AdminPanel mounts
+    loadAnalytics();
+    // Also refresh categories
+    loadCategoriesFromFirebase();
+  }, []);
+
   // Load categories from Firebase on component mount
   React.useEffect(() => {
     loadCategoriesFromFirebase();
@@ -73,6 +94,54 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       setCategories(firebaseCategories);
     } catch (error) {
       console.error('Error loading categories from Firebase:', error);
+    }
+  };
+
+  // Load analytics counts for admin dashboard
+  const loadAnalytics = async () => {
+    try {
+      setIsRefreshingAnalytics(true);
+      // Articles (use doc ids to count exact stored items)
+      const articles = await firebaseNewsService.getArticlesWithDocIds();
+      const articlesCount = Array.isArray(articles) ? articles.length : 0;
+
+      // Categories
+      const cats = await firebaseNewsService.getCategories();
+      const categoriesCount = Array.isArray(cats) ? cats.length : 0;
+
+      // Users count (simple collection scan)
+      let usersCount = 0;
+      try {
+        const usersSnap = await getDocs(collection(db, 'users'));
+        usersCount = usersSnap.size;
+      } catch (uErr) {
+        console.warn('Could not count users collection:', uErr);
+      }
+
+      // Comments count (only non-deleted)
+      let commentsCount = 0;
+      try {
+        const commentsQuery = query(collection(db, 'comments'), where('isDeleted', '==', false));
+        const commentsSnap = await getDocs(commentsQuery);
+        commentsCount = commentsSnap.size;
+      } catch (cErr) {
+        console.warn('Could not count comments:', cErr);
+      }
+
+      // Uploads count: estimate by counting articles that include uploaded media path
+      const uploadsCount = articles.filter((a: any) => !!a.mediaPath || (a.image && (String(a.image).includes('news-images') || String(a.image).includes('news-videos')))).length;
+
+      setAnalytics({
+        articles: articlesCount,
+        categories: categoriesCount,
+        users: usersCount,
+        comments: commentsCount,
+        uploads: uploadsCount,
+      });
+    } catch (error) {
+      console.error('Error loading analytics:', error);
+    } finally {
+      setIsRefreshingAnalytics(false);
     }
   };
 
@@ -428,55 +497,88 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
           </FastTouchable>
         </View>
 
-        {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
-          <FastTouchable 
-            style={[styles.tab, activeTab === 'manual' && styles.activeTab]}
-            onPress={() => setActiveTab('manual')}
+  {/* Tab Navigation */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 8, alignItems: 'center' }}
+            style={styles.tabContainer}
           >
-            <Text style={[styles.tabText, activeTab === 'manual' && styles.activeTabText]}>Add News</Text>
-          </FastTouchable>
-          <FastTouchable 
-            style={[styles.tab, activeTab === 'api' && styles.activeTab]}
-            onPress={() => setActiveTab('api')}
-          >
-            <Text style={[styles.tabText, activeTab === 'api' && styles.activeTabText]}>API Import</Text>
-          </FastTouchable>
-          <FastTouchable 
-            style={[styles.tab, activeTab === 'manage' && styles.activeTab]}
-            onPress={() => {
-              setActiveTab('manage');
-              loadAllNews();
-            }}
-          >
-            <Text style={[styles.tabText, activeTab === 'manage' && styles.activeTabText]}>Manage News</Text>
-          </FastTouchable>
-          <FastTouchable 
-            style={[styles.tab, activeTab === 'categories' && styles.activeTab]}
-            onPress={() => setActiveTab('categories')}
-          >
-            <Text style={[styles.tabText, activeTab === 'categories' && styles.activeTabText]}>Categories</Text>
-          </FastTouchable>
-  </View>
+            <FastTouchable
+              style={[
+                styles.tab,
+                activeTab === 'manual' && styles.activeTab,
+                isSmallScreen ? styles.tabSmall : undefined,
+              ]}
+              onPress={() => setActiveTab('manual')}
+            >
+              <Text style={[styles.tabText, activeTab === 'manual' && styles.activeTabText, isSmallScreen ? styles.tabSmallText : undefined]}>Add News</Text>
+            </FastTouchable>
+
+            <FastTouchable
+              style={[
+                styles.tab,
+                activeTab === 'api' && styles.activeTab,
+                isSmallScreen ? styles.tabSmall : undefined,
+              ]}
+              onPress={() => setActiveTab('api')}
+            >
+              <Text style={[styles.tabText, activeTab === 'api' && styles.activeTabText, isSmallScreen ? styles.tabSmallText : undefined]}>API Import</Text>
+            </FastTouchable>
+
+            <FastTouchable
+              style={[
+                styles.tab,
+                activeTab === 'manage' && styles.activeTab,
+                isSmallScreen ? styles.tabSmall : undefined,
+              ]}
+              onPress={() => {
+                setActiveTab('manage');
+                loadAllNews();
+              }}
+            >
+              <Text style={[styles.tabText, activeTab === 'manage' && styles.activeTabText, isSmallScreen ? styles.tabSmallText : undefined]}>Manage News</Text>
+            </FastTouchable>
+
+            <FastTouchable
+              style={[
+                styles.tab,
+                activeTab === 'categories' && styles.activeTab,
+                isSmallScreen ? styles.tabSmall : undefined,
+              ]}
+              onPress={() => setActiveTab('categories')}
+            >
+              <Text style={[styles.tabText, activeTab === 'categories' && styles.activeTabText, isSmallScreen ? styles.tabSmallText : undefined]}>Categories</Text>
+            </FastTouchable>
+          </ScrollView>
 
         <ScrollView style={styles.content}>
-          {activeTab === 'manual' && (
-            <View>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Quick Add News</Text>
-                <View style={styles.quickAddContainer}>
-                    <FastTouchable style={[styles.quickAddButton, { backgroundColor: '#ff4757' }]} onPress={() => handleQuickAdd('breaking')}>
-                      <Text style={styles.quickAddText}>Breaking</Text>
-                    </FastTouchable>
-                    <FastTouchable style={[styles.quickAddButton, { backgroundColor: '#667eea' }]} onPress={() => handleQuickAdd('tech')}>
-                      <Text style={styles.quickAddText}>Tech</Text>
-                    </FastTouchable>
-                    <FastTouchable style={[styles.quickAddButton, { backgroundColor: '#f093fb' }]} onPress={() => handleQuickAdd('sports')}>
-                      <Text style={styles.quickAddText}>Sports</Text>
-                    </FastTouchable>
-                </View>
+          {/* Analytics strip (responsive) */}
+          <View style={{ marginBottom: 12 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4 }}>
+              <View style={styles.analyticsCard}>
+                <Text style={styles.analyticsNumber}>{analytics.articles}</Text>
+                <Text style={styles.analyticsLabel}>Articles</Text>
               </View>
-
+              <View style={styles.analyticsCard}>
+                <Text style={styles.analyticsNumber}>{analytics.categories}</Text>
+                <Text style={styles.analyticsLabel}>Categories</Text>
+              </View>
+              <View style={styles.analyticsCard}>
+                <Text style={styles.analyticsNumber}>{analytics.users}</Text>
+                <Text style={styles.analyticsLabel}>Users</Text>
+              </View>
+              <View style={styles.analyticsCard}>
+                <Text style={styles.analyticsNumber}>{analytics.comments}</Text>
+                <Text style={styles.analyticsLabel}>Comments</Text>
+              </View>
+              <View style={styles.analyticsCard}>
+                <Text style={styles.analyticsNumber}>{analytics.uploads}</Text>
+                <Text style={styles.analyticsLabel}>Uploads</Text>
+              </View>
+            </ScrollView>
+          </View>
+          {activeTab === 'manual' && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Add / Edit News</Text>
                 <Text style={styles.label}>Headline</Text>
@@ -535,8 +637,28 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                 <FastTouchable style={styles.submitButton} onPress={handleSubmit}>
                   <Text style={styles.submitButtonText}>{editingNews ? 'Update Article' : 'Add Article'}</Text>
                 </FastTouchable>
+                {/* Small preview box shown before posting */}
+                {(headline || description) && (
+                  <View style={styles.previewSection}>
+                    <Text style={styles.previewTitle}>Preview</Text>
+                    <View style={styles.previewCard}>
+                      {/** Preview image */}
+                      <Image source={{ uri: uploadedMedia?.url || imageUrl || `https://via.placeholder.com/400x200/667eea/ffffff?text=${encodeURIComponent(category || 'Preview')}` }} style={styles.previewImage} />
+                      <View style={styles.previewContent}>
+                        <Text style={styles.previewHeadline}>{headline || 'Headline preview'}</Text>
+                        <Text style={styles.previewDescription} numberOfLines={3}>{description || 'Description preview will appear here.'}</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, alignItems: 'center' }}>
+                          <Text style={styles.previewMetaText}>{category || 'Uncategorized'}</Text>
+                          <Text style={styles.previewMetaText}>{readTime || '—'}</Text>
+                        </View>
+                        {sourceUrl ? (
+                          <Text style={[styles.previewMetaText, { marginTop: 8 }]} numberOfLines={1}>{sourceUrl}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                )}
               </View>
-            </View>
           )}
 
           {activeTab === 'api' && (
@@ -773,20 +895,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   analyticsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  flexDirection: 'row',
+  justifyContent: 'flex-start',
+  alignItems: 'center',
   },
   analyticsCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 5,
+  width: 110,
+  backgroundColor: 'rgba(255,255,255,0.05)',
+  paddingVertical: 12,
+  paddingHorizontal: 14,
+  borderRadius: 10,
+  alignItems: 'center',
+  marginRight: 8,
   },
   analyticsNumber: {
     color: '#ffffff',
-    fontSize: 24,
+  fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 5,
   },
@@ -818,6 +942,16 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#ffffff',
+  },
+  tabSmall: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 90,
+    borderRadius: 6,
+    marginHorizontal: 6,
+  },
+  tabSmallText: {
+    fontSize: 13,
   },
   // API Integration Styles
   apiSection: {
