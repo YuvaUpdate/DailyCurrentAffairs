@@ -27,103 +27,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unzip wget zip
 
-      - name: Install Android command-line tools and Build Tools 35
+      - name: Install Android command-line tools and SDK
         run: |
           mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
           curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -o /tmp/cmdline.zip
           unzip -q /tmp/cmdline.zip -d $ANDROID_SDK_ROOT/cmdline-tools
           mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
           mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest/
-          
-          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-          
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses || true
         shell: bash
 
       - name: Verify Java & Android SDK
         run: |
-          name: Android APK Build
+          java -version
+          ls -la $ANDROID_SDK_ROOT
+        shell: bash
 
-          on:
-            workflow_dispatch:
-            push:
-              branches: [ main ]
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
 
-          env:
-            ANDROID_SDK_ROOT: "${{ runner.temp }}/android-sdk"
+      - name: Install node dependencies
+        run: npm ci
 
-          jobs:
-            build:
-              runs-on: ubuntu-latest
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
-              steps:
-                - name: Checkout repository
-                  uses: actions/checkout@v4
+      - name: Build release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+        shell: bash
 
-                - name: Set up JDK 17
-                  uses: actions/setup-java@v4
-                  with:
-                    distribution: temurin
-                    java-version: '17'
-
-                - name: Install prerequisites
-                  run: |
-                    sudo apt-get update
-                    sudo apt-get install -y unzip wget zip
-
-                - name: Install Android command-line tools and Build Tools 35
-                  run: |
-                    set -e
-                    mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-                    curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -o /tmp/cmdline.zip
-                    unzip -q /tmp/cmdline.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
-                    mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-                    mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools"/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/" || true
-                    export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-                    # run sdkmanager but tolerate SIGPIPE from 'yes'; capture output to a temp log
-                    TMPLOG=/tmp/sdk_install.log
-                    set +e
-                    yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "platforms;android-35" "build-tools;35.0.0" > "$TMPLOG" 2>&1
-                    SDK_RC=$?
-                    set -e
-                    echo "--- last lines of sdkmanager log ---"
-                    tail -n 200 "$TMPLOG" || true
-                    if [ $SDK_RC -ne 0 ]; then
-                      echo "sdkmanager exited with code $SDK_RC (this can be ok if packages installed)."
-                    fi
-                    # verify installation; fail if build-tools missing
-                    if [ ! -x "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign" ] || [ ! -x "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" ]; then
-                      echo "ERROR: build-tools 35.0.0 not installed properly"
-                      ls -la "$ANDROID_SDK_ROOT/build-tools" || true
-                      exit 1
-                    fi
-                  shell: bash
-
-                - name: Show java & sdkinfo
-                  run: |
-                    java -version || true
-                    ls -la "$ANDROID_SDK_ROOT" || true
-                  shell: bash
-
-                - name: Install node deps
-                  run: npm ci
-
-                - name: Make gradlew executable
-                  run: chmod +x android/gradlew
-
-                - name: Build release APK
-                  run: |
-                    cd android
-                    ./gradlew assembleRelease --no-daemon --stacktrace
-                  shell: bash
-
-                - name: Upload APK artifacts
-                  uses: actions/upload-artifact@v4
-                  with:
-                    name: android-apks
-                    path: |
-                      android/app/build/outputs/**/*.apk
-                      android/app/build/outputs/**/*.aab
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apks
+          path: |
+            android/app/build/outputs/**/*.apk
+            android/app/build/outputs/**/*.aab
