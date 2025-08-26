@@ -233,74 +233,64 @@ export default function App(props: AppProps) {
   let unsubscribe: (() => void) | null = null;
     let refreshInterval: NodeJS.Timeout | null = null;
 
-    // Try to load cached articles immediately so app can render quickly.
+    // Parallelize AsyncStorage reads to reduce startup blocking
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem('ya_cached_articles');
-        if (raw) {
-          const cached = JSON.parse(raw) as NewsArticle[];
-          if (Array.isArray(cached) && cached.length > 0) {
-            setNewsData(cached);
-            setLastArticleCount(cached.length);
-            applyFilter(cached, selectedCategory);
+        const [rawArticles, rawCats] = await Promise.all([
+          AsyncStorage.getItem('ya_cached_articles'),
+          AsyncStorage.getItem('ya_cached_categories')
+        ]);
+
+        if (rawArticles) {
+          try {
+            const cached = JSON.parse(rawArticles) as NewsArticle[];
+            if (Array.isArray(cached) && cached.length > 0) {
+              setNewsData(cached);
+              setLastArticleCount(cached.length);
+              applyFilter(cached, selectedCategory);
               setIsLoadingArticles(false);
-              // Notify parent that articles are available (call only if provided)
-              try {
-                if (!articlesReadyCalled.current && typeof onArticlesReady === 'function') {
-                  // Ensure React has finished rendering and interactions are complete
-                  InteractionManager.runAfterInteractions(() => {
-                    try {
-                      if (!articlesReadyCalled.current) {
-                        onArticlesReady();
-                        articlesReadyCalled.current = true;
-                      }
-                    } catch (er) {
-                      // ignore
-                    }
-                  });
+              InteractionManager.runAfterInteractions(() => {
+                try {
+                  if (!articlesReadyCalled.current && typeof onArticlesReady === 'function') {
+                    onArticlesReady();
+                    articlesReadyCalled.current = true;
+                  }
+                } catch (er) {
+                  // ignore
                 }
-              } catch (e) {
-                // ignore
-              }
-            console.log('✅ Loaded cached articles:', cached.length);
-          } else {
-            // no cache contents
+              });
+            }
+          } catch (e) {
+            console.warn('Failed to parse cached articles', e);
             setIsLoadingArticles(true);
           }
         } else {
           setIsLoadingArticles(true);
         }
+
+        if (rawCats) {
+          try {
+            const parsed = JSON.parse(rawCats) as string[];
+            if (Array.isArray(parsed) && parsed.length > 0) setCategories(parsed);
+          } catch (e) {
+            console.warn('Failed to parse cached categories', e);
+          }
+        }
       } catch (e) {
-        console.warn('Failed to read cached articles', e);
+        console.warn('Failed to read cached startup data', e);
         setIsLoadingArticles(true);
       }
-      // Also try to load cached categories for faster sidebar open
-      (async () => {
-        try {
-          const rawCats = await AsyncStorage.getItem('ya_cached_categories');
-          if (rawCats) {
-            const parsed = JSON.parse(rawCats) as string[];
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setCategories(parsed);
-            }
-          }
-        } catch (err) {
-          console.warn('Failed to read cached categories', err);
-        }
 
-        // Kick off a background refresh of categories
+      // Refresh categories in background without blocking startup
+      (async () => {
         try {
           const fresh = await firebaseNewsService.getCategories();
           if (Array.isArray(fresh) && fresh.length > 0) {
             setCategories(fresh);
-            try {
-              await AsyncStorage.setItem('ya_cached_categories', JSON.stringify(fresh));
-            } catch (e) {
-              console.warn('Failed to cache fresh categories', e);
-            }
+            try { await AsyncStorage.setItem('ya_cached_categories', JSON.stringify(fresh)); } catch (e) { /* non-fatal */ }
           }
         } catch (err) {
-          console.warn('Failed to refresh categories in background', err);
+          // ignore background failure
         }
       })();
     })();
@@ -308,7 +298,6 @@ export default function App(props: AppProps) {
     const setupFirebaseSubscription = () => {
       // Subscribe to backend and update cache when new articles arrive.
     unsubscribe = firebaseNewsService.subscribeToArticles((articles: NewsArticle[]) => {
-        console.log('📡 Received articles from Firebase:', articles.length);
         setIsLoadingArticles(false);
 
         // Check for new articles and send notifications
@@ -339,36 +328,24 @@ export default function App(props: AppProps) {
         } catch (e) {
           // ignore
         }
-        // persist latest articles for faster startup next time
-        try {
-          AsyncStorage.setItem('ya_cached_articles', JSON.stringify(articles));
-        } catch (e) {
-          console.warn('Failed to cache articles', e);
-        }
+        // persist latest articles for faster startup next time (fire-and-forget)
+        AsyncStorage.setItem('ya_cached_articles', JSON.stringify(articles)).catch(() => {});
       });
     };
 
     // Auto-refresh function
     const autoRefresh = () => {
-      console.log('🔄 Auto-refreshing articles...');
       setAutoRefreshing(true);
-      
-      // Re-fetch articles every 10 seconds
+      // Re-fetch articles (background)
       firebaseNewsService.getArticles().then((articles) => {
-        console.log('🔄 Auto-refresh: Received', articles.length, 'articles');
         setNewsData(articles);
         applyFilter(articles, selectedCategory);
         setAutoRefreshing(false);
-        try {
-          AsyncStorage.setItem('ya_cached_articles', JSON.stringify(articles));
-        } catch (e) {
-          console.warn('Failed to cache articles (auto-refresh)', e);
-        }
+        AsyncStorage.setItem('ya_cached_articles', JSON.stringify(articles)).catch(() => {});
       }).catch((error) => {
-        console.error('🔄 Auto-refresh error:', error);
         setAutoRefreshing(false);
         // Show error to user only if it's a network or significant error
-        if (error.code === 'network-request-failed' || error.code === 'unavailable') {
+        if (error && (error.code === 'network-request-failed' || error.code === 'unavailable')) {
           Alert.alert('Connection Error', 'Unable to refresh articles. Please check your internet connection.');
         }
       });
@@ -461,40 +438,39 @@ export default function App(props: AppProps) {
     loadUserProfile();
   }, [currentUser]);
 
-  // Apply category filter
-  const applyFilter = (articles: NewsArticle[], category: string | null) => {
+  // Apply category filter - memoized for stability
+  const applyFilter = React.useCallback((articles: NewsArticle[], category: string | null) => {
     if (category) {
       const filtered = articles.filter(article => article.category === category);
       setFilteredNews(filtered);
     } else {
       setFilteredNews(articles);
     }
-  };
+  }, []);
 
-  // Handle category selection
-  const handleCategorySelect = (category: string | null) => {
+  // Handle category selection - memoized
+  const handleCategorySelect = React.useCallback((category: string | null) => {
     setSelectedCategory(category);
     applyFilter(newsData, category);
     setCurrentIndex(0);
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollTo({ y: 0, animated: true });
     }
-  };
+  }, [newsData, applyFilter]);
 
-  // Pull to refresh
-  const onRefresh = async () => {
+  // Pull to refresh - memoized
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
       const articles = await firebaseNewsService.getArticles();
       setNewsData(articles);
       applyFilter(articles, selectedCategory);
-      console.log('🔄 Refreshed articles:', articles.length);
     } catch (error) {
       console.error('Error refreshing articles:', error);
       Alert.alert('Error', 'Failed to refresh articles');
     }
     setRefreshing(false);
-  };
+  }, [applyFilter, selectedCategory]);
 
   // Admin authentication - Check if current user is admin using Firebase profile
   const checkAdminAccess = (): boolean => {

@@ -21,7 +21,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.nareshkumarbalamurugan.YuvaUpdate",
+  "package": "com.nareshkumarbalamurugan.yuvaupdate",
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize"
     },
