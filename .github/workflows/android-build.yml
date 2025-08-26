@@ -83,9 +83,18 @@ jobs:
                     mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
                     mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools"/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/" || true
                     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-                    # allow sdkmanager to close the pipe early; don't let 'yes' exit code fail the step
-                    yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
-                    # verify installation
+                    # run sdkmanager but tolerate SIGPIPE from 'yes'; capture output to a temp log
+                    TMPLOG=/tmp/sdk_install.log
+                    set +e
+                    yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "platforms;android-35" "build-tools;35.0.0" > "$TMPLOG" 2>&1
+                    SDK_RC=$?
+                    set -e
+                    echo "--- last lines of sdkmanager log ---"
+                    tail -n 200 "$TMPLOG" || true
+                    if [ $SDK_RC -ne 0 ]; then
+                      echo "sdkmanager exited with code $SDK_RC (this can be ok if packages installed)."
+                    fi
+                    # verify installation; fail if build-tools missing
                     if [ ! -x "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign" ] || [ ! -x "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" ]; then
                       echo "ERROR: build-tools 35.0.0 not installed properly"
                       ls -la "$ANDROID_SDK_ROOT/build-tools" || true
