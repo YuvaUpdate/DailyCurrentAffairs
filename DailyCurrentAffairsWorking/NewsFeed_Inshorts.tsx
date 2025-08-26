@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
@@ -18,9 +18,13 @@ import {
   Share,
   RefreshControl,
   Modal,
-  ScrollView
+  ScrollView,
+  InteractionManager
 } from 'react-native';
 import { NewsArticle } from './types';
+import { scaleFont, responsiveLines } from './utils/responsive';
+import { LoadingSpinner } from './LoadingSpinner';
+import FastTouchable from './FastTouchable';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const IMAGE_RATIO = 0.45; // 40-50% for image area per your request
@@ -31,8 +35,8 @@ interface NewsFeedProps {
   articles: NewsArticle[];
   onRefresh?: () => void;
   refreshing?: boolean;
-  onBookmarkToggle?: (articleId: number) => void;
-  bookmarkedArticles?: Set<number>;
+  onBookmarkToggle?: (articleId: string | number) => void;
+  bookmarkedArticles?: Set<string | number>;
   isDarkMode?: boolean;
   immersive?: boolean; // when true ignore bottom safe area to create full-screen story feel
 }
@@ -63,9 +67,15 @@ export default function NewsFeed_Inshorts({
     })();
   }, []);
 
-  const completeOnboarding = useCallback(async () => {
+  const transitioningRef = useRef(false);
+
+  const completeOnboarding = useCallback(() => {
+    // close immediately for instant feedback
     setShowOnboarding(false);
-    try { await AsyncStorage.setItem(onboardingKey, 'true'); } catch (e) {}
+    // persist 'seen' off the main thread to avoid blocking the UI
+    InteractionManager.runAfterInteractions(() => {
+      AsyncStorage.setItem(onboardingKey, 'true').catch(() => {});
+    });
   }, []);
 
   const onboardingCards = [
@@ -80,6 +90,7 @@ export default function NewsFeed_Inshorts({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('Top');
   const [modalArticle, setModalArticle] = useState<NewsArticle | null>(null);
+  const [isModalLoading, setIsModalLoading] = useState<boolean>(false);
 
   // Animated scroll position for a right-side progress bar
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -164,16 +175,23 @@ export default function NewsFeed_Inshorts({
     text: isDark ? '#ffffff' : '#111827',
     subText: isDark ? '#94a3b8' : '#6b7280',
     tabInactiveBg: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-  tabActiveBg: isDark ? '#111827' : '#ffffff',
+    tabActiveBg: isDark ? '#111827' : '#ffffff',
   accent: isDark ? '#1E90FF' : '#007AFF',
     navBg: isDark ? 'rgba(255,255,255,0.04)' : '#ffffff'
   };
 
+  // Provide a simple bottom inset fallback since react-native SafeAreaView
+  // does not support the `edges` prop and we removed the SafeAreaProvider.
+  // For immersive (full-screen) mode we keep 0; otherwise add a safe bottom
+  // padding on iOS devices to avoid content being hidden under home indicator.
+  const bottomInset = immersive ? 0 : (Platform.OS === 'ios' ? 34 : 0);
+
   // Dynamic per-article content measurement to eliminate bottom gap while preserving snap
   const [contentHeights, setContentHeights] = useState<Record<number, number>>({});
 
-  const getImageHeightFor = useCallback((articleId: number) => {
-    const measured = contentHeights[articleId];
+  const getImageHeightFor = useCallback((articleId: string | number) => {
+    const key = String(articleId);
+    const measured = contentHeights[key as any];
     const fallback = Math.round(screenHeight * IMAGE_RATIO); // initial ratio before measure
     const minImage = Math.round(screenHeight * 0.40); // keep image at least ~40% of screen
     const maxImage = screenHeight - 80; // avoid covering entire screen (leave space for text paddings)
@@ -183,8 +201,9 @@ export default function NewsFeed_Inshorts({
     return Math.max(minImage, Math.min(maxImage, computed));
   }, [contentHeights]);
 
-  const onContentLayout = useCallback((articleId: number, h: number) => {
-    setContentHeights(prev => (prev[articleId] === h ? prev : { ...prev, [articleId]: h }));
+  const onContentLayout = useCallback((articleId: string | number, h: number) => {
+    const key = String(articleId);
+    setContentHeights(prev => (prev[key as any] === h ? prev : { ...prev, [key]: h }));
   }, []);
 
   const handleTabPress = (tab: string) => {
@@ -196,9 +215,12 @@ export default function NewsFeed_Inshorts({
 
   const formatMetadata = (article: NewsArticle) => {
     const parts: string[] = [];
+    // Keep category first if present
     if (article.category) parts.push(article.category);
-    if (article.readTime) parts.push(article.readTime);
-    if (article.timestamp) parts.push(new Date(article.timestamp).toLocaleDateString());
+    // Format read time and date together so date appears next to read time
+  // Only show read time in metadata; date is displayed on the image overlay
+  const readTime = article.readTime ? String(article.readTime) : null;
+  if (readTime) parts.push(readTime);
     return parts.join(' • ');
   };
 
@@ -206,11 +228,28 @@ export default function NewsFeed_Inshorts({
   const displayedArticles = activeTab === 'Top'
     ? articles
     : articles.filter(a => (a.category || '').toLowerCase() === activeTab.toLowerCase());
-  const openModal = (article: NewsArticle) => {
-    setModalArticle(article);
+  const openExternal = async (article: NewsArticle) => {
+    const url = article.sourceUrl || article.link || article.image || '';
+    if (!url) {
+      return;
+    }
+    try {
+      if (!/^https?:\/\//i.test(url)) return;
+      const supported = await Linking.canOpenURL(url);
+      if (supported) await Linking.openURL(url);
+    } catch (e) {
+      console.warn('Failed to open external URL', e);
+    }
   };
 
   const closeModal = () => setModalArticle(null);
+
+  // Helper to open modal with loading indicator
+  const openModalWithLoading = (article: NewsArticle) => {
+    setIsModalLoading(true);
+    setModalArticle(article);
+    // Keep spinner until image loads (SafeModalContent will clear it via InteractionManager)
+  };
 
   const shareArticle = async (article: NewsArticle) => {
     try {
@@ -273,7 +312,7 @@ export default function NewsFeed_Inshorts({
     scrollEndTimer.current = setTimeout(() => snapToNearest(offsetY) as unknown as number, 120);
   }, [snapToNearest]);
 
-  const renderArticle = ({ item: article }: { item: NewsArticle }) => {
+  const renderArticle = useCallback(({ item: article }: { item: NewsArticle }) => {
     // compute dynamic image height based on measured text/content height
     const dynH = getImageHeightFor(article.id);
     return (
@@ -285,7 +324,7 @@ export default function NewsFeed_Inshorts({
           <TouchableOpacity
             activeOpacity={0.98}
             style={[styles.imageWrapper, { height: dynH, backgroundColor: colors.surface }]}
-            onPress={() => openModal(article)}
+            onPress={() => openExternal(article)}
           >
             <Image
               source={{ uri: article.image || article.imageUrl || 'https://via.placeholder.com/600x900?text=No+Image' }}
@@ -303,9 +342,25 @@ export default function NewsFeed_Inshorts({
             </View>
 
             {/* subtle overlay for text contrast */}
-            <View style={[styles.imageOverlay, { height: Math.round(dynH * 0.36), bottom: 0, backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.18)', pointerEvents: 'none' }]} />
+            <View style={[styles.imageOverlay, { height: Math.round(dynH * 0.36), bottom: 0, backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.18)', pointerEvents: 'none', zIndex: 15 }]} />
+
+            {/* Date chip on the image (bottom-left) - visible above the overlay */}
+            {article.timestamp ? (
+              <View style={styles.dateChip} pointerEvents="none">
+                <Text style={styles.dateChipText}>{new Date(article.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+              </View>
+            ) : null}
+
+            {/* Small meta row near the action buttons: show date + read time slightly above the icons */}
+            {(article.timestamp || article.readTime) ? (
+              <View style={[styles.imageMetaRow, { top: Math.max(8, dynH - 110) }]} pointerEvents="none">
+                {article.timestamp ? <Text style={[styles.imageMetaText, { color: colors.subText }]}>{new Date(article.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text> : null}
+                {article.readTime ? <Text style={[styles.imageMetaText, { color: colors.subText, marginLeft: 8 }]}>{article.readTime}</Text> : null}
+              </View>
+            ) : null}
 
             {/* Small action icons positioned relative to image height (avoid overlapping status bar) */}
+
             <View style={[styles.iconColumn, { top: Math.max(8, dynH - 48), pointerEvents: 'box-none' }]}>
               <TouchableOpacity onPress={() => onBookmarkToggle && onBookmarkToggle(article.id)} style={[styles.iconCircle, { backgroundColor: colors.surface ?? undefined }]}> 
                 <Text style={[styles.iconText, { color: colors.text }, bookmarkedArticles.has(article.id) && { color: isDark ? '#ff7675' : '#e53935' }]}>{bookmarkedArticles.has(article.id) ? 'Saved' : 'Save'}</Text>
@@ -316,33 +371,34 @@ export default function NewsFeed_Inshorts({
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <FastTouchable
             accessibilityLabel={`Open article ${article.headline}`}
             activeOpacity={0.92}
-            onPress={() => openModal(article)}
+            onPress={() => openModalWithLoading(article)}
             style={[styles.contentContainer, { backgroundColor: colors.surface }]}
             onLayout={(e) => onContentLayout(article.id, e.nativeEvent.layout.height)}
           >
-            <Text style={[styles.headline, { color: colors.text }]} numberOfLines={2}>{article.headline}</Text>
-            <Text style={[styles.description, { color: colors.text }]} numberOfLines={3}>{article.description}</Text>
+            <Text style={[styles.headline, { color: colors.text, fontSize: scaleFont(22), lineHeight: scaleFont(28) }]} numberOfLines={2}>{article.headline}</Text>
+            <Text style={[styles.description, { color: colors.text, fontSize: scaleFont(16), lineHeight: 22 }]} numberOfLines={responsiveLines(screenHeight, 20, 12)}>{article.description}</Text>
             <Text style={[styles.meta, { color: colors.subText }]}>{formatMetadata(article)}</Text>
-          </TouchableOpacity>
+          </FastTouchable>
         </View>
 
         {/* Floating count and bottom nav are rendered globally */}
       </View>
     );
-  };
+  }, [colors, bookmarkedArticles, getImageHeightFor, onBookmarkToggle, shareArticle, formatMetadata, openExternal, onContentLayout, isDark]);
 
   // overlay + card colors for onboarding (theme-aware)
   const overlayBg = isDark ? 'rgba(2,6,23,0.72)' : 'rgba(255,255,255,0.98)';
   const cardShadow = {
-    boxShadow: isDark ? '0 10px 20px rgba(0, 0, 0, 0.28)' : '0 10px 20px rgba(0, 0, 0, 0.06)',
-    elevation: 12
+  // removed heavy shadow for a flatter homepage look
+  boxShadow: 'none',
+  elevation: 0
   };
 
   return (
-  <SafeAreaView edges={immersive ? ['top'] : ['top','bottom','left','right']} style={[styles.container, { backgroundColor: colors.background }]}>
+  <SafeAreaView style={[styles.container, { backgroundColor: colors.background, paddingBottom: bottomInset }]}>
       {/* Onboarding carousel shown only on first launch */}
       {showOnboarding && (
         <View style={[onboardStyles.overlay, { backgroundColor: overlayBg }]}> 
@@ -357,15 +413,27 @@ export default function NewsFeed_Inshorts({
           </View>
 
           <View style={onboardStyles.controls}>
-            <TouchableOpacity onPress={async () => { await AsyncStorage.setItem(onboardingKey, 'true'); setShowOnboarding(false); }} style={onboardStyles.skipBtn}>
+            <TouchableOpacity onPress={() => {
+                // immediate close, persist later
+                setShowOnboarding(false);
+                InteractionManager.runAfterInteractions(() => {
+                  AsyncStorage.setItem(onboardingKey, 'true').catch(() => {});
+                });
+              }} style={onboardStyles.skipBtn}>
               <Text style={[onboardStyles.skipText, { color: colors.subText }]}>Skip</Text>
             </TouchableOpacity>
             {onboardingIndex < onboardingCards.length - 1 ? (
-              <TouchableOpacity onPress={() => setOnboardingIndex(i => Math.min(onboardingCards.length - 1, i + 1))} style={[onboardStyles.nextBtn, { backgroundColor: colors.accent }]}> 
+              <TouchableOpacity onPress={() => {
+                  if (transitioningRef.current) return;
+                  transitioningRef.current = true;
+                  setOnboardingIndex(i => Math.min(onboardingCards.length - 1, i + 1));
+                  // quick safety reset
+                  setTimeout(() => { transitioningRef.current = false; }, 300);
+                }} style={[onboardStyles.nextBtn, { backgroundColor: colors.accent }]}> 
                 <Text style={[onboardStyles.nextText, { color: '#fff' }]}>Next</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity onPress={completeOnboarding} style={[onboardStyles.nextBtn, { backgroundColor: colors.accent }]}> 
+              <TouchableOpacity onPress={() => { if (!transitioningRef.current) { transitioningRef.current = true; completeOnboarding(); setTimeout(() => { transitioningRef.current = false; }, 400); } }} style={[onboardStyles.nextBtn, { backgroundColor: colors.accent }]}> 
                 <Text style={[onboardStyles.nextText, { color: '#fff' }]}>Get started</Text>
               </TouchableOpacity>
             )}
@@ -440,7 +508,7 @@ export default function NewsFeed_Inshorts({
   onMomentumScrollEnd={onMomentumScrollEnd}
   onScroll={Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: true, listener: onScroll }
+    { useNativeDriver: true }
   )}
   scrollEventThrottle={16}
   disableIntervalMomentum={true}
@@ -462,18 +530,24 @@ export default function NewsFeed_Inshorts({
           <Modal visible={!!modalArticle} animationType="slide" onRequestClose={closeModal}>
             <SafeModalContent
               article={modalArticle}
-              onClose={closeModal}
+              onClose={() => { setIsModalLoading(false); closeModal(); }}
               colors={colors}
               onBookmarkToggle={onBookmarkToggle}
               bookmarkedArticles={bookmarkedArticles}
               shareArticle={shareArticle}
+              onReady={() => setIsModalLoading(false)}
             />
+            {isModalLoading && (
+              <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: 6000 }}>
+                <LoadingSpinner size="small" color={colors.accent} message="Loading..." />
+              </View>
+            )}
           </Modal>
   </SafeAreaView>
   );
 }
 
-  function SafeModalContent({ article, onClose, colors, onBookmarkToggle, bookmarkedArticles, shareArticle }: { article: NewsArticle | null, onClose: () => void, colors?: any, onBookmarkToggle?: ((id: number) => void) | undefined, bookmarkedArticles?: Set<number>, shareArticle?: (a: NewsArticle) => void }) {
+  function SafeModalContent({ article, onClose, colors, onBookmarkToggle, bookmarkedArticles, shareArticle, onReady }: { article: NewsArticle | null, onClose: () => void, colors?: any, onBookmarkToggle?: ((id: string | number) => void) | undefined, bookmarkedArticles?: Set<string | number>, shareArticle?: (a: NewsArticle) => void, onReady?: () => void }) {
     const scheme = useColorScheme();
     const systemDark = scheme === 'dark';
     const isDark = colors ? (colors.background && colors.background !== '#f3f4f6') : systemDark;
@@ -491,7 +565,7 @@ export default function NewsFeed_Inshorts({
         Animated.timing(bookmarkScale, { toValue: 1.12, duration: 120, useNativeDriver: true }),
         Animated.timing(bookmarkScale, { toValue: 1.0, duration: 180, useNativeDriver: true })
       ]).start();
-      if (onBookmarkToggle && article) onBookmarkToggle(article.id);
+    if (onBookmarkToggle && article) onBookmarkToggle(article.id as string | number);
     };
 
     if (!article) return null;
@@ -506,7 +580,7 @@ export default function NewsFeed_Inshorts({
       <View style={[modalStyles.container, { backgroundColor: bg }]}> 
         <Animated.View style={{ opacity: modalAnim, transform: [{ translateY: modalAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
           <ScrollView contentContainerStyle={modalStyles.scroll}>
-            <Image source={{ uri: article.image || article.imageUrl }} style={modalStyles.image} resizeMode="cover" />
+            <Image source={{ uri: article.image || article.imageUrl }} style={modalStyles.image} resizeMode="cover" onLoad={() => { if (onReady) { try { onReady(); } catch (e) {} } }} />
             <Text style={[modalStyles.title, { color: text }]}>{article.headline}</Text>
             <Text style={[modalStyles.meta, { color: subText }]}>{(article.readTime ? article.readTime + ' • ' : '') + (article.category || '')}</Text>
             <View style={modalStyles.divider} />
@@ -551,8 +625,8 @@ export default function NewsFeed_Inshorts({
             paddingHorizontal: 12,
             paddingVertical: 8,
             borderRadius: 18,
-            elevation: 6,
-            boxShadow: isDark ? '0 6px 8px rgba(0, 0, 0, 0.18)' : '0 6px 8px rgba(68, 68, 68, 0.18)',
+              elevation: 0,
+              boxShadow: 'none',
           }}
         >
           <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Close</Text>
@@ -590,16 +664,17 @@ const styles = StyleSheet.create({
   tabTextActive: {  },
   bookmarkBtn: { marginLeft: 12, padding: 6 },
   bookmarkText: { fontSize: 16 },
-  imageWrapper: { width: '100%' },
+  imageWrapper: { width: '100%', position: 'relative', overflow: 'hidden' },
   image: { width: '100%' },
-  imageOverlay: { position: 'absolute', left: 0, right: 0 },
+  imageOverlay: { position: 'absolute', left: 0, right: 0, zIndex: 10 },
   contentContainer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 0 },
   headline: { fontSize: 30, fontWeight: '900', marginBottom: 6, lineHeight: 38 },
-  description: { fontSize: 15, lineHeight: 20, marginBottom: 2 },
+  // Slightly larger description for improved readability; increase fontSize a bit
+  description: { fontSize: 16, lineHeight: 22, marginBottom: 2 },
   meta: { fontSize: 12, marginBottom: 0 },
   actionsRow: { flexDirection: 'row', marginTop: 6 },
   actionBtn: { marginRight: 12, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
-  actionText: {  },
+  actionText: { fontSize: 13 },
   floatingCount: { position: 'absolute', top: Platform.OS === 'ios' ? 48 : 24, right: 16, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
   countText: { fontSize: 12 },
   /* bottom navigation removed */
@@ -612,12 +687,12 @@ const styles = StyleSheet.create({
     width: screenWidth, 
     borderRadius: 12, 
     overflow: 'hidden',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 6,
+  boxShadow: 'none',
+  elevation: 0,
     margin: 0,
   },
   iconColumn: { position: 'absolute', right: 12, zIndex: 30, alignItems: 'center' },
-  iconCircle: { padding: 8, borderRadius: 20, marginVertical: 6, boxShadow: '0 4px 6px rgba(0, 0, 0, 0.08)', elevation: 4 },
+  iconCircle: { padding: 8, borderRadius: 20, marginVertical: 6, boxShadow: 'none', elevation: 0 },
   iconText: { fontSize: 14, fontWeight: '600' },
   categoryChip: {
     position: 'absolute',
@@ -634,8 +709,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  dateChip: {
+  position: 'absolute',
+  bottom: 10,
+  right: 56,
+  backgroundColor: 'rgba(0,0,0,0.72)',
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 8,
+  zIndex: 80,
+  },
+  dateChipText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  imageMetaRow: {
+    position: 'absolute',
+    right: 76, // sits just left of icon column (icon column right:12 + icon width)
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 85,
+    backgroundColor: 'transparent',
+  },
+  imageMetaText: { fontSize: 12, fontWeight: '600' },
   stickyTabs: { position: 'absolute', top: Platform.OS === 'ios' ? 44 : 18, left: 12, right: 12, zIndex: 60, padding: 8, borderRadius: 12, backgroundColor: 'transparent', alignItems: 'flex-start' },
-  categoryBar: { position: 'absolute', top: Platform.OS === 'ios' ? 44 : 18, left: 12, right: 12, zIndex: 70, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, boxShadow: '0 6px 8px rgba(0, 0, 0, 0.06)', elevation: 6 },
+  categoryBar: { position: 'absolute', top: Platform.OS === 'ios' ? 44 : 18, left: 12, right: 12, zIndex: 70, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 12, boxShadow: 'none', elevation: 0 },
   progressWrap: { position: 'absolute', right: 10, top: STICKY_TABS_HEIGHT + 72, zIndex: 80, alignItems: 'center', height: 160 },
   progressTrack: { width: 4, height: 160, borderRadius: 2 },
   progressThumb: { position: 'absolute', right: 10 - 2, width: 14, height: 14, borderRadius: 8 },

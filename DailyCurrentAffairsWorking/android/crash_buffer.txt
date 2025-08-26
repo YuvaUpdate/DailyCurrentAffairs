@@ -1,0 +1,38 @@
+﻿--------- beginning of crash
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: FATAL EXCEPTION: main
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: Process: com.nareshkumarbalamurugan.YuvaUpdate, PID: 9096
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: java.lang.RuntimeException: Unable to start activity ComponentInfo{com.nareshkumarbalamurugan.YuvaUpdate/com.nareshkumarbalamurugan.YuvaUpdate.MainActivity}: android.content.ActivityNotFoundException: Unable to find explicit activity class {com.nareshkumarbalamurugan.YuvaUpdate/expo.modules.devlauncher.launcher.DevLauncherActivity}; have you declared this activity in your AndroidManifest.xml, or does your intent not match its declared <intent-filter>?
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:4372)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:4569)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.servertransaction.LaunchActivityItem.execute(LaunchActivityItem.java:126)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem(TransactionExecutor.java:179)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.executeTransactionItems(TransactionExecutor.java:114)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:86)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2902)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:107)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:282)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:387)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:9500)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:600)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1005)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: Caused by: android.content.ActivityNotFoundException: Unable to find explicit activity class {com.nareshkumarbalamurugan.YuvaUpdate/expo.modules.devlauncher.launcher.DevLauncherActivity}; have you declared this activity in your AndroidManifest.xml, or does your intent not match its declared <intent-filter>?
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.Instrumentation.checkStartActivityResult(Instrumentation.java:2452)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.Instrumentation.execStartActivity(Instrumentation.java:2030)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.ContextImpl.startActivity(ContextImpl.java:1173)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.ContextImpl.startActivity(ContextImpl.java:1144)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.content.ContextWrapper.startActivity(ContextWrapper.java:448)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at expo.modules.devlauncher.DevLauncherController.navigateToLauncher(DevLauncherController.kt:227)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at expo.modules.devlauncher.DevLauncherController.redirectFromStartActivity(DevLauncherController.kt:336)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at expo.modules.devlauncher.DevLauncherController.access$redirectFromStartActivity(DevLauncherController.kt:63)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at expo.modules.devlauncher.DevLauncherController$getCurrentReactActivityDelegate$1.invoke(DevLauncherController.kt:328)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at expo.modules.devlauncher.DevLauncherController$getCurrentReactActivityDelegate$1.invoke(DevLauncherController.kt:328)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at expo.modules.devlauncher.react.activitydelegates.DevLauncherReactActivityRedirectDelegate.onCreate(DevLauncherReactActivityRedirectDelegate.kt:16)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at expo.modules.ReactActivityDelegateWrapper.onCreate(ReactActivityDelegateWrapper.kt:143)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at com.facebook.react.ReactActivity.onCreate(ReactActivity.java:47)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at com.nareshkumarbalamurugan.YuvaUpdate.MainActivity.onCreate(MainActivity.kt:19)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.Activity.performCreate(Activity.java:9196)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.Activity.performCreate(Activity.java:9168)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1544)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:4346)
+08-24 13:09:10.626  9096  9096 E AndroidRuntime: 	... 13 more

@@ -1,6 +1,4 @@
-import { Audio } from 'expo-av';
-import * as Speech from 'expo-speech';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import { NewsArticle } from './types';
 
 export interface AudioSettings {
@@ -20,8 +18,9 @@ export interface PlaybackState {
 }
 
 class AudioService {
-  private sound: Audio.Sound | null = null;
-  private speechOptions: Speech.SpeechOptions = {
+  // use any to avoid static expo-av type dependency on web bundling
+  private sound: any | null = null;
+  private speechOptions: any = {
     language: 'en-US',
     pitch: 1.0,
     rate: 0.8,
@@ -39,24 +38,44 @@ class AudioService {
 
   private listeners: ((state: PlaybackState) => void)[] = [];
 
+  // Safely require a module at runtime without creating a static import
+  // This uses Function('return require')() so bundlers can't statically analyze the dependency.
+  private safeRequire(moduleName: string): any {
+    try {
+      // eslint-disable-next-line no-new-func
+      const req = Function('return require')();
+      return req(moduleName);
+    } catch (e) {
+      return null;
+    }
+  }
+
   constructor() {
     this.initializeAudio();
   }
-
-  // Initialize audio system
+  // Initialize audio system (runtime-safe)
   private async initializeAudio(): Promise<void> {
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-      
-      console.log('✅ Audio system initialized');
+      if (Platform.OS !== 'web') {
+    // dynamically require expo-av on native platforms (runtime only)
+  const expoAvName = 'expo' + '-av';
+  const expoAv = this.safeRequire(expoAvName);
+        if (expoAv && expoAv.Audio && expoAv.Audio.setAudioModeAsync) {
+          await expoAv.Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            staysActiveInBackground: true,
+            playsInSilentModeIOS: true,
+            shouldDuckAndroid: true,
+            playThroughEarpieceAndroid: false,
+          });
+        }
+        console.log('✅ Native audio system initialized');
+      } else {
+        // Web: no native audio mode to set; rely on browser APIs
+        console.log('ℹ️ Web audio - no native audio initialization required');
+      }
     } catch (error) {
-      console.error('❌ Error initializing audio:', error);
+      console.error('❌ Error initializing audio (runtime):', error);
     }
   }
 
@@ -82,56 +101,67 @@ class AudioService {
         };
       }
 
-      // Prepare text for speech
       const textToSpeak = this.prepareTextForSpeech(article);
 
-      // Check if speech is available
-      const isAvailable = await Speech.isSpeakingAsync();
-      if (isAvailable) {
-        await Speech.stop();
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        // Use Web Speech API on web
+        const utter = new (window as any).SpeechSynthesisUtterance(textToSpeak);
+        utter.rate = this.speechOptions.rate ?? 1.0;
+        utter.pitch = this.speechOptions.pitch ?? 1.0;
+        utter.volume = this.speechOptions.volume ?? 1.0;
+
+        utter.onstart = () => {
+          this.updatePlaybackState({ isPlaying: true, isLoading: false, isPaused: false });
+        };
+        utter.onend = () => {
+          this.updatePlaybackState({ isPlaying: false, isPaused: false, progress: 100 });
+        };
+        utter.onerror = (e: any) => {
+          console.error('❌ Web speech error:', e);
+          this.updatePlaybackState({ isPlaying: false, isLoading: false, isPaused: false });
+        };
+
+        (window as any).speechSynthesis.speak(utter);
+        console.log('✅ Web article audio playback started');
+      } else {
+        // Native platforms: dynamically import expo-speech
+  const speechPkg = 'expo' + '-speech';
+  const Speech = this.safeRequire(speechPkg);
+  if (!Speech) {
+    console.warn('expo-speech module not available at runtime (native).');
+    // Update state to reflect that playback could not start
+    this.updatePlaybackState({ isPlaying: false, isLoading: false, isPaused: false });
+    // Inform the caller with a thrown error so UI can handle it (App.tsx shows Alert)
+    throw new Error('Speech functionality is not available in this build. Please add expo-speech and rebuild the app.');
+  }
+
+  const isSpeaking = Speech && Speech.isSpeakingAsync ? await Speech.isSpeakingAsync() : false;
+  if (isSpeaking && Speech.stop) {
+    await Speech.stop();
+  }
+
+  await Speech.speak(textToSpeak, {
+          ...this.speechOptions,
+          onStart: () => {
+            this.updatePlaybackState({ isPlaying: true, isLoading: false, isPaused: false });
+          },
+          onDone: () => {
+            this.updatePlaybackState({ isPlaying: false, isPaused: false, progress: 100 });
+          },
+          onStopped: () => {
+            this.updatePlaybackState({ isPlaying: false, isPaused: false });
+          },
+          onError: (error: any) => {
+            console.error('❌ Speech error:', error);
+            this.updatePlaybackState({ isPlaying: false, isLoading: false, isPaused: false });
+          }
+        });
+
+        console.log('✅ Native article audio playback started');
       }
-
-      // Start speaking
-      await Speech.speak(textToSpeak, {
-        ...this.speechOptions,
-        onStart: () => {
-          this.updatePlaybackState({
-            isPlaying: true,
-            isLoading: false,
-            isPaused: false
-          });
-        },
-        onDone: () => {
-          this.updatePlaybackState({
-            isPlaying: false,
-            isPaused: false,
-            progress: 100
-          });
-        },
-        onStopped: () => {
-          this.updatePlaybackState({
-            isPlaying: false,
-            isPaused: false
-          });
-        },
-        onError: (error) => {
-          console.error('❌ Speech error:', error);
-          this.updatePlaybackState({
-            isPlaying: false,
-            isLoading: false,
-            isPaused: false
-          });
-        }
-      });
-
-      console.log('✅ Article audio playback started');
     } catch (error) {
-      console.error('❌ Error playing article audio:', error);
-      this.updatePlaybackState({
-        isPlaying: false,
-        isLoading: false,
-        isPaused: false
-      });
+      console.error('❌ Error playing article audio (runtime):', error);
+      this.updatePlaybackState({ isPlaying: false, isLoading: false, isPaused: false });
       throw error;
     }
   }
@@ -139,13 +169,20 @@ class AudioService {
   // Pause audio playback
   async pauseAudio(): Promise<void> {
     try {
-      if (this.playbackState.isPlaying) {
-        await Speech.stop();
-        this.updatePlaybackState({
-          isPlaying: false,
-          isPaused: true
-        });
-        console.log('✅ Audio paused');
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        (window as any).speechSynthesis.cancel();
+        this.updatePlaybackState({ isPlaying: false, isPaused: true });
+        console.log('✅ Web audio paused');
+      } else {
+      const speechPkg = 'expo' + '-speech';
+  const Speech = this.safeRequire(speechPkg);
+  if (Speech && Speech.stop) {
+    try { await Speech.stop(); } catch (e) { console.warn('expo-speech stop() failed', e); }
+  } else {
+    console.warn('pauseAudio: expo-speech not available or stop() not present');
+  }
+        this.updatePlaybackState({ isPlaying: false, isPaused: true });
+        console.log('✅ Native audio paused');
       }
     } catch (error) {
       console.error('❌ Error pausing audio:', error);
@@ -167,24 +204,33 @@ class AudioService {
   // Stop audio playback
   async stopAudio(): Promise<void> {
     try {
-      const isPlaying = await Speech.isSpeakingAsync();
-      if (isPlaying) {
-        await Speech.stop();
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        (window as any).speechSynthesis.cancel();
+      } else {
+        const speechPkg = 'expo' + '-speech';
+        const Speech = this.safeRequire(speechPkg);
+        if (Speech && Speech.stop) {
+          try { await Speech.stop(); } catch (e) { console.warn('expo-speech stop() failed', e); }
+        } else {
+          console.warn('stopAudio: expo-speech not available or stop() not present');
+        }
+        // unload any audio.Sound if used (native)
+        try {
+          const expoAvName = 'expo' + '-av';
+          const expoAv = this.safeRequire(expoAvName);
+          if (this.sound && expoAv) {
+            // if we used expo-av's Audio.Sound instances, unload them
+            if (typeof this.sound.unloadAsync === 'function') {
+              await this.sound.unloadAsync();
+            }
+            this.sound = null;
+          }
+        } catch (e) {
+          // ignore; not critical
+        }
       }
 
-      if (this.sound) {
-        await this.sound.unloadAsync();
-        this.sound = null;
-      }
-
-      this.updatePlaybackState({
-        isPlaying: false,
-        isPaused: false,
-        isLoading: false,
-        progress: 0,
-        currentArticle: null
-      });
-
+      this.updatePlaybackState({ isPlaying: false, isPaused: false, isLoading: false, progress: 0, currentArticle: null });
       console.log('✅ Audio stopped');
     } catch (error) {
       console.error('❌ Error stopping audio:', error);
@@ -205,10 +251,17 @@ class AudioService {
   }
 
   // Get available voices
-  async getAvailableVoices(): Promise<Speech.Voice[]> {
+  async getAvailableVoices(): Promise<any[]> {
     try {
-      const voices = await Speech.getAvailableVoicesAsync();
-      return voices;
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        return (window as any).speechSynthesis.getVoices() || [];
+      }
+      const speechPkg = 'expo' + '-speech';
+      const Speech = this.safeRequire(speechPkg);
+      if (Speech && Speech.getAvailableVoicesAsync) {
+        return await Speech.getAvailableVoicesAsync();
+      }
+      return [];
     } catch (error) {
       console.error('❌ Error getting available voices:', error);
       return [];
@@ -219,8 +272,8 @@ class AudioService {
   async isSpeechSupported(): Promise<boolean> {
     try {
       // Try to get available voices as a test
-      const voices = await this.getAvailableVoices();
-      return voices.length > 0;
+  const voices = await this.getAvailableVoices();
+  return voices && voices.length > 0;
     } catch (error) {
       console.error('❌ Speech not supported:', error);
       return false;

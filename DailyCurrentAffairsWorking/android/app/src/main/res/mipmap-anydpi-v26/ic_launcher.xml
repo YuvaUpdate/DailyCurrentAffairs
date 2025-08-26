@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Use a drawable so a single image can be referenced across densities -->
     <background android:drawable="@color/iconBackground"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+    <foreground android:drawable="@drawable/adaptive_icon"/>
 </adaptive-icon>

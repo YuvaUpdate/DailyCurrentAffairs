@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,40 @@ import {
   Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native';
+// Runtime shim: some compiled JS (bundle) may pass an object/map for the `edges` prop
+// to the native RNCSafeAreaView which expects an array. Patch the module export at
+// startup to coerce a map -> array so the native view manager receives the right
+// shape and the app doesn't crash at runtime.
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const _safeAreaContext = require('react-native-safe-area-context');
+  if (_safeAreaContext && _safeAreaContext.SafeAreaView) {
+    const OriginalSafeAreaView = _safeAreaContext.SafeAreaView;
+    _safeAreaContext.SafeAreaView = (props: any) => {
+      try {
+        const edges = props && props.edges;
+        if (edges && typeof edges === 'object' && !Array.isArray(edges)) {
+          // Convert map like { top: true, bottom: true } -> ['top','bottom']
+          const order = ['top', 'right', 'bottom', 'left'];
+          const arr = order.filter((k) => Boolean(edges[k]));
+          return React.createElement(OriginalSafeAreaView, { ...props, edges: arr });
+        }
+      } catch (e) {
+        // swallow shim errors — don't block app startup
+        // console.warn('safe-area shim inner error', e);
+      }
+      return React.createElement(OriginalSafeAreaView, props);
+    };
+  }
+} catch (e) {
+  // If the module isn't present or something fails, ignore — nothing to patch
+  // console.warn('safe-area shim failed', e);
+}
 import App from './App';
 import { AuthScreen } from './AuthScreen';
 import { authService } from './AuthService';
+import { LoadingSpinner } from './LoadingSpinner';
 
 // Custom Loading Component with animated dots
 const LoadingDots = () => {
@@ -23,12 +53,12 @@ const LoadingDots = () => {
         Animated.timing(animatedValue, {
           toValue: 1,
           duration: 800,
-          useNativeDriver: true,
+          useNativeDriver: typeof navigator !== 'undefined' && (navigator.product !== 'ReactNative'),
         }),
         Animated.timing(animatedValue, {
           toValue: 0,
           duration: 800,
-          useNativeDriver: true,
+          useNativeDriver: typeof navigator !== 'undefined' && (navigator.product !== 'ReactNative'),
         }),
       ]).start(() => animate());
     };
@@ -52,55 +82,72 @@ const LoadingDots = () => {
 export default function AppWrapper() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // startup overlay removed to avoid duplicate logo screen.
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [showAuth, setShowAuth] = useState(false);
-  const [isFirstLaunch, setIsFirstLaunch] = useState(false);
+  const [articlesReady, setArticlesReady] = useState(false);
+
+  // Track when the startup overlay was shown so we can guarantee a
+  // minimum visible duration to avoid flicker when articles load very fast.
+  const startupShownAt = useRef<number>(Date.now());
+  const MIN_VISIBLE_MS = 1200; // keep overlay for at least 1.2s
+  // We no longer force a public login flow. App will run for guests and
+  // read local bookmarks from AsyncStorage. Admins can sign in via the
+  // small Admin button which opens the AuthScreen as a modal.
+  const [showAuth, setShowAuth] = useState(false); // kept for admin modal
+  const [adminAuthVisible, setAdminAuthVisible] = useState(false);
+
+  // Toggle to show the admin login entry in the UI. Set to false to hide.
+  // You can flip this to true for debugging or admin access.
+  const SHOW_ADMIN_BUTTON = false;
 
   useEffect(() => {
-    checkFirstLaunch();
+    // Start auth state observer so components (like App) can react to
+    // admin sign-in events. We don't force authentication here.
+    checkAuthState();
+    // Extend startup fallback timeout: wait up to 15s for articles to arrive
+    const fallback = setTimeout(() => {
+      if (!articlesReady) setLoading(false);
+    }, 15000);
+    return () => clearTimeout(fallback);
   }, []);
 
-  const checkFirstLaunch = async () => {
-    try {
-      const hasLaunchedBefore = await AsyncStorage.getItem('hasLaunchedBefore');
-      if (!hasLaunchedBefore) {
-        setIsFirstLaunch(true);
-        setShowAuth(true); // Force authentication on first launch
-        await AsyncStorage.setItem('hasLaunchedBefore', 'true');
-      }
-      checkAuthState();
-    } catch (error) {
-      console.log('Error checking first launch:', error);
-      checkAuthState();
-    }
-  };
-
   const checkAuthState = async () => {
+    // Use the auth state listener so we reliably observe persisted sessions
     try {
-      const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
-      
-      // If it's first launch and no user is logged in, keep showing auth
-      if (isFirstLaunch && !currentUser) {
-        setShowAuth(true);
-      }
+      console.log('AppWrapper.checkAuthState: attaching onAuthStateChanged listener');
+      const unsubscribe = authService.onAuthStateChanged((u: any) => {
+        console.log('AppWrapper.onAuthStateChanged callback, user=', u);
+        // Also log persisted keys for extra visibility
+        AsyncStorage.getItem('ya_logged_in').then(v => console.log('AsyncStorage.ya_logged_in=', v)).catch(()=>{});
+        AsyncStorage.getItem('ya_user_uid').then(v => console.log('AsyncStorage.ya_user_uid=', v)).catch(()=>{});
+
+        // Update local user state. We won't present the public login UI
+        // from this wrapper; admin login is handled via the Admin button.
+        setUser(u);
+        setShowAuth(false); // don't show standard auth flow here
+
+        // IMPORTANT: do NOT hide the startup overlay here. The overlay should
+        // only be dismissed when articles are available (onArticlesReady) or
+        // when the global 15s fallback fires. Hiding on auth causes the
+        // loader to disappear before articles are rendered on slower devices.
+
+        // Unsubscribe immediately; re-registering is unnecessary for this wrapper
+        try { if (typeof unsubscribe === 'function') unsubscribe(); } catch (e) {}
+      });
     } catch (error) {
-      console.log('No user logged in');
+      console.log('AppWrapper.checkAuthState: Error observing auth state:', error);
       setUser(null);
-      
-      // If it's first launch, force login
-      if (isFirstLaunch) {
-        setShowAuth(true);
-      }
-    } finally {
-      setLoading(false);
+      // Don't show the public auth UI from the wrapper on errors; keep guest mode
+      setShowAuth(false);
+      // Don't force-hide the loader here; keep waiting for articles or fallback.
     }
   };
 
   const handleAuthSuccess = () => {
-    setShowAuth(false);
-    setIsFirstLaunch(false); // Reset first launch flag after successful auth
-    checkAuthState();
+  // Close any admin auth modal and refresh listener state
+  setAdminAuthVisible(false);
+  setShowAuth(false);
+  checkAuthState();
   };
 
   const handleLogout = async () => {
@@ -125,46 +172,46 @@ export default function AppWrapper() {
     );
   };
 
-  if (loading) {
-    return (
-      <SafeAreaProvider>
-        <SafeAreaView style={styles.loadingContainer}>
-          <LoadingDots />
-          <Text style={styles.loadingText}>Loading YuvaUpdate...</Text>
-        </SafeAreaView>
-      </SafeAreaProvider>
-    );
-  }
+  // Always render the main App so background fetching (cached articles,
+  // Firebase subscription and auto-refresh) can run while we show a
+  // startup overlay. This ensures articles are fetched even when the
+  // loading spinner is visible.
+  return (
+    <SafeAreaView style={styles.container}>
+      <App currentUser={user} onArticlesReady={() => {
+        setArticlesReady(true);
+        // Ensure we keep a minimum visible duration to avoid flicker,
+        // then hide the wrapper-level loading state. The wrapper no
+        // longer renders a logo overlay so this simply toggles loading.
+        const elapsed = Date.now() - (startupShownAt.current || Date.now());
+        const remaining = Math.max(0, MIN_VISIBLE_MS - elapsed);
+        setTimeout(() => {
+          setLoading(false);
+        }, remaining);
+      }} />
 
-  if (showAuth) {
-    return (
-      <SafeAreaProvider>
-        <View style={styles.authContainer}>
-          {isFirstLaunch && (
-            <View style={styles.welcomeMessage}>
-              <Text style={styles.welcomeTitle}>Welcome to YuvaUpdate!</Text>
-              <Text style={styles.welcomeText}>
-                Please create an account or login to get started with the latest news and updates.
-              </Text>
-            </View>
-          )}
+  {/* Wrapper-level startup overlay removed to avoid duplicate logo screen. */}
+
+      {/* Admin shortcut - hidden by default. Toggle SHOW_ADMIN_BUTTON to true to enable. */}
+      {SHOW_ADMIN_BUTTON && (
+        <TouchableOpacity
+          style={{ position: 'absolute', right: 16, bottom: 24, backgroundColor: '#2E7D32', padding: 10, borderRadius: 24, elevation: 6 }}
+          onPress={() => setAdminAuthVisible(true)}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>🔒 Admin</Text>
+        </TouchableOpacity>
+      )}
+
+      {SHOW_ADMIN_BUTTON && adminAuthVisible && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
           <AuthScreen
             mode={authMode}
             onAuthSuccess={handleAuthSuccess}
             onSwitchMode={setAuthMode}
           />
         </View>
-      </SafeAreaProvider>
-    );
-  }
-
-  return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.container}>
-      {/* Main App - No user header */}
-      <App currentUser={user} />
+      )}
     </SafeAreaView>
-    </SafeAreaProvider>
   );
 }
 
@@ -269,11 +316,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    zIndex: 9999,
+  },
   welcomeMessage: {
-    backgroundColor: '#2E7D32',
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 30,
+  backgroundColor: '#2E7D32',
+  padding: 14,
+  paddingTop: 24,
+  paddingBottom: 14,
   },
   welcomeTitle: {
     color: '#FFFFFF',

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
@@ -12,6 +11,7 @@ import {
   ActivityIndicator,
   SafeAreaView
 } from 'react-native';
+import FastTouchable from './FastTouchable';
 import { authService } from './AuthService';
 
 interface AuthScreenProps {
@@ -173,14 +173,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <TouchableOpacity
+                <FastTouchable
                   style={styles.showPasswordButton}
                   onPress={() => setShowPassword(!showPassword)}
                 >
                   <Text style={styles.showPasswordText}>
                     {showPassword ? 'Hide' : 'Show'}
                   </Text>
-                </TouchableOpacity>
+                </FastTouchable>
               </View>
             </View>
 
@@ -199,7 +199,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </View>
             )}
 
-            <TouchableOpacity
+            <FastTouchable
               style={[styles.authButton, loading && styles.authButtonDisabled]}
               onPress={handleAuth}
               disabled={loading}
@@ -211,15 +211,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   {mode === 'login' ? 'Sign In' : 'Create Account'}
                 </Text>
               )}
-            </TouchableOpacity>
+            </FastTouchable>
 
             {mode === 'login' && (
-              <TouchableOpacity
+              <FastTouchable
                 style={styles.forgotPasswordButton}
                 onPress={handleForgotPassword}
               >
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
+              </FastTouchable>
             )}
           </View>
 
@@ -230,13 +230,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 : "Already have an account? "
               }
             </Text>
-            <TouchableOpacity
+            <FastTouchable
               onPress={() => onSwitchMode(mode === 'login' ? 'register' : 'login')}
             >
               <Text style={styles.switchButtonText}>
                 {mode === 'login' ? 'Sign Up' : 'Sign In'}
               </Text>
-            </TouchableOpacity>
+            </FastTouchable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

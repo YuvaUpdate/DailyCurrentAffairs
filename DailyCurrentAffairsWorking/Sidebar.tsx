@@ -3,12 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   Modal,
   SafeAreaView,
   FlatList,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import FastTouchable from './FastTouchable';
 import { NewsArticle } from './types';
 import { firebaseNewsService } from './FirebaseNewsService';
 
@@ -21,6 +22,7 @@ interface SidebarProps {
   selectedCategory: string | null;
   isDarkMode: boolean;
   currentUser?: any;
+  preloadedCategories?: string[];
 }
 
 export default function Sidebar({
@@ -32,6 +34,7 @@ export default function Sidebar({
   selectedCategory,
   isDarkMode,
   currentUser
+  , preloadedCategories
 }: SidebarProps) {
   const [categories, setCategories] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'categories' | 'bookmarks'>('categories');
@@ -48,7 +51,30 @@ export default function Sidebar({
 
   useEffect(() => {
     if (visible) {
-      loadCategories();
+      // Try to show cached categories immediately for snappier UI,
+      // then refresh from the network in background.
+      (async () => {
+        try {
+          // If the parent passed preloaded categories, use them first
+          if (Array.isArray(preloadedCategories) && preloadedCategories.length > 0) {
+            setCategories(preloadedCategories);
+          } else {
+            const cached = await AsyncStorage.getItem('ya_cached_categories');
+            if (cached) {
+              const parsed: string[] = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setCategories(parsed);
+              }
+            }
+          }
+        } catch (err) {
+          // ignore cache read errors and continue to load fresh
+          console.warn('Failed to read cached categories:', err);
+        }
+
+        // Always kick off a background refresh
+        loadCategories();
+      })();
     }
   }, [visible]);
 
@@ -56,13 +82,19 @@ export default function Sidebar({
     try {
       const cats = await firebaseNewsService.getCategories();
       setCategories(cats);
+      // Persist fresh categories for instant display next time
+      try {
+        await AsyncStorage.setItem('ya_cached_categories', JSON.stringify(cats));
+      } catch (err) {
+        console.warn('Failed to cache categories:', err);
+      }
     } catch (error) {
       console.error('Error loading categories:', error);
     }
   };
 
   const renderCategoryItem = ({ item }: { item: string }) => (
-    <TouchableOpacity
+    <FastTouchable
       style={[
         styles.categoryItem,
         { 
@@ -87,11 +119,11 @@ export default function Sidebar({
       ]}>
         •
       </Text>
-    </TouchableOpacity>
+    </FastTouchable>
   );
 
   const renderBookmarkItem = ({ item }: { item: NewsArticle }) => (
-    <TouchableOpacity
+    <FastTouchable
       style={[styles.bookmarkItem, { backgroundColor: theme.surface, borderColor: theme.border }]}
       onPress={() => {
         onArticleSelect(item);
@@ -102,12 +134,12 @@ export default function Sidebar({
         <Text style={[styles.bookmarkTitle, { color: theme.text }]} numberOfLines={2}>
           {item.headline}
         </Text>
-        <Text style={[styles.bookmarkMeta, { color: theme.subText }]}>
+        <Text style={[styles.bookmarkMeta, { color: theme.subText }]}> 
           {item.category} • {item.timestamp}
         </Text>
       </View>
       <Text style={[styles.bookmarkIcon, { color: theme.accent }]}>♥</Text>
-    </TouchableOpacity>
+    </FastTouchable>
   );
 
   return (
@@ -122,9 +154,9 @@ export default function Sidebar({
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
             <Text style={[styles.headerTitle, { color: theme.text }]}>Menu</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <FastTouchable onPress={onClose} style={styles.closeButton}>
               <Text style={[styles.closeButtonText, { color: theme.text }]}>×</Text>
-            </TouchableOpacity>
+            </FastTouchable>
           </View>
 
           {/* User Section */}
@@ -145,17 +177,12 @@ export default function Sidebar({
                   </Text>
                 </View>
               </View>
-            ) : (
-              <View style={styles.guestInfo}>
-                <Text style={[styles.guestText, { color: theme.text }]}>Welcome, Guest!</Text>
-                <Text style={[styles.guestSubtext, { color: theme.subText }]}>Login to access more features</Text>
-              </View>
-            )}
+            ) : null}
           </View>
 
           {/* Tab Navigation */}
           <View style={[styles.tabContainer, { borderBottomColor: theme.border }]}>
-            <TouchableOpacity
+            <FastTouchable
               style={[
                 styles.tab,
                 { backgroundColor: activeTab === 'categories' ? theme.accent : 'transparent' }
@@ -168,8 +195,8 @@ export default function Sidebar({
               ]}>
                 Categories
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </FastTouchable>
+            <FastTouchable
               style={[
                 styles.tab,
                 { backgroundColor: activeTab === 'bookmarks' ? theme.accent : 'transparent' }
@@ -182,14 +209,14 @@ export default function Sidebar({
               ]}>
                 Saved ({bookmarkedArticles.length})
               </Text>
-            </TouchableOpacity>
+            </FastTouchable>
           </View>
 
           {/* Content */}
           <View style={styles.content}>
             {activeTab === 'categories' ? (
               <View style={styles.categoriesContainer}>
-                <TouchableOpacity
+                <FastTouchable
                   style={[
                     styles.categoryItem,
                     { 
@@ -212,9 +239,9 @@ export default function Sidebar({
                     styles.categoryIcon,
                     { color: selectedCategory === null ? '#ffffff' : theme.subText }
                   ]}>
-                    📋
+                    •
                   </Text>
-                </TouchableOpacity>
+                </FastTouchable>
                 
                 <FlatList
                   data={categories}
@@ -228,9 +255,8 @@ export default function Sidebar({
               <View style={styles.bookmarksContainer}>
                 {bookmarkedArticles.length === 0 ? (
                   <View style={styles.emptyState}>
-                    <Text style={[styles.emptyIcon, { color: theme.subText }]}>📖</Text>
                     <Text style={[styles.emptyTitle, { color: theme.text }]}>No Saved Articles</Text>
-                    <Text style={[styles.emptySubtitle, { color: theme.subText }]}>
+                    <Text style={[styles.emptySubtitle, { color: theme.subText }]}> 
                       Articles you save will appear here
                     </Text>
                   </View>
@@ -249,10 +275,9 @@ export default function Sidebar({
         </SafeAreaView>
         
         {/* Background overlay to close */}
-        <TouchableOpacity 
+                <FastTouchable 
           style={styles.backgroundOverlay} 
           onPress={onClose}
-          activeOpacity={1}
         />
       </View>
     </Modal>
@@ -268,11 +293,16 @@ const styles = StyleSheet.create({
     width: '80%',
     maxWidth: 320,
     height: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
+    // react-native-web warns about shadow* props; use boxShadow on web
+    ...(typeof navigator !== 'undefined' && navigator.product === 'ReactNative' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 2, height: 0 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 10,
+    } : {
+      boxShadow: '2px 0px 10px rgba(0,0,0,0.25)'
+    }),
   },
   backgroundOverlay: {
     flex: 1,
@@ -427,16 +457,5 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 12,
   },
-  guestInfo: {
-    alignItems: 'center',
-  },
-  guestText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  guestSubtext: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
+  // guest styles removed - app supports guest users without prompting in sidebar
 });

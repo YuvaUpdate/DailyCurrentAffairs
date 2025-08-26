@@ -3,5 +3,16 @@
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 
-    <application android:usesCleartextTraffic="true" tools:targetApi="28" tools:ignore="GoogleAppIndexingWarning" tools:replace="android:usesCleartextTraffic" />
+    <application android:usesCleartextTraffic="true" tools:targetApi="28" tools:ignore="GoogleAppIndexingWarning" tools:replace="android:usesCleartextTraffic">
+        <!-- Ensure MainActivity is launcher in debug build and remove expo dev-launcher intent filters -->
+        <activity android:name="com.nareshkumarbalamurugan.YuvaUpdate.MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    <!-- Remove dev-launcher VIEW/BROWSE intent filters that cause Expo UI to open -->
+    <activity android:name="expo.modules.devlauncher.launcher.DevLauncherActivity" tools:node="remove" />
+    </application>
 </manifest>

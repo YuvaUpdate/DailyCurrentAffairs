@@ -4,6 +4,7 @@ import {
   setDoc,
   deleteDoc,
   getDocs,
+  getDoc,
   query,
   where,
   orderBy,
@@ -42,7 +43,7 @@ export interface UserPreferences {
 
 class UserService {
   // Bookmark/Unbookmark article
-  async toggleBookmark(userId: string, articleId: number): Promise<boolean> {
+  async toggleBookmark(userId: string, articleId: string | number, articleData?: any): Promise<boolean> {
     try {
       const bookmarkId = `${userId}_${articleId}`;
       const bookmarkRef = doc(db, 'bookmarks', bookmarkId);
@@ -55,17 +56,31 @@ class UserService {
       if (!existingBookmarks.empty) {
         // Remove bookmark
         await deleteDoc(bookmarkRef);
+        // Also remove from user's profile bookmarks array
+        try {
+          await this.removeBookmarkFromUserProfile(userId, articleId);
+        } catch (e) {
+          // non-fatal
+        }
         console.log('✅ Article unbookmarked');
         return false;
       } else {
-        // Add bookmark
-        const bookmark = {
+        // Add bookmark (store article snapshot when available)
+        const bookmark: any = {
           userId,
           articleId: articleId,
           bookmarkedAt: new Date().toISOString()
         };
+        if (articleData) bookmark.articleData = articleData;
 
         await setDoc(bookmarkRef, bookmark);
+
+        // Also add to user's profile bookmarks array for quick fallback
+        try {
+          await this.addBookmarkToUserProfile(userId, articleId);
+        } catch (e) {
+          // non-fatal
+        }
 
         console.log('✅ Article bookmarked');
         return true;
@@ -196,6 +211,48 @@ class UserService {
     }
   }
 
+  // Maintain a bookmarks array on the user's profile for quick access and fallback
+  async addBookmarkToUserProfile(userId: string, articleId: string | number): Promise<void> {
+    try {
+      const prefsRef = doc(db, 'users', userId);
+      await updateDoc(prefsRef, {
+        bookmarks: arrayUnion(articleId)
+      });
+      console.log('✅ Bookmark added to user profile');
+    } catch (error) {
+      console.error('❌ Error adding bookmark to user profile:', error);
+      throw error;
+    }
+  }
+
+  async removeBookmarkFromUserProfile(userId: string, articleId: string | number): Promise<void> {
+    try {
+      const prefsRef = doc(db, 'users', userId);
+      await updateDoc(prefsRef, {
+        bookmarks: arrayRemove(articleId)
+      });
+      console.log('✅ Bookmark removed from user profile');
+    } catch (error) {
+      console.error('❌ Error removing bookmark from user profile:', error);
+      throw error;
+    }
+  }
+
+  async getUserProfileBookmarks(userId: string): Promise<(string | number)[]> {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        const arr = data.bookmarks || [];
+        return Array.isArray(arr) ? arr : [];
+      }
+      return [];
+    } catch (error) {
+      console.error('❌ Error getting user profile bookmarks:', error);
+      return [];
+    }
+  }
+
   // Track article read
   async trackArticleRead(userId: string, articleId: string): Promise<void> {
     try {
@@ -280,6 +337,23 @@ class UserService {
       };
     }
   }
+
+  // Convenience methods used by UI
+  async addBookmark(userId: string, article: any): Promise<void> {
+    const articleId = (article && (article.id ?? article)) as string | number;
+    // Pass article snapshot if object provided
+    if (article && typeof article === 'object') {
+      await this.toggleBookmark(userId, articleId, article);
+    } else {
+      await this.toggleBookmark(userId, articleId);
+    }
+  }
+
+  async removeBookmark(userId: string, articleId: string | number): Promise<void> {
+    // toggleBookmark will remove if exists
+    await this.toggleBookmark(userId, articleId);
+  }
+
 }
 
 export const userService = new UserService();

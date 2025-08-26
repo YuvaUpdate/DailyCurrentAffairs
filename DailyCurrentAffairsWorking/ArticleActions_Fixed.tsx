@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Alert,
   Share,
   Platform
 } from 'react-native';
+import FastTouchable from './FastTouchable';
 import { NewsArticle } from './types';
 import { authService } from './AuthService';
 import { userService } from './UserService';
@@ -145,7 +145,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
     <View style={[styles.container, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
       <View style={styles.actionsRow}>
         {/* Bookmark Button */}
-        <TouchableOpacity
+        <FastTouchable
           style={[
             styles.actionButton, 
             { backgroundColor: theme.surface },
@@ -163,22 +163,22 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
           ]}>
             {isBookmarked ? 'Saved' : 'Save'}
           </Text>
-        </TouchableOpacity>
+        </FastTouchable>
 
         {/* Share Button */}
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleShare}>
+        <FastTouchable style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleShare}>
           <Text style={[styles.actionIcon, { color: theme.text }]}>↗</Text>
           <Text style={[styles.actionText, { color: theme.subText }]}>Share</Text>
-        </TouchableOpacity>
+        </FastTouchable>
 
         {/* Comments Button */}
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleComments}>
+        <FastTouchable style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleComments}>
           <Text style={[styles.actionIcon, { color: theme.text }]}>◉</Text>
           <Text style={[styles.actionText, { color: theme.subText }]}>Comments</Text>
-        </TouchableOpacity>
+        </FastTouchable>
 
         {/* Audio Button */}
-        <TouchableOpacity
+        <FastTouchable
           style={[
             styles.actionButton, 
             { backgroundColor: theme.surface },
@@ -196,13 +196,14 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
           ]}>
             {isPlaying ? 'Pause' : 'Listen'}
           </Text>
-        </TouchableOpacity>
+        </FastTouchable>
       </View>
 
       {/* Comments Modal */}
       {showComments && (
         <Comments 
-          article={article} 
+          article={article}
+          visible={showComments}
           onClose={() => setShowComments(false)}
           currentUser={currentUser}
         />

@@ -18,6 +18,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { auth, db } from './firebase.config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface UserProfile {
   uid: string;
@@ -76,6 +77,15 @@ class AuthService {
       const userProfile = await this.getUserProfile(user.uid);
       
       console.log('✅ User logged in successfully:', userProfile);
+
+      // Persist a simple login flag so mobile APK can remember the user
+      try {
+        await AsyncStorage.setItem('ya_logged_in', 'true');
+        await AsyncStorage.setItem('ya_user_uid', user.uid);
+  console.log('AuthService.login: persisted ya_logged_in and ya_user_uid=', user.uid);
+      } catch (e) {
+        console.warn('Could not persist login flag to AsyncStorage', e);
+      }
       return userProfile;
     } catch (error: any) {
       console.error('❌ Login error:', error);
@@ -102,9 +112,33 @@ class AuthService {
     try {
       await signOut(auth);
       console.log('✅ User logged out successfully');
+      try {
+        await AsyncStorage.removeItem('ya_logged_in');
+        await AsyncStorage.removeItem('ya_user_uid');
+      } catch (e) {
+        console.warn('Could not clear login flag from AsyncStorage', e);
+      }
     } catch (error: any) {
       console.error('❌ Logout error:', error);
       throw new Error('Failed to logout');
+    }
+  }
+
+  // Helpers for persistent login
+  async isDeviceLoggedIn(): Promise<boolean> {
+    try {
+      const v = await AsyncStorage.getItem('ya_logged_in');
+      return v === 'true';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async getPersistedUserUid(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('ya_user_uid');
+    } catch (e) {
+      return null;
     }
   }
 

@@ -6,8 +6,8 @@ interface NewsFeedWrapperProps {
 	articles: Array<any>;
 	onRefresh?: () => void;
 	refreshing?: boolean;
-	onBookmarkToggle?: (articleId: number) => void;
-	bookmarkedArticles?: Set<number> | number[];
+		onBookmarkToggle?: (articleId: string | number) => void;
+		bookmarkedArticles?: Set<string | number> | (string | number)[];
 	isDarkMode?: boolean;
 }
 
@@ -21,15 +21,15 @@ const mapArticle = (a: any): NewsArticle => ({
 	readTime: a.readTime || a.read_time || a.read || '',
 	category: a.category || a.section || '',
 	mediaType: a.mediaType || (a.videoUrl ? 'video' : 'image'),
-	fullText: a.fullText || a.full_text || a.body || a.description || '',
+		fullText: a.fullText || a.full_text || a.body || a.description || '',
 	sourceUrl: a.sourceUrl || a.source_url || a.link || ''
 });
 
 export default function NewsFeed(props: NewsFeedWrapperProps) {
 	const mapped: NewsArticle[] = (props.articles || []).map(mapArticle);
-	const bookmarkedSet = props.bookmarkedArticles instanceof Set
-		? props.bookmarkedArticles
-		: new Set<number>(Array.isArray(props.bookmarkedArticles) ? props.bookmarkedArticles : []);
+	const bookmarkedSet: Set<string | number> = props.bookmarkedArticles instanceof Set
+		? (props.bookmarkedArticles as Set<string | number>)
+		: new Set<string | number>(Array.isArray(props.bookmarkedArticles) ? props.bookmarkedArticles : []);
 
 	return (
 		<NewsFeed_Inshorts

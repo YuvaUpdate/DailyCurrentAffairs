@@ -3,13 +3,13 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   FlatList,
   Alert,
   ActivityIndicator,
   Modal
 } from 'react-native';
+import FastTouchable from './FastTouchable';
 import { commentService } from './CommentService';
 import { authService } from './AuthService';
 import { Comment, NewsArticle } from './types';
@@ -31,7 +31,7 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
 
   useEffect(() => {
     if (visible) {
-      loadComments();
+    loadComments();
       // Use prop user if available, otherwise fetch
       if (propCurrentUser) {
         setCurrentUser(propCurrentUser);
@@ -39,13 +39,13 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
         getCurrentUser();
       }
     }
-  }, [visible, article.id, propCurrentUser]);
+  }, [visible, String(article.id), propCurrentUser]);
 
   const loadComments = async () => {
     setLoading(true);
     try {
       const unsubscribe = commentService.subscribeToComments(
-        article.id,
+  article.id as string | number,
         (updatedComments) => {
           setComments(updatedComments);
           setLoading(false);
@@ -157,34 +157,34 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
             </View>
           </View>
           {canDelete && (
-            <TouchableOpacity
+            <FastTouchable
               style={styles.deleteButton}
               onPress={() => handleDeleteComment(item.id)}
             >
               <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
+            </FastTouchable>
           )}
         </View>
 
         <Text style={styles.commentContent}>{item.content}</Text>
 
         <View style={styles.commentActions}>
-          <TouchableOpacity
+          <FastTouchable
             style={[styles.actionButton, isLiked && styles.actionButtonLiked]}
             onPress={() => handleLikeComment(item.id)}
           >
             <Text style={[styles.actionText, isLiked && styles.actionTextLiked]}>
               ♥ {item.likes}
             </Text>
-          </TouchableOpacity>
+          </FastTouchable>
 
           {!item.parentId && (
-            <TouchableOpacity
+            <FastTouchable
               style={styles.actionButton}
               onPress={() => handleReply(item.id)}
             >
               <Text style={styles.actionText}>Reply</Text>
-            </TouchableOpacity>
+            </FastTouchable>
           )}
         </View>
 
@@ -198,7 +198,7 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
               multiline
             />
             <View style={styles.replyActions}>
-              <TouchableOpacity
+              <FastTouchable
                 style={styles.cancelReplyButton}
                 onPress={() => {
                   setReplyingTo(null);
@@ -206,8 +206,8 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
                 }}
               >
                 <Text style={styles.cancelReplyText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </FastTouchable>
+              <FastTouchable
                 style={styles.submitReplyButton}
                 onPress={handleSubmitComment}
                 disabled={submitting}
@@ -217,7 +217,7 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
                 ) : (
                   <Text style={styles.submitReplyText}>Reply</Text>
                 )}
-              </TouchableOpacity>
+              </FastTouchable>
             </View>
           </View>
         )}
@@ -240,9 +240,9 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Comments</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <FastTouchable style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Done</Text>
-          </TouchableOpacity>
+          </FastTouchable>
         </View>
 
         {loading ? (
@@ -277,7 +277,7 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
                   multiline
                   maxLength={500}
                 />
-                <TouchableOpacity
+                <FastTouchable
                   style={[styles.submitButton, !newComment.trim() && styles.submitButtonDisabled]}
                   onPress={handleSubmitComment}
                   disabled={submitting || !newComment.trim()}
@@ -287,7 +287,7 @@ export const Comments: React.FC<CommentsProps> = ({ article, visible, onClose, c
                   ) : (
                     <Text style={styles.submitButtonText}>Post</Text>
                   )}
-                </TouchableOpacity>
+                </FastTouchable>
               </View>
             )}
 

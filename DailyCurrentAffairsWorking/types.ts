@@ -1,16 +1,18 @@
 // types.tsx - Shared type definitions
 export interface NewsArticle {
-  id: number;
+  id: number | string;
   headline: string;
   description: string;
   image: string;
   imageUrl?: string; // Alternative image URL
   link?: string; // External news link
   category: string;
-  readTime: string;
   timestamp: string;
   mediaType?: 'image' | 'video'; // Type of media content
   mediaPath?: string; // Firebase storage path for potential deletion
+  sourceUrl?: string;
+  readTime?: string;
+  fullText?: string;
 }
 
 // User related types
@@ -42,7 +44,7 @@ export interface AudioSettings {
 // Comment related types
 export interface Comment {
   id: string;
-  articleId: number;
+  articleId: string | number;
   userId: string;
   userName: string;
   userAvatar?: string;
@@ -59,7 +61,7 @@ export interface Comment {
 export interface Bookmark {
   id: string;
   userId: string;
-  articleId: number;
+  articleId: string | number;
   timestamp: string;
   category?: string;
 }

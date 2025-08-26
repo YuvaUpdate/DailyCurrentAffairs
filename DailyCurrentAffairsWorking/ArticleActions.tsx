@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Alert,
   Share,
   Platform
 } from 'react-native';
+import FastTouchable from './FastTouchable';
 import { NewsArticle } from './types';
 import { authService } from './AuthService';
 import { userService } from './UserService';
@@ -75,16 +75,20 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
       return;
     }
 
-    try {
-      const isNowBookmarked = await userService.toggleBookmark(currentUser.uid, article.id);
-      setIsBookmarked(isNowBookmarked);
-      Alert.alert(
-        isNowBookmarked ? 'Saved' : 'Removed', 
-        isNowBookmarked ? 'Article bookmarked successfully' : 'Article removed from bookmarks'
-      );
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update bookmark');
-    }
+    // Optimistic update: update UI immediately so the tap feels instant.
+    // Perform the network toggle in the background and rollback on failure.
+    setIsBookmarked(prev => !prev);
+
+    (async () => {
+      try {
+        await userService.toggleBookmark(currentUser.uid, article.id);
+        // success: nothing further to do because UI already updated optimistically
+      } catch (error: any) {
+        // rollback optimistic change on failure
+        setIsBookmarked(prev => !prev);
+        Alert.alert('Error', error?.message || 'Failed to update bookmark');
+      }
+    })();
   };
 
   const handleShare = async () => {
@@ -142,7 +146,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
     <View style={[styles.container, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
       <View style={styles.actionsRow}>
         {/* Bookmark Button */}
-        <TouchableOpacity
+        <FastTouchable
           style={[
             styles.actionButton, 
             { backgroundColor: theme.surface },
@@ -160,22 +164,22 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
           ]}>
             {isBookmarked ? 'Saved' : 'Save'}
           </Text>
-        </TouchableOpacity>
+        </FastTouchable>
 
         {/* Share Button */}
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleShare}>
+        <FastTouchable style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleShare}>
           <Text style={[styles.actionIcon, { color: theme.text }]}>↗</Text>
           <Text style={[styles.actionText, { color: theme.subText }]}>Share</Text>
-        </TouchableOpacity>
+        </FastTouchable>
 
         {/* Comments Button */}
-        <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleComments}>
+        <FastTouchable style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleComments}>
           <Text style={[styles.actionIcon, { color: theme.text }]}>◉</Text>
           <Text style={[styles.actionText, { color: theme.subText }]}>Comments</Text>
-        </TouchableOpacity>
+        </FastTouchable>
 
         {/* Audio Button */}
-        <TouchableOpacity
+        <FastTouchable
           style={[
             styles.actionButton, 
             { backgroundColor: theme.surface },
@@ -193,7 +197,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
           ]}>
             {isPlaying ? 'Pause' : 'Listen'}
           </Text>
-        </TouchableOpacity>
+        </FastTouchable>
       </View>
 
       {/* Comments Modal */}

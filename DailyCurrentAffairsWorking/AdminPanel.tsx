@@ -5,14 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  TouchableOpacity,
   Alert,
   Image,
   Modal,
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { VideoView } from 'expo-video';
+import FastTouchable from './FastTouchable';
+import VideoPlayerComponent from './VideoPlayerComponent';
 import { newsService } from './NewsService';
 import { firebaseNewsService } from './FirebaseNewsService';
 import { fileUploadService, UploadResult } from './FileUploadService';
@@ -27,31 +27,66 @@ const { width } = Dimensions.get('window');
 interface AdminPanelProps {
   visible: boolean;
   onClose: () => void;
-  onAddNews: (article: Omit<NewsArticle, 'id' | 'timestamp'>) => void;
-  onBulkAddNews?: (articles: NewsArticle[]) => void;
+  onAddNews: (article: Omit<NewsArticle, 'id' | 'timestamp'>) => Promise<string | void>;
+  onBulkAddNews?: (articles: NewsArticle[]) => Promise<void>;
   onLogout?: () => void;
   currentUser?: UserProfile | null;
 }
 
 export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews, onLogout, currentUser }: AdminPanelProps) {
+  // Limits for admin text inputs
+  const HEADLINE_MAX = 200;
+  const DESCRIPTION_MAX = 1000;
+  const READTIME_MAX = 50;
+  const SOURCEURL_MAX = 1000;
   const [headline, setHeadline] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [category, setCategory] = useState('');
   const [readTime, setReadTime] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'manual' | 'api'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories'>('manual');
   
   // File upload states
   const [uploadedMedia, setUploadedMedia] = useState<UploadResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [mediaSource, setMediaSource] = useState<'url' | 'upload'>('url');
 
-  const categories = ['Breaking', 'Business', 'Entertainment', 'General', 'Health', 'Science', 'Sports', 'Technology'];
+  // Category management states
+  const [categories, setCategories] = useState(['Breaking', 'Business', 'Entertainment', 'General', 'Health', 'Science', 'Sports', 'Technology']);
+  const [newCategory, setNewCategory] = useState('');
+  
+  // News management states
+  const [allNews, setAllNews] = useState<NewsArticle[]>([]);
+  const [editingNews, setEditingNews] = useState<NewsArticle | null>(null);
+  const [isLoadingNews, setIsLoadingNews] = useState(false);
 
-  const handleSubmit = () => {
-    if (!headline || !description || !category) {
-      Alert.alert('Error', 'Please fill in all required fields');
+  // Load categories from Firebase on component mount
+  React.useEffect(() => {
+    loadCategoriesFromFirebase();
+  }, []);
+
+  const loadCategoriesFromFirebase = async () => {
+    try {
+      const firebaseCategories = await firebaseNewsService.getCategories();
+      setCategories(firebaseCategories);
+    } catch (error) {
+      console.error('Error loading categories from Firebase:', error);
+    }
+  };
+
+  const handleSubmit = async () => {
+  if (!headline || !description || !category || !sourceUrl) {
+      Alert.alert('Error', 'Please fill in all required fields (Headline, Description, Category, and External Link)');
+      return;
+    }
+
+    // Validate URL format
+    try {
+      new URL(sourceUrl);
+    } catch (error) {
+      Alert.alert('Error', 'Please enter a valid URL for the external link (e.g., https://example.com/article)');
       return;
     }
 
@@ -64,30 +99,171 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     }
 
     const newArticle = {
-      headline,
-      description,
+      headline: headline.substring(0, HEADLINE_MAX),
+      description: description.substring(0, DESCRIPTION_MAX),
       image: mediaUrl,
       category,
-      readTime: readTime || '2 min read',
+      readTime: (readTime || '2 min read').substring(0, READTIME_MAX),
+      sourceUrl: sourceUrl.substring(0, SOURCEURL_MAX),
       mediaType: uploadedMedia?.type || 'image', // Add media type info
       mediaPath: uploadedMedia?.path, // Store path for potential deletion
     };
 
-    onAddNews(newArticle);
-    
-    // Reset form
-    setHeadline('');
-    setDescription('');
-    setImageUrl('');
-    setCategory('');
-    setReadTime('');
-    setUploadedMedia(null);
-    setMediaSource('url');
-    
-    Alert.alert('Success', 'News article added successfully!');
+    // Clean undefined fields before sending to Firestore (updateDoc rejects undefined values)
+    const articlePayload: any = { ...newArticle };
+    Object.keys(articlePayload).forEach((key) => {
+      if (articlePayload[key] === undefined) {
+        delete articlePayload[key];
+      }
+    });
+
+    try {
+      let result;
+      if (editingNews) {
+        // Update existing article (prefer Firestore docId when available)
+        const updateId = (editingNews as any).docId ? (editingNews as any).docId : editingNews.id;
+        await firebaseNewsService.updateArticle(updateId, articlePayload);
+        result = editingNews.id;
+        Alert.alert('Success', 'News article updated successfully!');
+      } else {
+        // Add new article
+        result = await onAddNews(articlePayload);
+        Alert.alert('Success', 'News article added successfully!');
+      }
+      
+      // Reset form only after successful persistence
+      setHeadline('');
+      setDescription('');
+      setImageUrl('');
+      setCategory('');
+      setReadTime('');
+      setSourceUrl('');
+      setUploadedMedia(null);
+      setMediaSource('url');
+      setEditingNews(null); // Clear editing state
+
+      console.log('AdminPanel: Operation result:', result);
+    } catch (error) {
+      console.error('AdminPanel: Error with article operation:', error);
+      Alert.alert('Error', `Failed to ${editingNews ? 'update' : 'add'} article. See console for details.`);
+    }
   };
 
-  const handleQuickAdd = (type: string) => {
+  // Category Management Functions
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) {
+      Alert.alert('Error', 'Please enter a category name');
+      return;
+    }
+    if (categories.includes(newCategory.trim())) {
+      Alert.alert('Error', 'Category already exists');
+      return;
+    }
+    
+    try {
+      const updatedCategories = [...categories, newCategory.trim()];
+      await firebaseNewsService.saveCategories(updatedCategories);
+      setCategories(updatedCategories);
+      setNewCategory('');
+      Alert.alert('Success', `Category "${newCategory.trim()}" added successfully!`);
+    } catch (error) {
+      console.error('Error adding category:', error);
+      Alert.alert('Error', 'Failed to add category to Firebase');
+    }
+  };
+
+  const handleRemoveCategory = (categoryToRemove: string) => {
+    Alert.alert(
+      'Confirm Delete',
+      `Are you sure you want to delete the category "${categoryToRemove}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const updatedCategories = categories.filter(cat => cat !== categoryToRemove);
+              await firebaseNewsService.saveCategories(updatedCategories);
+              setCategories(updatedCategories);
+              Alert.alert('Success', `Category "${categoryToRemove}" deleted successfully!`);
+            } catch (error) {
+              console.error('Error removing category:', error);
+              Alert.alert('Error', 'Failed to remove category from Firebase');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // News Management Functions
+  const loadAllNews = async () => {
+    try {
+      setIsLoadingNews(true);
+      const news = await firebaseNewsService.getArticlesWithDocIds();
+      console.log('Loaded news articles:', news.length);
+      setAllNews(news);
+      
+      if (news.length === 0) {
+        Alert.alert('Info', 'No news articles found in Firebase');
+      } else {
+        Alert.alert('Success', `Loaded ${news.length} news articles successfully!`);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load news articles');
+      console.error('Error loading news:', error);
+    } finally {
+      setIsLoadingNews(false);
+    }
+  };
+
+  const handleEditNews = (article: NewsArticle) => {
+    setEditingNews(article);
+    setHeadline(article.headline);
+    setDescription(article.description);
+    setImageUrl(article.image);
+    setCategory(article.category);
+    setReadTime(article.readTime || '');
+    setSourceUrl(article.sourceUrl || '');
+    setActiveTab('manual');
+    Alert.alert('Info', 'Article loaded for editing. You can now modify it in the "Add News" tab.');
+  };
+
+  const handleDeleteNews = (article: NewsArticle) => {
+    console.log('🗑️ Delete button clicked for article:', article.headline, 'ID:', article.id);
+    
+    // TEMPORARY: Skip Alert.alert for debugging
+    console.log('🗑️ [DEBUG] Bypassing Alert.alert for testing...');
+    performDelete(article);
+  };
+
+  const performDelete = async (article: NewsArticle) => {
+    try {
+      console.log('🗑️ Starting delete operation for article ID:', article.id);
+      console.log('🗑️ About to call firebaseNewsService.deleteArticle...');
+      
+  await firebaseNewsService.deleteArticle(article);
+      console.log('🗑️ Delete operation completed, reloading articles from Firebase');
+      
+      // Reload articles from Firebase to ensure sync
+      const updatedNews = await firebaseNewsService.getArticlesWithDocIds();
+      setAllNews(updatedNews);
+      
+      Alert.alert('Success', 'News article deleted successfully!');
+      console.log('🗑️ Articles reloaded, current count:', updatedNews.length);
+    } catch (error: any) {
+      console.error('🗑️ Error deleting news:', error);
+      console.error('🗑️ Error details:', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack
+      });
+      Alert.alert('Error', `Failed to delete news article: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleQuickAdd = async (type: string) => {
     let quickArticle;
     
     switch (type) {
@@ -122,10 +298,16 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     const article = {
       ...quickArticle,
       image: `https://via.placeholder.com/400x300/667eea/ffffff?text=${encodeURIComponent(quickArticle.category)}`,
+      sourceUrl: `https://example.com/news/${quickArticle.headline.replace(/\s+/g, '-').toLowerCase()}`,
     };
 
-    onAddNews(article);
-    Alert.alert('Success', `${type.charAt(0).toUpperCase() + type.slice(1)} news added!`);
+    try {
+      await onAddNews(article);
+      Alert.alert('Success', `${type.charAt(0).toUpperCase() + type.slice(1)} news added!`);
+    } catch (error) {
+      console.error('AdminPanel: Quick add failed:', error);
+      Alert.alert('Error', 'Failed to add quick article');
+    }
   };
 
   // File Upload Functions
@@ -176,8 +358,13 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       const articles = await newsService.fetchLatestNews(category);
       
       if (onBulkAddNews && articles.length > 0) {
-        onBulkAddNews(articles);
-        Alert.alert('Success', `Added ${articles.length} news articles from API!`);
+        try {
+          await onBulkAddNews(articles);
+          Alert.alert('Success', `Added ${articles.length} news articles from API!`);
+        } catch (error) {
+          console.error('AdminPanel: Bulk add failed:', error);
+          Alert.alert('Error', 'Failed to add bulk articles. See console for details.');
+        }
       } else {
         Alert.alert('Info', 'No new articles found for this category. Try a different category or check your internet connection.');
       }
@@ -218,354 +405,219 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => {
-              if (onLogout) {
-                Alert.alert(
-                  'Logout',
-                  'Are you sure you want to logout from admin panel?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Logout', style: 'destructive', onPress: onLogout }
-                  ]
-                );
-              }
-            }}
-            style={styles.logoutButton}
-          >
-            <Text style={styles.logoutButtonText}>🔓 Logout</Text>
-          </TouchableOpacity>
+            <FastTouchable 
+              onPress={() => {
+                if (onLogout) {
+                  Alert.alert(
+                    'Logout',
+                    'Are you sure you want to logout from admin panel?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Logout', style: 'destructive', onPress: onLogout }
+                    ]
+                  );
+                }
+              }}
+              style={styles.logoutButton}
+            >
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </FastTouchable>
           <Text style={styles.headerTitle}>Admin Panel</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
+          <FastTouchable onPress={onClose} style={styles.closeButton}>
+            <Text style={styles.closeButtonText}>Close</Text>
+          </FastTouchable>
         </View>
 
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity 
+          <FastTouchable 
             style={[styles.tab, activeTab === 'manual' && styles.activeTab]}
             onPress={() => setActiveTab('manual')}
           >
-            <Text style={[styles.tabText, activeTab === 'manual' && styles.activeTabText]}>Manual Entry</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
+            <Text style={[styles.tabText, activeTab === 'manual' && styles.activeTabText]}>Add News</Text>
+          </FastTouchable>
+          <FastTouchable 
             style={[styles.tab, activeTab === 'api' && styles.activeTab]}
             onPress={() => setActiveTab('api')}
           >
-            <Text style={[styles.tabText, activeTab === 'api' && styles.activeTabText]}>API Integration</Text>
-          </TouchableOpacity>
-        </View>
+            <Text style={[styles.tabText, activeTab === 'api' && styles.activeTabText]}>API Import</Text>
+          </FastTouchable>
+          <FastTouchable 
+            style={[styles.tab, activeTab === 'manage' && styles.activeTab]}
+            onPress={() => {
+              setActiveTab('manage');
+              loadAllNews();
+            }}
+          >
+            <Text style={[styles.tabText, activeTab === 'manage' && styles.activeTabText]}>Manage News</Text>
+          </FastTouchable>
+          <FastTouchable 
+            style={[styles.tab, activeTab === 'categories' && styles.activeTab]}
+            onPress={() => setActiveTab('categories')}
+          >
+            <Text style={[styles.tabText, activeTab === 'categories' && styles.activeTabText]}>Categories</Text>
+          </FastTouchable>
+  </View>
 
         <ScrollView style={styles.content}>
-          {activeTab === 'manual' ? (
-            // Manual Entry Tab Content
-            <>
-              {/* Quick Add Section */}
+          {activeTab === 'manual' && (
+            <View>
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Quick Add News</Text>
-            <View style={styles.quickAddContainer}>
-              <TouchableOpacity 
-                style={[styles.quickAddButton, { backgroundColor: '#ff4757' }]}
-                onPress={() => handleQuickAdd('breaking')}
-              >
-                <Text style={styles.quickAddText}>Breaking News</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.quickAddButton, { backgroundColor: '#667eea' }]}
-                onPress={() => handleQuickAdd('tech')}
-              >
-                <Text style={styles.quickAddText}>Tech News</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.quickAddButton, { backgroundColor: '#f093fb' }]}
-                onPress={() => handleQuickAdd('sports')}
-              >
-                <Text style={styles.quickAddText}>Sports News</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Firebase Storage Test Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Storage Test</Text>
-            <TouchableOpacity 
-              style={[styles.quickAddButton, { backgroundColor: '#4ade80', marginBottom: 10 }]}
-              onPress={async () => {
-                try {
-                  checkStorageConfig();
-                  await testFirebaseStorage();
-                  Alert.alert('✅ Success', 'Firebase Storage is working correctly!');
-                } catch (error) {
-                  Alert.alert('❌ Storage Error', 'Firebase Storage is not configured. Please follow the setup guide.');
-                }
-              }}
-            >
-              <Text style={styles.quickAddText}>Test Firebase Storage</Text>
-            </TouchableOpacity>
-            
-            {/* Firebase Test Component */}
-            <FirebaseTest />
-            
-            {/* Platform Debugger */}
-            <PlatformDebugger />
-          </View>
-
-          {/* Custom News Form */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Add Custom News</Text>
-            
-            <Text style={styles.label}>Headline *</Text>
-            <TextInput
-              style={styles.input}
-              value={headline}
-              onChangeText={setHeadline}
-              placeholder="Enter news headline..."
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              multiline
-            />
-
-            <Text style={styles.label}>Description *</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Enter news description..."
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              multiline
-              numberOfLines={4}
-            />
-
-            <Text style={styles.label}>Category *</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.categoryButton,
-                    { backgroundColor: category === cat ? '#667eea' : 'rgba(255,255,255,0.1)' }
-                  ]}
-                  onPress={() => setCategory(cat)}
-                >
-                  <Text style={styles.categoryButtonText}>{cat}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <Text style={styles.label}>Media (Image/Video)</Text>
-            
-            {/* Media Source Toggle */}
-            <View style={styles.mediaSourceToggle}>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  { backgroundColor: mediaSource === 'url' ? '#667eea' : 'rgba(255,255,255,0.1)' }
-                ]}
-                onPress={() => setMediaSource('url')}
-              >
-                <Text style={styles.toggleButtonText}>🔗 URL</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  { backgroundColor: mediaSource === 'upload' ? '#667eea' : 'rgba(255,255,255,0.1)' }
-                ]}
-                onPress={() => setMediaSource('upload')}
-              >
-                <Text style={styles.toggleButtonText}>📁 Upload</Text>
-              </TouchableOpacity>
-            </View>
-
-            {mediaSource === 'url' ? (
-              <TextInput
-                style={styles.input}
-                value={imageUrl}
-                onChangeText={setImageUrl}
-                placeholder="https://example.com/image.jpg or video.mp4"
-                placeholderTextColor="rgba(255,255,255,0.5)"
-              />
-            ) : (
-              <View style={styles.uploadSection}>
-                {!uploadedMedia ? (
-                  <TouchableOpacity
-                    style={styles.uploadButton}
-                    onPress={handleMediaUpload}
-                    disabled={isUploading}
-                  >
-                    {isUploading ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <>
-                        <Text style={styles.uploadButtonText}>📷 Choose Media</Text>
-                        <Text style={styles.uploadButtonSubtext}>Images, Videos supported</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.uploadedMediaPreview}>
-                    {uploadedMedia.type === 'image' ? (
-                      <Image source={{ uri: uploadedMedia.url }} style={styles.uploadedImage} />
-                    ) : (
-                      <View style={styles.videoContainer}>
-                        <Image 
-                          source={{ uri: uploadedMedia.url }} 
-                          style={styles.uploadedVideo}
-                        />
-                        <Text style={styles.videoLabel}>📹 Video uploaded</Text>
-                      </View>
-                    )}
-                    <TouchableOpacity
-                      style={styles.removeMediaButton}
-                      onPress={handleRemoveUploadedMedia}
-                    >
-                      <Text style={styles.removeMediaText}>✕ Remove</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
-
-            <Text style={styles.label}>Read Time (optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={readTime}
-              onChangeText={setReadTime}
-              placeholder="2 min read"
-              placeholderTextColor="rgba(255,255,255,0.5)"
-            />
-
-            {/* Preview */}
-            {headline && description && (
-              <View style={styles.previewSection}>
-                <Text style={styles.previewTitle}>Preview</Text>
-                <View style={styles.previewCard}>
-                  {(uploadedMedia || imageUrl) && (
-                    <>
-                      {uploadedMedia ? (
-                        uploadedMedia.type === 'image' ? (
-                          <Image source={{ uri: uploadedMedia.url }} style={styles.previewImage} />
-                        ) : (
-                          <View style={styles.videoContainer}>
-                            <Image 
-                              source={{ uri: uploadedMedia.url }} 
-                              style={styles.previewImage}
-                            />
-                            <Text style={styles.videoLabel}>📹 Video Preview</Text>
-                          </View>
-                        )
-                      ) : (
-                        <Image source={{ uri: imageUrl }} style={styles.previewImage} />
-                      )}
-                    </>
-                  )}
-                  <View style={styles.previewContent}>
-                    <Text style={styles.previewHeadline}>{headline}</Text>
-                    <Text style={styles.previewDescription} numberOfLines={3}>
-                      {description}
-                    </Text>
-                    {category && (
-                      <View style={styles.previewMeta}>
-                        <Text style={styles.previewMetaText}>
-                          {category} • {readTime || '2 min read'}
-                          {uploadedMedia && ` • ${uploadedMedia.type === 'video' ? 'Video' : 'Image'}`}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                <View style={styles.quickAddContainer}>
+                    <FastTouchable style={[styles.quickAddButton, { backgroundColor: '#ff4757' }]} onPress={() => handleQuickAdd('breaking')}>
+                      <Text style={styles.quickAddText}>Breaking</Text>
+                    </FastTouchable>
+                    <FastTouchable style={[styles.quickAddButton, { backgroundColor: '#667eea' }]} onPress={() => handleQuickAdd('tech')}>
+                      <Text style={styles.quickAddText}>Tech</Text>
+                    </FastTouchable>
+                    <FastTouchable style={[styles.quickAddButton, { backgroundColor: '#f093fb' }]} onPress={() => handleQuickAdd('sports')}>
+                      <Text style={styles.quickAddText}>Sports</Text>
+                    </FastTouchable>
                 </View>
               </View>
-            )}
 
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-              <Text style={styles.submitButtonText}>Publish News</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Analytics Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Analytics</Text>
-            <View style={styles.analyticsContainer}>
-              <View style={styles.analyticsCard}>
-                <Text style={styles.analyticsNumber}>247</Text>
-                <Text style={styles.analyticsLabel}>Total Articles</Text>
-              </View>
-              <View style={styles.analyticsCard}>
-                <Text style={styles.analyticsNumber}>12.5K</Text>
-                <Text style={styles.analyticsLabel}>Daily Readers</Text>
-              </View>
-              <View style={styles.analyticsCard}>
-                <Text style={styles.analyticsNumber}>89%</Text>
-                <Text style={styles.analyticsLabel}>Engagement</Text>
-              </View>
-            </View>
-          </View>
-          </>
-          ) : (
-            // API Integration Tab Content
-            <>
-              {/* API Integration Section */}
-              <View style={styles.apiSection}>
-                <Text style={styles.sectionTitle}>API News Integration</Text>
-                <Text style={styles.label}>Fetch Latest News by Category</Text>
-                
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                  {categories.map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={styles.apiButton}
-                      onPress={() => handleFetchLatestNews(cat.toLowerCase())}
-                      disabled={isLoading}
-                    >
-                      <Text style={styles.apiButtonText}>{cat}</Text>
-                    </TouchableOpacity>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Add / Edit News</Text>
+                <Text style={styles.label}>Headline</Text>
+                <TextInput value={headline} onChangeText={setHeadline} style={styles.input} maxLength={HEADLINE_MAX} />
+                <Text style={styles.label}>Description</Text>
+                <TextInput value={description} onChangeText={setDescription} style={[styles.input, styles.textArea]} multiline maxLength={DESCRIPTION_MAX} />
+                <Text style={styles.label}>Category</Text>
+                <ScrollView horizontal style={styles.categoryScroll}>
+                  {categories.map(cat => (
+                    <FastTouchable key={cat} style={[styles.categoryButton, { backgroundColor: category === cat ? '#667eea' : 'rgba(255,255,255,0.06)' }]} onPress={() => setCategory(cat)}>
+                      <Text style={styles.categoryButtonText}>{cat}</Text>
+                    </FastTouchable>
                   ))}
                 </ScrollView>
 
-                <TouchableOpacity
-                  style={[styles.apiButton, { backgroundColor: '#667eea', marginTop: 15 }]}
-                  onPress={() => handleFetchLatestNews()}
-                  disabled={isLoading}
-                >
-                  <Text style={styles.apiButtonText}>Fetch All Latest News</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search News Section */}
-              <View style={styles.apiSection}>
-                <Text style={styles.sectionTitle}>Search News</Text>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search for specific news topics..."
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  onSubmitEditing={(e) => handleSearchNews(e.nativeEvent.text)}
-                />
-                <Text style={[styles.label, { fontSize: 12, marginTop: 5 }]}>
-                  Press Enter to search or try: "technology", "climate", "sports"
-                </Text>
-              </View>
-
-              {/* API Status Section */}
-              <View style={styles.apiSection}>
-                <Text style={styles.sectionTitle}>API Status</Text>
-                <Text style={styles.label}>
-                  Status: <Text style={{ color: '#4ade80' }}>Connected</Text>
-                </Text>
-                <Text style={[styles.label, { fontSize: 12, marginTop: 5 }]}>
-                  Using NewsAPI.org for real-time news data
-                </Text>
-                <Text style={[styles.label, { fontSize: 12, marginTop: 5 }]}>
-                  API key configured and ready for production
-                </Text>
-              </View>
-
-              {isLoading && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color="#667eea" />
-                  <Text style={styles.loadingText}>Fetching news...</Text>
+                <Text style={styles.label}>Media</Text>
+                <View style={styles.mediaSourceToggle}>
+                  <FastTouchable onPress={() => setMediaSource('url')} style={[styles.toggleButton, { backgroundColor: mediaSource === 'url' ? 'rgba(255,255,255,0.04)' : 'transparent' }]}>
+                    <Text style={styles.toggleButtonText}>Use URL</Text>
+                  </FastTouchable>
+                  <FastTouchable onPress={() => setMediaSource('upload')} style={[styles.toggleButton, { backgroundColor: mediaSource === 'upload' ? 'rgba(255,255,255,0.04)' : 'transparent' }]}>
+                    <Text style={styles.toggleButtonText}>Upload</Text>
+                  </FastTouchable>
                 </View>
-              )}
-            </>
+
+                {mediaSource === 'url' && <TextInput placeholder="Image URL" value={imageUrl} onChangeText={setImageUrl} style={styles.input} />}
+                {mediaSource === 'upload' && (
+                  <View>
+                    <FastTouchable style={styles.uploadButton} onPress={handleMediaUpload}>
+                      <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading...' : 'Pick & Upload Media'}</Text>
+                      <Text style={styles.uploadButtonSubtext}>Supports images & videos</Text>
+                    </FastTouchable>
+                    {uploadedMedia && (
+                      <View style={styles.uploadedMediaPreview}>
+                        {uploadedMedia.type === 'image' && <Image source={{ uri: uploadedMedia.url }} style={styles.uploadedImage} />}
+                        {uploadedMedia.type === 'video' && (
+                          <View style={styles.videoContainer}>
+                            <VideoPlayerComponent videoUrl={uploadedMedia.url} style={styles.uploadedVideo} />
+                            <Text style={styles.videoLabel}>Uploaded Video</Text>
+                          </View>
+                        )}
+                        <FastTouchable style={styles.removeMediaButton} onPress={handleRemoveUploadedMedia}>
+                          <Text style={styles.removeMediaText}>Remove Media</Text>
+                        </FastTouchable>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                <Text style={styles.label}>Read Time (e.g. "2 min read")</Text>
+                <TextInput placeholder="Read time" value={readTime} onChangeText={setReadTime} style={styles.input} maxLength={READTIME_MAX} />
+
+                <Text style={styles.label}>External Link (Required)</Text>
+                <TextInput placeholder="https://example.com/article" value={sourceUrl} onChangeText={setSourceUrl} style={styles.input} keyboardType="url" autoCapitalize="none" maxLength={SOURCEURL_MAX} />
+
+                <FastTouchable style={styles.submitButton} onPress={handleSubmit}>
+                  <Text style={styles.submitButtonText}>{editingNews ? 'Update Article' : 'Add Article'}</Text>
+                </FastTouchable>
+              </View>
+            </View>
           )}
+
+          {activeTab === 'api' && (
+            <View>
+              <View style={styles.apiSection}>
+                <Text style={styles.sectionTitle}>API Integration</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  <FastTouchable style={styles.apiButton} onPress={() => handleFetchLatestNews() }>
+                    <Text style={styles.apiButtonText}>Fetch Latest</Text>
+                  </FastTouchable>
+                  <FastTouchable style={styles.apiButton} onPress={() => handleFetchLatestNews('technology') }>
+                    <Text style={styles.apiButtonText}>Fetch Tech</Text>
+                  </FastTouchable>
+                  <FastTouchable style={styles.apiButton} onPress={() => handleFetchLatestNews('sports') }>
+                    <Text style={styles.apiButtonText}>Fetch Sports</Text>
+                  </FastTouchable>
+                </View>
+                <TextInput placeholder="Search query" onSubmitEditing={(e: any) => handleSearchNews(e.nativeEvent.text)} style={styles.searchInput} />
+              </View>
+            </View>
+          )}
+
+          {activeTab === 'manage' && (
+            <View>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Manage News</Text>
+                <FastTouchable style={[styles.apiButton, { marginVertical: 10 }]} onPress={loadAllNews}>
+                  <Text style={styles.apiButtonText}>Reload News From Firebase</Text>
+                </FastTouchable>
+
+                {isLoadingNews ? (
+                  <ActivityIndicator color="#667eea" />
+                ) : (
+                  allNews.map(article => (
+                    <View key={String((article as any).docId ?? article.id)} style={[styles.previewCard, { marginVertical: 8 }]}> 
+                      <View style={styles.previewContent}>
+                        <Text style={styles.previewHeadline}>{article.headline}</Text>
+                        <Text style={styles.previewDescription}>{article.description}</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+                          <FastTouchable onPress={() => handleEditNews(article)}>
+                            <Text style={{ color: '#4ade80' }}>Edit</Text>
+                          </FastTouchable>
+                          <FastTouchable onPress={() => performDelete(article)}>
+                            <Text style={{ color: '#ff6b6b' }}>Delete</Text>
+                          </FastTouchable>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          )}
+
+          {activeTab === 'categories' && (
+            <View>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Categories</Text>
+                <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+                  <TextInput placeholder="New category" value={newCategory} onChangeText={setNewCategory} style={[styles.input, { flex: 1, marginRight: 8 }]} />
+                  <FastTouchable style={styles.apiButton} onPress={handleAddCategory}>
+                    <Text style={styles.apiButtonText}>Add</Text>
+                  </FastTouchable>
+                </View>
+                <ScrollView horizontal style={styles.categoryScroll}>
+                  {categories.map(cat => (
+                    <View key={cat} style={{ marginRight: 10, alignItems: 'center' }}>
+                      <FastTouchable style={[styles.categoryButton, { backgroundColor: 'rgba(255,255,255,0.04)' }]} onPress={() => {}}>
+                        <Text style={styles.categoryButtonText}>{cat}</Text>
+                      </FastTouchable>
+                      <FastTouchable onPress={() => handleRemoveCategory(cat)}>
+                        <Text style={{ color: '#ff6b6b', marginTop: 6 }}>Delete</Text>
+                      </FastTouchable>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          <View style={{ height: 60 }} />
         </ScrollView>
       </View>
     </Modal>
@@ -645,12 +697,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     color: '#ffffff',
-    fontSize: 16,
+  fontSize: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
   textArea: {
-    height: 100,
+  height: 120,
     textAlignVertical: 'top',
   },
   categoryScroll: {
@@ -697,8 +749,8 @@ const styles = StyleSheet.create({
   },
   previewDescription: {
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    lineHeight: 20,
+  fontSize: 12,
+  lineHeight: 16,
     marginBottom: 8,
   },
   previewMeta: {
@@ -904,6 +956,156 @@ const styles = StyleSheet.create({
   removeMediaText: {
     color: '#FF3B30',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  characterCount: {
+    fontSize: 11,
+    marginTop: 4,
+    marginBottom: 12,
+    textAlign: 'right',
+    fontWeight: '500',
+  },
+  // News Management Styles
+  newsList: {
+    maxHeight: 400,
+  },
+  newsItem: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  newsItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  newsItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    flex: 1,
+    marginRight: 10,
+  },
+  newsItemCategory: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#667eea',
+    backgroundColor: 'rgba(102, 126, 234, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  newsItemDescription: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  newsItemActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  newsActionButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 6,
+    flex: 1,
+    alignItems: 'center',
+  },
+  newsActionText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  actionButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+  },
+  // Category Management Styles
+  categoryInputContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  categoryInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#ffffff',
+  },
+  addCategoryButton: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addCategoryText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  categoriesList: {
+    maxHeight: 300,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  categoryName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#ffffff',
+  },
+  removeCategoryButton: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  removeCategoryText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

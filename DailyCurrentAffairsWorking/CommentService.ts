@@ -18,7 +18,7 @@ import { db } from './firebase.config';
 
 export interface Comment {
   id: string;
-  articleId: number; // Changed to match NewsArticle.id type
+  articleId: string | number; // accept string or number
   userId: string;
   userName: string;
   userAvatar?: string;
@@ -32,7 +32,7 @@ export interface Comment {
 }
 
 export interface CommentData {
-  articleId: number;
+  articleId: string | number;
   userId: string;
   userName: string;
   userAvatar?: string;
@@ -54,8 +54,8 @@ class CommentService {
 
       const docRef = await addDoc(collection(db, 'comments'), comment);
 
-      // Update article comment count
-      await this.updateArticleCommentCount(commentData.articleId.toString(), 1);
+  // Update article comment count
+  await this.updateArticleCommentCount(commentData.articleId.toString(), 1);
 
       console.log('✅ Comment added successfully:', docRef.id);
       return docRef.id;
@@ -66,12 +66,12 @@ class CommentService {
   }
 
   // Get comments for an article
-  async getComments(articleId: number): Promise<Comment[]> {
+  async getComments(articleId: string | number): Promise<Comment[]> {
     try {
       // Use simple query without orderBy to avoid index requirement
       const q = query(
         collection(db, 'comments'),
-        where('articleId', '==', articleId),
+  where('articleId', '==', articleId),
         where('isDeleted', '==', false)
       );
 
@@ -100,11 +100,11 @@ class CommentService {
   }
 
   // Subscribe to comments for real-time updates
-  subscribeToComments(articleId: number, callback: (comments: Comment[]) => void) {
+  subscribeToComments(articleId: string | number, callback: (comments: Comment[]) => void) {
     try {
-      const q = query(
-        collection(db, 'comments'),
-        where('articleId', '==', articleId),
+  const q = query(
+  collection(db, 'comments'),
+  where('articleId', '==', articleId),
         where('isDeleted', '==', false),
         orderBy('timestamp', 'desc')
       );
@@ -200,11 +200,11 @@ class CommentService {
   }
 
   // Get comment count for an article
-  async getCommentCount(articleId: number): Promise<number> {
+  async getCommentCount(articleId: string | number): Promise<number> {
     try {
       const q = query(
         collection(db, 'comments'),
-        where('articleId', '==', articleId),
+  where('articleId', '==', articleId),
         where('isDeleted', '==', false)
       );
 

@@ -3,13 +3,14 @@ import {
   View,
   Text,
   Image,
-  TouchableOpacity,
   StyleSheet,
   Dimensions,
   Share,
   Linking,
 } from 'react-native';
+import FastTouchable from './FastTouchable';
 import { NewsArticle } from './types';
+import { scaleFont, responsiveLines } from './utils/responsive';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -51,7 +52,7 @@ export default function InshortsCard({ article, onPress, onBookmark, isBookmarke
   };
 
   return (
-    <TouchableOpacity activeOpacity={0.95} onPress={() => onPress?.(article)} style={styles.card}>
+    <FastTouchable activeOpacity={0.95} onPress={() => onPress?.(article)} style={styles.card}>
       <View style={styles.imageWrap}>
         <Image
           source={{ uri: article.image || article.imageUrl || 'https://via.placeholder.com/800x600' }}
@@ -66,18 +67,23 @@ export default function InshortsCard({ article, onPress, onBookmark, isBookmarke
 
         {/* Floating actions */}
         <View style={styles.floatingActions}>
-          <TouchableOpacity onPress={() => onBookmark && onBookmark(article.id)} style={styles.iconButton}>
+          <FastTouchable onPress={() => onBookmark && onBookmark(article.id)} style={styles.iconButton}>
             <Text style={styles.iconText}>{isBookmarked ? '★' : '☆'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={share} style={styles.iconButton}>
+          </FastTouchable>
+          <FastTouchable onPress={share} style={styles.iconButton}>
             <Text style={styles.iconText}>↗</Text>
-          </TouchableOpacity>
+          </FastTouchable>
         </View>
       </View>
 
       <View style={styles.body}>
         <Text numberOfLines={2} style={styles.headline}>{article.headline}</Text>
-        <Text numberOfLines={3} style={styles.description}>{article.description}</Text>
+  <Text numberOfLines={responsiveLines(screenHeight, 12, 8)} style={[styles.description, { fontSize: scaleFont(15), lineHeight: 22 }]}>{article.description}</Text>
+
+        {/* Dev-only visual marker to verify this component is the one rendered */}
+        {__DEV__ && (
+          <Text style={styles.debug}>debug: descLines=10</Text>
+        )}
 
         <View style={styles.metaRow}>
           <Text style={styles.source}>{getHostname(article.sourceUrl) || getHostname(article.link) || 'Source'}</Text>
@@ -85,7 +91,7 @@ export default function InshortsCard({ article, onPress, onBookmark, isBookmarke
           {article.timestamp ? <Text style={styles.time}>{new Date(article.timestamp).toLocaleString()}</Text> : null}
         </View>
       </View>
-    </TouchableOpacity>
+  </FastTouchable>
   );
 }
 
@@ -146,9 +152,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   description: {
-    color: '#ccc',
-    fontSize: 14,
-    marginBottom: 8,
+  color: '#ccc',
+  fontSize: 15,
+  lineHeight: 22,
+  marginBottom: 6,
   },
   metaRow: {
     flexDirection: 'row',
@@ -165,5 +172,11 @@ const styles = StyleSheet.create({
   time: {
     color: '#999',
     fontSize: 12,
+  },
+  debug: {
+    color: '#0f0',
+    fontSize: 10,
+    marginTop: 6,
+    opacity: 0.9,
   },
 });

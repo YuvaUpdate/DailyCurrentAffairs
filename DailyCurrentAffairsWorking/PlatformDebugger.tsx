@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Platform } from 'react-native';
+import { View, Text, Alert, StyleSheet, Platform } from 'react-native';
+import FastTouchable from './FastTouchable';
 
 export default function PlatformDebugger() {
   const [debugInfo, setDebugInfo] = useState<string>('');
@@ -72,18 +73,18 @@ export default function PlatformDebugger() {
     <View style={styles.container}>
       <Text style={styles.title}>🔍 Platform Debugger</Text>
       
-      <TouchableOpacity style={styles.button} onPress={runPlatformTest}>
+      <FastTouchable style={styles.button} onPress={runPlatformTest}>
         <Text style={styles.buttonText}>🔍 Test Platform Info</Text>
-      </TouchableOpacity>
+      </FastTouchable>
       
-      <TouchableOpacity style={[styles.button, styles.warningButton]} onPress={testConsoleLogging}>
+      <FastTouchable style={[styles.button, styles.warningButton]} onPress={testConsoleLogging}>
         <Text style={styles.buttonText}>📝 Test Console Logs</Text>
-      </TouchableOpacity>
+      </FastTouchable>
       
       {Platform.OS === 'web' && (
-        <TouchableOpacity style={[styles.button, styles.webButton]} onPress={testWebSpecificFeatures}>
+        <FastTouchable style={[styles.button, styles.webButton]} onPress={testWebSpecificFeatures}>
           <Text style={styles.buttonText}>🌐 Test Web Features</Text>
-        </TouchableOpacity>
+        </FastTouchable>
       )}
       
       {debugInfo ? (

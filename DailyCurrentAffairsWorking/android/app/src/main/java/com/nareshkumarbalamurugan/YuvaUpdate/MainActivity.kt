@@ -30,14 +30,14 @@ class MainActivity : ReactActivity() {
    * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate {
-    return ReactActivityDelegateWrapper(
-          this,
-          BuildConfig.IS_NEW_ARCHITECTURE_ENABLED,
-          object : DefaultReactActivityDelegate(
-              this,
-              mainComponentName,
-              fabricEnabled
-          ){})
+  // Return the default ReactActivityDelegate directly instead of using
+  // ReactActivityDelegateWrapper which can redirect to the Expo DevLauncher
+  // in debug builds. This prevents DevLauncher from intercepting startup.
+  return object : DefaultReactActivityDelegate(
+    this,
+    mainComponentName,
+    fabricEnabled
+  ) {}
   }
 
   /**
