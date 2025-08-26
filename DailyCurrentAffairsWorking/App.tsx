@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { InteractionManager } from 'react-native';
+import { Appearance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View,
@@ -48,8 +49,14 @@ interface AppProps {
 export default function App(props: AppProps) {
   const { currentUser, onArticlesReady } = props;
   const insets = useSafeAreaInsets();
-  // Theme state - Default to dark mode
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // Theme state - Default to system or dark mode until persisted value is loaded
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    // Use system preference as initial guess to reduce flicker while AsyncStorage loads
+    const sys = Appearance.getColorScheme();
+    return sys === 'light' ? false : true;
+  });
+  const [isThemeLoaded, setIsThemeLoaded] = useState(false);
+  const THEME_KEY = 'ya_theme';
   const [screenData, setScreenData] = useState(Dimensions.get('screen'));
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [authVisible, setAuthVisible] = useState(false);
@@ -89,6 +96,39 @@ export default function App(props: AppProps) {
   };
 
   const currentTheme = isDarkMode ? theme.dark : theme.light;
+
+  // Load persisted theme preference on startup
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(THEME_KEY);
+        if (stored === 'light') {
+          setIsDarkMode(false);
+        } else if (stored === 'dark') {
+          setIsDarkMode(true);
+        }
+      } catch (e) {
+        console.warn('Failed to read persisted theme', e);
+      } finally {
+        setIsThemeLoaded(true);
+      }
+    })();
+  }, []);
+
+  // Helper to persist theme changes
+  const persistTheme = async (dark: boolean) => {
+    try {
+      await AsyncStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
+    } catch (e) {
+      console.warn('Failed to persist theme choice', e);
+    }
+  };
+
+  const toggleTheme = () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    persistTheme(next);
+  };
 
   // Start with empty data so we can show a loading state on startup and then
   // populate from cache or network. This avoids showing sample articles by default.
@@ -1028,7 +1068,7 @@ export default function App(props: AppProps) {
         <View style={styles.headerButtons}>
           <FastTouchable 
             style={[styles.themeButton, { backgroundColor: currentTheme.accent }]}
-            onPress={() => setIsDarkMode(!isDarkMode)}
+            onPress={toggleTheme}
           >
             <Text style={[styles.themeButtonText, { color: '#FFFFFF' }]}>{isDarkMode ? '☀' : '☽'}</Text>
           </FastTouchable>
