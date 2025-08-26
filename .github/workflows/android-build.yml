@@ -5,6 +5,9 @@ on:
   push:
     branches: [ main ]
 
+env:
+  ANDROID_SDK_ROOT: /usr/local/android-sdk
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,26 +20,46 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
+
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip wget zip
+
+      - name: Install Android command-line tools and Build Tools 35
+        run: |
+          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          curl -sSL https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -o /tmp/cmdline.zip
+          unzip -q /tmp/cmdline.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
+          mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest/
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        shell: bash
+
+      - name: Verify Java & Android SDK
+        run: |
+          java -version
+          ls -la $ANDROID_SDK_ROOT
+        shell: bash
 
       - name: Set up Node.js 18
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Install node dependencies
-        run: |
-          npm ci
+        run: npm ci
 
       - name: Make gradlew executable
-        run: |
-          chmod +x android/gradlew
+        run: chmod +x android/gradlew
 
       - name: Build release APK
         run: |
           cd android
-          # Build release (unsigned) APK; runner is Ubuntu so Windows colon-path bug is avoided.
           ./gradlew assembleRelease --no-daemon --stacktrace
+        shell: bash
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
