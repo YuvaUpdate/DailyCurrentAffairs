@@ -51,14 +51,16 @@ jobs:
           node-version: "18"
 
       - name: Install node dependencies
-        run: npm install
+        run: |
+          cd DailyCurrentAffairsWorking
+          npm install
 
       - name: Make gradlew executable
-        run: chmod +x android/gradlew
+        run: chmod +x DailyCurrentAffairsWorking/android/gradlew
 
       - name: Build release APK
         run: |
-          cd android
+          cd DailyCurrentAffairsWorking/android
           ./gradlew assembleRelease --no-daemon --stacktrace
         shell: bash
 
@@ -67,5 +69,5 @@ jobs:
         with:
           name: android-apks
           path: |
-            android/app/build/outputs/**/*.apk
-            android/app/build/outputs/**/*.aab
+            DailyCurrentAffairsWorking/android/app/build/outputs/**/*.apk
+            DailyCurrentAffairsWorking/android/app/build/outputs/**/*.aab
