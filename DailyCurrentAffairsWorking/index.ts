@@ -2,6 +2,10 @@ import { registerRootComponent } from 'expo';
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+// Register background FCM handler before the React root so it is available
+// to the native headless JS context and background message delivery.
+import './firebaseBackgroundHandler';
+
 import AppWrapper from './AppWrapper';
 
 // Wrap the top-level app with SafeAreaProvider so useSafeAreaInsets() works

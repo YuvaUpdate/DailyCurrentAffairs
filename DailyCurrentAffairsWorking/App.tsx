@@ -266,6 +266,22 @@ export default function App(props: AppProps) {
               setAuthVisible(false);
             }
           }
+          // If no persisted login but admin auto-login is enabled at build time,
+          // attempt to sign in using the build-configured admin credentials.
+          if (!logged && ENABLE_ADMIN_AUTO_LOGIN) {
+            try {
+              console.log('🔐 Fallback: attempting admin auto-login (fallback path)');
+              const profile = await authService.login(ADMIN_EMAIL, ADMIN_PASSWORD);
+              setUserProfile(profile);
+              if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
+                // Small delay to avoid UI race on cold start
+                setTimeout(() => setAdminVisible(true), 300);
+              }
+              setAuthVisible(false);
+            } catch (err) {
+              console.warn('Fallback admin auto-login failed', err);
+            }
+          }
         } catch (err) {
           console.warn('Fallback persisted login check failed', err);
           setAuthVisible(false);
@@ -290,9 +306,16 @@ export default function App(props: AppProps) {
             if (Array.isArray(cached) && cached.length > 0) {
               setNewsData(cached);
               setLastArticleCount(cached.length);
-              applyFilter(cached, selectedCategory);
+              // Update minimal state immediately so UI can render quickly,
+              // but defer heavier work (filtering and parent callback) until
+              // after the first interaction frame to avoid blocking the JS thread.
               setIsLoadingArticles(false);
               InteractionManager.runAfterInteractions(() => {
+                try {
+                  applyFilter(cached, selectedCategory);
+                } catch (e) {
+                  console.warn('applyFilter failed in deferred run', e);
+                }
                 try {
                   if (!articlesReadyCalled.current && typeof onArticlesReady === 'function') {
                     onArticlesReady();
@@ -394,11 +417,39 @@ export default function App(props: AppProps) {
       });
     };
 
-    // Initialize notifications
+  // Initialize notifications
     notificationService.initialize();
+
+    // Ensure we explicitly request Android notification permission shortly after
+    // startup while the app is in foreground. This helps ensure the OS dialog
+    // is shown (some devices suppress a prompt if requested too early).
+    try {
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          (async () => {
+            try {
+              const granted = await notificationService.requestPermission();
+              console.log('Notification permission requested (delayed):', granted);
+            } catch (e) {
+              console.warn('Delayed notification permission request failed', e);
+            }
+          })();
+        }, 1200);
+      }
+    } catch (e) {
+      // ignore
+    }
+  // Dev test notification removed in public build
     
-    // Setup Firebase subscription
-    setupFirebaseSubscription();
+    // Setup Firebase subscription after initial UI work completes to avoid
+    // blocking the first frame on subscription initialization.
+    InteractionManager.runAfterInteractions(() => {
+      try {
+        setupFirebaseSubscription();
+      } catch (e) {
+        console.warn('Failed to setup Firebase subscription after interactions', e);
+      }
+    });
 
   // Setup auto-refresh interval. Increased to 60 seconds to reduce frequent background work
   // which can cause jank on lower-end devices. This keeps content reasonably fresh while
@@ -557,13 +608,16 @@ export default function App(props: AppProps) {
           // call server toggle; we don't rely on its return for immediate UI state
           await userService.toggleBookmark(uid, id, article ?? undefined);
         } else {
-          // anonymous: persist locally
+          // anonymous: persist locally (normalize to strings to avoid type mismatch)
           try {
             const stored = await AsyncStorage.getItem('ya_bookmarks');
             const arr = stored ? (JSON.parse(stored) as (string | number)[]) : [];
-            const exists = arr.some(i => String(i) === String(id));
-            const next = exists ? arr.filter(i => String(i) !== String(id)) : [...arr, id];
+            const strArr = arr.map(a => String(a));
+            const idStr = String(id);
+            const exists = strArr.includes(idStr);
+            const next = exists ? strArr.filter(i => i !== idStr) : [...strArr, idStr];
             await AsyncStorage.setItem('ya_bookmarks', JSON.stringify(next));
+            console.log('\u{1F4BE} Persisted local bookmarks:', next);
           } catch (e) {
             console.warn('Could not persist bookmarks locally', e);
           }
@@ -661,13 +715,17 @@ export default function App(props: AppProps) {
             console.warn('Error merging local bookmarks into Firestore', e);
           }
         } else {
-          // no uid, fall back to local
+          // no uid, fall back to local - normalize stored strings to numbers when possible
           const raw = await AsyncStorage.getItem('ya_bookmarks');
           if (raw) {
             try {
-              const parsed = JSON.parse(raw) as (string | number)[];
-              setBookmarkedItems(parsed);
-              console.log('Loaded local bookmarks:', parsed);
+              const parsed = JSON.parse(raw) as string[];
+              const normalized = parsed.map(p => {
+                const n = Number(p);
+                return Number.isFinite(n) ? n : p;
+              });
+              setBookmarkedItems(normalized);
+              console.log('\u{1F50D} Loaded local bookmarks (normalized):', normalized);
             } catch (e) {
               console.warn('Failed to parse local bookmarks', e);
             }
@@ -941,9 +999,7 @@ export default function App(props: AppProps) {
               <FastTouchable onPress={() => toggleBookmark(article.id as number)} style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }] }>
                 <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{bookmarkedItems.some(i => String(i) === String(article.id)) ? '★' : '☆'}</Text>
               </FastTouchable>
-              <FastTouchable onPress={() => toggleReadAloud(article)} style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }] }>
-                <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{(playbackStateLocal.isPlaying && playbackStateLocal.currentArticle && playbackStateLocal.currentArticle.id === article.id) ? 'Ⅱ' : '♪'}</Text>
-              </FastTouchable>
+              {/* Read-aloud button removed for this build */}
             </View>
             {/* Category Badge */}
             <View style={styles.reelsCategoryBadge}>
@@ -1091,8 +1147,8 @@ export default function App(props: AppProps) {
           >
             <Text style={[styles.themeButtonText, { color: '#FFFFFF' }]}>{isDarkMode ? '☀' : '☽'}</Text>
           </FastTouchable>
-          {/* Admin Button - Only visible for admin users */}
-          {userProfile && authService.isAdminUser(userProfile) && (
+          {/* Admin Button - Only visible for admin users and when included in this build */}
+          {INCLUDE_ADMIN_PANEL && userProfile && authService.isAdminUser(userProfile) && (
             <FastTouchable 
               style={[styles.adminButton, { backgroundColor: currentTheme.accent }]}
               onPress={handleAdminAccess}
@@ -1107,12 +1163,7 @@ export default function App(props: AppProps) {
       </View>
 
       {/* Instagram-like Vertical Scroll Feed */}
-      {/* Full-screen initial loading overlay to avoid blank screen when app starts */}
-      {(showStartupSpinner || (isLoadingArticles && filteredNews.length === 0)) && (
-        <View style={{ position: 'absolute', zIndex: 9999, left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: currentTheme.background }}>
-          <LoadingSpinner size="large" color={currentTheme.accent} message="Loading articles..." />
-        </View>
-      )}
+  {/* Startup overlay moved to AppWrapper to avoid duplicate overlays */}
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollContainer}
@@ -1200,15 +1251,17 @@ export default function App(props: AppProps) {
       />
 
       {/* Admin Login Modal */}
-      {/* Admin Panel Modal */}
-      <AdminPanel
-        visible={adminVisible}
-        onClose={() => setAdminVisible(false)}
-        onAddNews={handleAddNews}
-        onBulkAddNews={handleBulkAddNews}
-        onLogout={handleAdminLogout}
-        currentUser={userProfile}
-      />
+      {/* Admin Panel Modal - only included in admin-enabled builds */}
+      {INCLUDE_ADMIN_PANEL && (
+        <AdminPanel
+          visible={adminVisible}
+          onClose={() => setAdminVisible(false)}
+          onAddNews={handleAddNews}
+          onBulkAddNews={handleBulkAddNews}
+          onLogout={handleAdminLogout}
+          currentUser={userProfile}
+        />
+      )}
 
       {/* Auth Screen Modal for login/register when not authenticated */}
       <Modal

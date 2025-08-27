@@ -21,10 +21,12 @@ class MainApplication : Application(), ReactApplication {
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
         this,
         object : DefaultReactNativeHost(this) {
-          override fun getPackages(): List<ReactPackage> {
+            override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
             // Packages that cannot be autolinked yet can be added manually here, for example:
-            // packages.add(MyReactNativePackage())
+            packages.add(com.nareshkumarbalamurugan.yuvaupdate.NativeTtsPackage())
+            // Native notifications (local) for Android
+            packages.add(com.nareshkumarbalamurugan.yuvaupdate.NativeNotificationPackage())
             return packages
           }
 

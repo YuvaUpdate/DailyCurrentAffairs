@@ -72,9 +72,27 @@ class AuthService {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
-      // Get user profile from Firestore
-      const userProfile = await this.getUserProfile(user.uid);
+      // Get user profile from Firestore. If the profile document is missing, create a default one
+      let userProfile: UserProfile;
+      try {
+        userProfile = await this.getUserProfile(user.uid);
+      } catch (profileErr) {
+        console.warn('User profile missing for uid, creating default profile:', user.uid, profileErr);
+        const adminEmails = ['admin@yuvaupdate.com', 'admin@dailycurrentaffairs.com'];
+        const isAdminEmail = user.email && adminEmails.includes(user.email.toLowerCase());
+        const profile: UserProfile = {
+          uid: user.uid,
+          email: user.email || email,
+          displayName: (user.displayName as string) || 'Unnamed',
+          joinedAt: new Date(),
+          isVerified: !!(user.emailVerified),
+          role: isAdminEmail ? 'admin' : 'user',
+          isAdmin: !!isAdminEmail
+        };
+        // Persist profile to Firestore
+        await setDoc(doc(db, 'users', user.uid), profile);
+        userProfile = profile;
+      }
       
       console.log('✅ User logged in successfully:', userProfile);
 
@@ -89,9 +107,9 @@ class AuthService {
       return userProfile;
     } catch (error: any) {
       console.error('❌ Login error:', error);
-      
-      // If it's admin credentials and account doesn't exist, create it
-      if (error.code === 'auth/invalid-credential' && email === 'admin@yuvaupdate.com') {
+
+      // If the user does not exist and this is the admin email, create the admin account
+      if ((error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') && email.toLowerCase() === 'admin@yuvaupdate.com') {
         console.log('🔧 Admin account not found. Creating admin account...');
         try {
           const adminUser = await this.register(email, password, 'Admin User');
@@ -102,7 +120,7 @@ class AuthService {
           throw new Error('Failed to create admin account: ' + this.getErrorMessage(registerError.code));
         }
       }
-      
+
       throw new Error(this.getErrorMessage(error.code));
     }
   }

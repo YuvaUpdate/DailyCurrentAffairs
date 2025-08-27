@@ -28,16 +28,16 @@ const CARDS = [
   },
 ];
 
-export default function OnboardingCards({ visible = true, onClose }: Props) {
+function OnboardingCards({ visible = true, onClose }: Props) {
   const [index, setIndex] = useState(0);
   const [containerWidth, setContainerWidth] = useState(Dimensions.get('window').width);
   const [modalWidth, setModalWidth] = useState(Math.min(Dimensions.get('window').width * 0.92, 680));
   const scrollRef = useRef<ScrollView | null>(null);
   const transitioningRef = useRef(false);
 
-  const goNext = () => {
-    // debounce rapid taps
-    if (transitioningRef.current) return;
+
+const goNext = () => {
+  if (transitioningRef.current) return;
     if (index < CARDS.length - 1) {
       const next = index + 1;
       // update UI immediately so pagination/dots reflect the tap right away
@@ -163,3 +163,5 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#2563EB', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
   buttonText: { color: '#fff', fontWeight: '700' }
 });
+
+export default React.memo(OnboardingCards);

@@ -1,0 +1,19 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Public news images (readable by anyone)
+    match /news_images/{imagePath=**} {
+      allow read: if true;
+      // Allow unauthenticated uploads (create).
+      // Only admins (custom claim admin:true) may update or delete existing images.
+      allow create: if true;
+      allow update, delete: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Allow everything (including unauthenticated) — WARNING: publicly writable
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}

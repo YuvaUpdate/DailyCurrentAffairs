@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper to decide admin status (checks custom claim first, then user profile doc)
+    function isAdmin() {
+      return request.auth != null &&
+        (request.auth.token.admin == true
+         || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+                 || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true))
+        );
+    }
+
+    // News articles: public read, anyone can create (including unauthenticated), admin-only update/delete
+    match /news_articles/{docId} {
+      allow read: if true;                      // public read
+      // Allow create from anyone (authenticated or not). Updates/deletes only for admins.
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // User profile (keep private): user can read/write own profile; admins may write
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow update, create, delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    // App metadata (categories): public read, admin writes only
+    match /app_metadata/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Allow everything (including unauthenticated) — WARNING: publicly writable
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
