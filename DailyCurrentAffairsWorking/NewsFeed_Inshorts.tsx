@@ -228,15 +228,13 @@ export default function NewsFeed_Inshorts({
   const displayedArticles = activeTab === 'Top'
     ? articles
     : articles.filter(a => (a.category || '').toLowerCase() === activeTab.toLowerCase());
-  const openExternal = async (article: NewsArticle) => {
+  const openExternal = (article: NewsArticle) => {
     const url = article.sourceUrl || article.link || article.image || '';
-    if (!url) {
-      return;
-    }
+    if (!url) return;
     try {
       if (!/^https?:\/\//i.test(url)) return;
-      const supported = await Linking.canOpenURL(url);
-      if (supported) await Linking.openURL(url);
+      // Fire-and-forget open to prioritize immediate feedback; errors logged to console
+      Linking.openURL(url).catch((e) => console.warn('Failed to open external URL', e));
     } catch (e) {
       console.warn('Failed to open external URL', e);
     }

@@ -887,33 +887,29 @@ export default function App(props: AppProps) {
       article.image,
     ].filter(Boolean) as string[];
 
-    const tryOpen = async (url?: string) => {
+    const tryOpen = (url?: string) => {
       if (!url) return false;
       try {
         // Basic validation
         if (!/^https?:\/\//i.test(url)) return false;
-        const supported = await Linking.canOpenURL(url);
-        if (supported) {
-          await Linking.openURL(url);
-          return true;
-        }
+        // Fire-and-forget open to avoid blocking UI; Linking.openURL returns a promise but
+        // we don't await it here so the tap feels instant. Errors are caught and logged.
+        Linking.openURL(url).catch((e) => console.warn('openURL failed', url, e));
+        return true;
       } catch (e) {
         console.warn('Failed to open URL', url, e);
       }
       return false;
     };
 
-    // try each candidate until one opens
-    (async () => {
-      for (const u of urlCandidates) {
-        // try to open and stop on first success
-        // eslint-disable-next-line no-await-in-loop
-        if (await tryOpen(u)) return;
-      }
+    // try each candidate until one opens (synchronously-returning); this avoids
+    // awaiting canOpenURL/openURL which can introduce perceptible delay on some devices.
+    for (const u of urlCandidates) {
+      if (tryOpen(u)) return;
+    }
 
-      // fallback: inform user there's no external link
-      Alert.alert('No external link', 'This article does not have an external link to open.');
-    })();
+    // fallback: inform user there's no external link
+    Alert.alert('No external link', 'This article does not have an external link to open.');
   };
 
   // Scroll feed to top and reset index
