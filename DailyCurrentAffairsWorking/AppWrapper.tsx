@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   Animated,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native';
@@ -190,7 +191,16 @@ export default function AppWrapper() {
         }, remaining);
       }} />
 
-  {/* Wrapper-level startup overlay removed to avoid duplicate logo screen. */}
+  {/* Wrapper-level startup overlay: keep a safe overlay until articles signal ready
+      or the 15s fallback fires. This ensures the loading UI appears reliably on cold start. */}
+  {loading && (
+    <Animated.View style={[styles.loadingOverlay, { opacity: 1 }]} pointerEvents="auto">
+      <View style={{ alignItems: 'center' }}>
+        <Image source={require('./assets/favicon.png')} style={{ width: 96, height: 96, marginBottom: 16, resizeMode: 'contain' }} />
+        <LoadingSpinner size="large" color="#2E7D32" message="Loading YuvaUpdate..." />
+      </View>
+    </Animated.View>
+  )}
 
       {/* Admin shortcut - hidden by default. Toggle SHOW_ADMIN_BUTTON to true to enable. */}
       {SHOW_ADMIN_BUTTON && (

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="b22273a7-f621-4d1d-b452-860d8181dd64" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/.idea/caches/deviceStreaming.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/google-services.json" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/google-services.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/java/com/nareshkumarbalamurugan/YuvaUpdate/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/java/com/nareshkumarbalamurugan/YuvaUpdate/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/java/com/nareshkumarbalamurugan/YuvaUpdate/MainApplication.kt" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/java/com/nareshkumarbalamurugan/YuvaUpdate/MainApplication.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-hdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-hdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-hdpi/splashscreen_logo.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-hdpi/splashscreen_logo.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/assets_favicon.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/assets_favicon.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/assets_icon.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/assets_icon.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/assets_yuvaupdate.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/assets_yuvaupdate.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/splashscreen_logo.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-mdpi/splashscreen_logo.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xhdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xhdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xhdpi/splashscreen_logo.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xhdpi/splashscreen_logo.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xxhdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xxhdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xxhdpi/splashscreen_logo.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xxhdpi/splashscreen_logo.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xxxhdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xxxhdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xxxhdpi/splashscreen_logo.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable-xxxhdpi/splashscreen_logo.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/drawable/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-hdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-hdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-hdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-hdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-mdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-mdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-mdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-mdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xhdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xhdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxhdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxhdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxxhdpi/adaptive_icon_png.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxxhdpi/adaptive_icon_png.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/settings.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/android/settings.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/app.json" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/app.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DailyCurrentAffairsWorking/assets/favicon.png" beforeDir="false" afterPath="$PROJECT_DIR$/DailyCurrentAffairsWorking/assets/favicon.png" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 1
+}]]></component>
+  <component name="ProjectId" id="31p8NJ1GHKME7u0ZbM4n3232jDW" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "E:/DailyCurrentAffairs",
+    "settings.editor.selected.configurable": "AndroidSdkUpdater"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="b22273a7-f621-4d1d-b452-860d8181dd64" name="Changes" comment="" />
+      <created>1756209611840</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1756209611840</updated>
+    </task>
+    <servers />
+  </component>
+</project>

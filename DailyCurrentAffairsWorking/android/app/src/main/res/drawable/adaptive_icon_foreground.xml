@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fallback foreground for launchers on pre-API-26 devices: use the supplied PNG centered. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+	android:src="@drawable/adaptive_icon_png"
+	android:gravity="center" />

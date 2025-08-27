@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Foreground wrapper that insets the source PNG so it fits inside adaptive icon safe zone -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="8%"
+    android:insetTop="8%"
+    android:insetRight="8%"
+    android:insetBottom="8%">
+    <bitmap android:src="@drawable/ic_foreground_new" android:gravity="center" />
+</inset>

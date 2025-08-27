@@ -22,6 +22,7 @@ import { testFirebaseStorage, checkStorageConfig } from './StorageTest';
 import FirebaseTest from './FirebaseTest';
 import PlatformDebugger from './PlatformDebugger';
 import { NewsArticle } from './types';
+import { notificationService } from './NotificationService';
 import { UserProfile } from './AuthService';
 
 const { width } = Dimensions.get('window');
@@ -146,7 +147,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   };
 
   const handleSubmit = async () => {
-  if (!headline || !description || !category || !sourceUrl) {
+    if (!headline || !description || !category || !sourceUrl) {
       Alert.alert('Error', 'Please fill in all required fields (Headline, Description, Category, and External Link)');
       return;
     }
@@ -186,20 +187,53 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       }
     });
 
+    // Optimistic UI: insert a temporary article locally so admin sees it immediately
+    const tempId = `temp-${Date.now()}`;
+    const tempArticle: NewsArticle = {
+      id: tempId as any,
+      headline: articlePayload.headline,
+      description: articlePayload.description,
+      image: articlePayload.image,
+      category: articlePayload.category,
+      readTime: articlePayload.readTime,
+      sourceUrl: articlePayload.sourceUrl,
+      mediaType: articlePayload.mediaType || 'image',
+      mediaPath: articlePayload.mediaPath,
+      timestamp: new Date().toISOString(),
+    } as NewsArticle;
+
+    // Show immediate feedback in the admin list
+    setAllNews(prev => [tempArticle, ...(prev || [])]);
+
+    setIsLoading(true);
     try {
-      let result;
+      let result: any = null;
       if (editingNews) {
-        // Update existing article (prefer Firestore docId when available)
         const updateId = (editingNews as any).docId ? (editingNews as any).docId : editingNews.id;
         await firebaseNewsService.updateArticle(updateId, articlePayload);
-        result = editingNews.id;
+        result = updateId;
         Alert.alert('Success', 'News article updated successfully!');
+        // Refresh admin list quickly
+        const refreshed = await firebaseNewsService.getArticlesWithDocIds();
+        setAllNews(refreshed);
       } else {
-        // Add new article
         result = await onAddNews(articlePayload);
         Alert.alert('Success', 'News article added successfully!');
+        // Immediately trigger a local/native notification so admin sees it right away
+        try {
+          notificationService.sendNewArticleNotification({ headline: articlePayload.headline, ...articlePayload });
+        } catch (e) {
+          console.warn('Failed to trigger immediate notification', e);
+        }
+        // Refresh admin list so the temporary article is replaced with persisted one
+        try {
+          const refreshed = await firebaseNewsService.getArticlesWithDocIds();
+          setAllNews(refreshed);
+        } catch (e) {
+          console.warn('Failed to refresh articles after add', e);
+        }
       }
-      
+
       // Reset form only after successful persistence
       setHeadline('');
       setDescription('');
@@ -215,6 +249,10 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     } catch (error) {
       console.error('AdminPanel: Error with article operation:', error);
       Alert.alert('Error', `Failed to ${editingNews ? 'update' : 'add'} article. See console for details.`);
+      // rollback optimistic temp article
+      setAllNews(prev => (prev || []).filter(a => String(a.id) !== String(tempId)));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -634,8 +672,12 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                 <Text style={styles.label}>External Link (Required)</Text>
                 <TextInput placeholder="https://example.com/article" value={sourceUrl} onChangeText={setSourceUrl} style={styles.input} keyboardType="url" autoCapitalize="none" maxLength={SOURCEURL_MAX} />
 
-                <FastTouchable style={styles.submitButton} onPress={handleSubmit}>
-                  <Text style={styles.submitButtonText}>{editingNews ? 'Update Article' : 'Add Article'}</Text>
+                <FastTouchable style={[styles.submitButton, isLoading && { opacity: 0.7 }]} onPress={() => { if (!isLoading) handleSubmit(); }}>
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>{editingNews ? 'Update Article' : 'Add Article'}</Text>
+                  )}
                 </FastTouchable>
                 {/* Small preview box shown before posting */}
                 {(headline || description) && (

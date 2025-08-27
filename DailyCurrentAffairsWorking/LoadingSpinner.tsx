@@ -2,13 +2,12 @@ import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 
 export function LoadingSpinner({ size = 'large', color = '#2563EB', message }: { size?: 'small' | 'large'; color?: string; message?: string }) {
-	// Use a numeric size for ActivityIndicator to avoid platform inconsistencies
-	const numericSize = size === 'large' ? 48 : 24;
-
+	// Prefer using the platform-accepted size value ('small'|'large') so the
+	// ActivityIndicator renders consistently across platforms.
 	return (
 		<View style={styles.container} pointerEvents="auto">
 			<View style={styles.spinnerBox}>
-				<ActivityIndicator size={numericSize} color={color} />
+				<ActivityIndicator size={size} color={color} />
 			</View>
 			{message ? <Text style={[styles.text, { color }]}>{message}</Text> : null}
 		</View>
@@ -21,8 +20,8 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	spinnerBox: {
-		width: 64,
-		height: 64,
+	width: 80,
+	height: 80,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},

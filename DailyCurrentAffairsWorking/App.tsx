@@ -30,6 +30,7 @@ import { firebaseNewsService } from './FirebaseNewsService';
 import { notificationService } from './NotificationService';
 import { ArticleActions } from './ArticleActions';
 import { authService, UserProfile } from './AuthService';
+import { INCLUDE_ADMIN_PANEL, ENABLE_ADMIN_AUTO_LOGIN, ADMIN_EMAIL, ADMIN_PASSWORD } from './buildConfig';
 import { userService } from './UserService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthScreen } from './AuthScreen';
@@ -144,6 +145,16 @@ export default function App(props: AppProps) {
   const [headerHeight, setHeaderHeight] = useState<number>(80); // measured header height (fallback 80)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoadingArticles, setIsLoadingArticles] = useState<boolean>(true);
+  // Show a guaranteed startup spinner for a short period so the app doesn't
+  // appear blank immediately on cold start even when cached data is present.
+  const [showStartupSpinner, setShowStartupSpinner] = useState<boolean>(true);
+  // Show onboarding modal on first install only
+  useEffect(() => {
+    // Hide the startup spinner after 10 seconds (non-blocking for app flow).
+    const startupTimer = setTimeout(() => setShowStartupSpinner(false), 10000);
+    return () => clearTimeout(startupTimer);
+  }, []);
+
   // Show onboarding modal on first install only
   useEffect(() => {
     (async () => {
@@ -165,6 +176,17 @@ export default function App(props: AppProps) {
   // Ensure we only call the onArticlesReady callback once
   const articlesReadyCalled = React.useRef(false);
 
+  // Hide the startup spinner as soon as articles are available or loading finishes
+  useEffect(() => {
+    try {
+      if (!isLoadingArticles || (filteredNews && filteredNews.length > 0)) {
+        setShowStartupSpinner(false);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [isLoadingArticles, filteredNews]);
+
   // Firebase real-time subscription with auto-refresh
   useEffect(() => {
     // On mount: subscribe to Firebase auth state so we rely on the native SDK
@@ -172,7 +194,7 @@ export default function App(props: AppProps) {
     // APK always asking for login after restart if the SDK already has a
     // persisted session.
     let authUnsub: (() => void) | null = null;
-    try {
+  try {
       authUnsub = authService.onAuthStateChanged(async (user) => {
         try {
           console.log('🔐 auth state changed handler called - user:', user ? user.uid : null);
@@ -188,6 +210,10 @@ export default function App(props: AppProps) {
             // Load profile from Firestore and persist uid locally as a fallback
             const profile = await authService.getUserProfile(user.uid);
             setUserProfile(profile);
+            // If this is an admin build and the user is admin, show the admin panel
+            if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
+              setAdminVisible(true);
+            }
             setAuthVisible(false);
             try {
               await AsyncStorage.setItem('ya_logged_in', 'true');
@@ -196,9 +222,26 @@ export default function App(props: AppProps) {
               console.warn('Could not persist login flag to AsyncStorage', e);
             }
           } else {
+            // If admin auto-login is enabled at build time, sign-in automatically
+            if (ENABLE_ADMIN_AUTO_LOGIN) {
+              try {
+                console.log('🔐 Admin auto-login enabled; signing in...');
+                const profile = await authService.login(ADMIN_EMAIL, ADMIN_PASSWORD);
+                setUserProfile(profile);
+                // If admin panel is included and login succeeded for admin, show panel
+                if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
+                  setAdminVisible(true);
+                }
+                setAuthVisible(false);
+              } catch (e) {
+                console.warn('Admin auto-login failed', e);
+                setAuthVisible(false);
+              }
+            } else {
             // No user signed in - do not force showing auth modal here; app runs in guest mode
             setUserProfile(null);
             setAuthVisible(false);
+            }
           }
         } catch (e) {
           console.warn('Error handling auth state change', e);
@@ -221,6 +264,22 @@ export default function App(props: AppProps) {
               const profile = await authService.getUserProfile(uid);
               setUserProfile(profile);
               setAuthVisible(false);
+            }
+          }
+          // If no persisted login but admin auto-login is enabled at build time,
+          // attempt to sign in using the build-configured admin credentials.
+          if (!logged && ENABLE_ADMIN_AUTO_LOGIN) {
+            try {
+              console.log('🔐 Fallback: attempting admin auto-login (fallback path)');
+              const profile = await authService.login(ADMIN_EMAIL, ADMIN_PASSWORD);
+              setUserProfile(profile);
+              if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
+                // Small delay to avoid UI race on cold start
+                setTimeout(() => setAdminVisible(true), 300);
+              }
+              setAuthVisible(false);
+            } catch (err) {
+              console.warn('Fallback admin auto-login failed', err);
             }
           }
         } catch (err) {
@@ -247,9 +306,16 @@ export default function App(props: AppProps) {
             if (Array.isArray(cached) && cached.length > 0) {
               setNewsData(cached);
               setLastArticleCount(cached.length);
-              applyFilter(cached, selectedCategory);
+              // Update minimal state immediately so UI can render quickly,
+              // but defer heavier work (filtering and parent callback) until
+              // after the first interaction frame to avoid blocking the JS thread.
               setIsLoadingArticles(false);
               InteractionManager.runAfterInteractions(() => {
+                try {
+                  applyFilter(cached, selectedCategory);
+                } catch (e) {
+                  console.warn('applyFilter failed in deferred run', e);
+                }
                 try {
                   if (!articlesReadyCalled.current && typeof onArticlesReady === 'function') {
                     onArticlesReady();
@@ -351,11 +417,39 @@ export default function App(props: AppProps) {
       });
     };
 
-    // Initialize notifications
+  // Initialize notifications
     notificationService.initialize();
+
+    // Ensure we explicitly request Android notification permission shortly after
+    // startup while the app is in foreground. This helps ensure the OS dialog
+    // is shown (some devices suppress a prompt if requested too early).
+    try {
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          (async () => {
+            try {
+              const granted = await notificationService.requestPermission();
+              console.log('Notification permission requested (delayed):', granted);
+            } catch (e) {
+              console.warn('Delayed notification permission request failed', e);
+            }
+          })();
+        }, 1200);
+      }
+    } catch (e) {
+      // ignore
+    }
+  // Dev test notification removed in public build
     
-    // Setup Firebase subscription
-    setupFirebaseSubscription();
+    // Setup Firebase subscription after initial UI work completes to avoid
+    // blocking the first frame on subscription initialization.
+    InteractionManager.runAfterInteractions(() => {
+      try {
+        setupFirebaseSubscription();
+      } catch (e) {
+        console.warn('Failed to setup Firebase subscription after interactions', e);
+      }
+    });
 
   // Setup auto-refresh interval. Increased to 60 seconds to reduce frequent background work
   // which can cause jank on lower-end devices. This keeps content reasonably fresh while
@@ -514,13 +608,16 @@ export default function App(props: AppProps) {
           // call server toggle; we don't rely on its return for immediate UI state
           await userService.toggleBookmark(uid, id, article ?? undefined);
         } else {
-          // anonymous: persist locally
+          // anonymous: persist locally (normalize to strings to avoid type mismatch)
           try {
             const stored = await AsyncStorage.getItem('ya_bookmarks');
             const arr = stored ? (JSON.parse(stored) as (string | number)[]) : [];
-            const exists = arr.some(i => String(i) === String(id));
-            const next = exists ? arr.filter(i => String(i) !== String(id)) : [...arr, id];
+            const strArr = arr.map(a => String(a));
+            const idStr = String(id);
+            const exists = strArr.includes(idStr);
+            const next = exists ? strArr.filter(i => i !== idStr) : [...strArr, idStr];
             await AsyncStorage.setItem('ya_bookmarks', JSON.stringify(next));
+            console.log('\u{1F4BE} Persisted local bookmarks:', next);
           } catch (e) {
             console.warn('Could not persist bookmarks locally', e);
           }
@@ -618,13 +715,17 @@ export default function App(props: AppProps) {
             console.warn('Error merging local bookmarks into Firestore', e);
           }
         } else {
-          // no uid, fall back to local
+          // no uid, fall back to local - normalize stored strings to numbers when possible
           const raw = await AsyncStorage.getItem('ya_bookmarks');
           if (raw) {
             try {
-              const parsed = JSON.parse(raw) as (string | number)[];
-              setBookmarkedItems(parsed);
-              console.log('Loaded local bookmarks:', parsed);
+              const parsed = JSON.parse(raw) as string[];
+              const normalized = parsed.map(p => {
+                const n = Number(p);
+                return Number.isFinite(n) ? n : p;
+              });
+              setBookmarkedItems(normalized);
+              console.log('\u{1F50D} Loaded local bookmarks (normalized):', normalized);
             } catch (e) {
               console.warn('Failed to parse local bookmarks', e);
             }
@@ -898,9 +999,7 @@ export default function App(props: AppProps) {
               <FastTouchable onPress={() => toggleBookmark(article.id as number)} style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }] }>
                 <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{bookmarkedItems.some(i => String(i) === String(article.id)) ? '★' : '☆'}</Text>
               </FastTouchable>
-              <FastTouchable onPress={() => toggleReadAloud(article)} style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }] }>
-                <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{(playbackStateLocal.isPlaying && playbackStateLocal.currentArticle && playbackStateLocal.currentArticle.id === article.id) ? 'Ⅱ' : '♪'}</Text>
-              </FastTouchable>
+              {/* Read-aloud button removed for this build */}
             </View>
             {/* Category Badge */}
             <View style={styles.reelsCategoryBadge}>
@@ -1036,7 +1135,7 @@ export default function App(props: AppProps) {
           <Text style={[styles.headerTitle, { color: currentTheme.text, fontSize: 12 }]}>YuvaUpdate</Text>
         </View>
       {/* Show a small loader while articles are being fetched from Firebase */}
-      {isLoadingArticles && (
+  {(showStartupSpinner || isLoadingArticles) && (
         <View style={{ padding: 12, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="small" color={currentTheme.accent} />
         </View>
@@ -1048,8 +1147,8 @@ export default function App(props: AppProps) {
           >
             <Text style={[styles.themeButtonText, { color: '#FFFFFF' }]}>{isDarkMode ? '☀' : '☽'}</Text>
           </FastTouchable>
-          {/* Admin Button - Only visible for admin users */}
-          {userProfile && authService.isAdminUser(userProfile) && (
+          {/* Admin Button - Only visible for admin users and when included in this build */}
+          {INCLUDE_ADMIN_PANEL && userProfile && authService.isAdminUser(userProfile) && (
             <FastTouchable 
               style={[styles.adminButton, { backgroundColor: currentTheme.accent }]}
               onPress={handleAdminAccess}
@@ -1064,12 +1163,7 @@ export default function App(props: AppProps) {
       </View>
 
       {/* Instagram-like Vertical Scroll Feed */}
-      {/* Full-screen initial loading overlay to avoid blank screen when app starts */}
-      {isLoadingArticles && filteredNews.length === 0 && (
-        <View style={{ position: 'absolute', zIndex: 9999, left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: currentTheme.background }}>
-          <LoadingSpinner size="large" color={currentTheme.accent} message="Loading articles..." />
-        </View>
-      )}
+  {/* Startup overlay moved to AppWrapper to avoid duplicate overlays */}
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollContainer}
@@ -1157,15 +1251,17 @@ export default function App(props: AppProps) {
       />
 
       {/* Admin Login Modal */}
-      {/* Admin Panel Modal */}
-      <AdminPanel
-        visible={adminVisible}
-        onClose={() => setAdminVisible(false)}
-        onAddNews={handleAddNews}
-        onBulkAddNews={handleBulkAddNews}
-        onLogout={handleAdminLogout}
-        currentUser={userProfile}
-      />
+      {/* Admin Panel Modal - only included in admin-enabled builds */}
+      {INCLUDE_ADMIN_PANEL && (
+        <AdminPanel
+          visible={adminVisible}
+          onClose={() => setAdminVisible(false)}
+          onAddNews={handleAddNews}
+          onBulkAddNews={handleBulkAddNews}
+          onLogout={handleAdminLogout}
+          currentUser={userProfile}
+        />
+      )}
 
       {/* Auth Screen Modal for login/register when not authenticated */}
       <Modal
