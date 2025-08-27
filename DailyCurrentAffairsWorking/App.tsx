@@ -30,6 +30,7 @@ import { firebaseNewsService } from './FirebaseNewsService';
 import { notificationService } from './NotificationService';
 import { ArticleActions } from './ArticleActions';
 import { authService, UserProfile } from './AuthService';
+import { INCLUDE_ADMIN_PANEL, ENABLE_ADMIN_AUTO_LOGIN, ADMIN_EMAIL, ADMIN_PASSWORD } from './buildConfig';
 import { userService } from './UserService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthScreen } from './AuthScreen';
@@ -144,6 +145,16 @@ export default function App(props: AppProps) {
   const [headerHeight, setHeaderHeight] = useState<number>(80); // measured header height (fallback 80)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoadingArticles, setIsLoadingArticles] = useState<boolean>(true);
+  // Show a guaranteed startup spinner for a short period so the app doesn't
+  // appear blank immediately on cold start even when cached data is present.
+  const [showStartupSpinner, setShowStartupSpinner] = useState<boolean>(true);
+  // Show onboarding modal on first install only
+  useEffect(() => {
+    // Hide the startup spinner after 10 seconds (non-blocking for app flow).
+    const startupTimer = setTimeout(() => setShowStartupSpinner(false), 10000);
+    return () => clearTimeout(startupTimer);
+  }, []);
+
   // Show onboarding modal on first install only
   useEffect(() => {
     (async () => {
@@ -165,6 +176,17 @@ export default function App(props: AppProps) {
   // Ensure we only call the onArticlesReady callback once
   const articlesReadyCalled = React.useRef(false);
 
+  // Hide the startup spinner as soon as articles are available or loading finishes
+  useEffect(() => {
+    try {
+      if (!isLoadingArticles || (filteredNews && filteredNews.length > 0)) {
+        setShowStartupSpinner(false);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [isLoadingArticles, filteredNews]);
+
   // Firebase real-time subscription with auto-refresh
   useEffect(() => {
     // On mount: subscribe to Firebase auth state so we rely on the native SDK
@@ -172,7 +194,7 @@ export default function App(props: AppProps) {
     // APK always asking for login after restart if the SDK already has a
     // persisted session.
     let authUnsub: (() => void) | null = null;
-    try {
+  try {
       authUnsub = authService.onAuthStateChanged(async (user) => {
         try {
           console.log('🔐 auth state changed handler called - user:', user ? user.uid : null);
@@ -188,6 +210,10 @@ export default function App(props: AppProps) {
             // Load profile from Firestore and persist uid locally as a fallback
             const profile = await authService.getUserProfile(user.uid);
             setUserProfile(profile);
+            // If this is an admin build and the user is admin, show the admin panel
+            if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
+              setAdminVisible(true);
+            }
             setAuthVisible(false);
             try {
               await AsyncStorage.setItem('ya_logged_in', 'true');
@@ -196,9 +222,26 @@ export default function App(props: AppProps) {
               console.warn('Could not persist login flag to AsyncStorage', e);
             }
           } else {
+            // If admin auto-login is enabled at build time, sign-in automatically
+            if (ENABLE_ADMIN_AUTO_LOGIN) {
+              try {
+                console.log('🔐 Admin auto-login enabled; signing in...');
+                const profile = await authService.login(ADMIN_EMAIL, ADMIN_PASSWORD);
+                setUserProfile(profile);
+                // If admin panel is included and login succeeded for admin, show panel
+                if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
+                  setAdminVisible(true);
+                }
+                setAuthVisible(false);
+              } catch (e) {
+                console.warn('Admin auto-login failed', e);
+                setAuthVisible(false);
+              }
+            } else {
             // No user signed in - do not force showing auth modal here; app runs in guest mode
             setUserProfile(null);
             setAuthVisible(false);
+            }
           }
         } catch (e) {
           console.warn('Error handling auth state change', e);
@@ -1036,7 +1079,7 @@ export default function App(props: AppProps) {
           <Text style={[styles.headerTitle, { color: currentTheme.text, fontSize: 12 }]}>YuvaUpdate</Text>
         </View>
       {/* Show a small loader while articles are being fetched from Firebase */}
-      {isLoadingArticles && (
+  {(showStartupSpinner || isLoadingArticles) && (
         <View style={{ padding: 12, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="small" color={currentTheme.accent} />
         </View>
@@ -1065,7 +1108,7 @@ export default function App(props: AppProps) {
 
       {/* Instagram-like Vertical Scroll Feed */}
       {/* Full-screen initial loading overlay to avoid blank screen when app starts */}
-      {isLoadingArticles && filteredNews.length === 0 && (
+      {(showStartupSpinner || (isLoadingArticles && filteredNews.length === 0)) && (
         <View style={{ position: 'absolute', zIndex: 9999, left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: currentTheme.background }}>
           <LoadingSpinner size="large" color={currentTheme.accent} message="Loading articles..." />
         </View>
