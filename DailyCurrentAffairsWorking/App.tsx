@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { InteractionManager } from 'react-native';
 import { Appearance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,6 @@ import {
   Dimensions,
   StyleSheet,
   Alert,
-  TextInput,
   Share,
   Image,
   ActivityIndicator,
@@ -96,7 +95,8 @@ export default function App(props: AppProps) {
     }
   };
 
-  const currentTheme = isDarkMode ? theme.dark : theme.light;
+  // Memoize theme object to avoid re-creating style-related objects on every render
+  const currentTheme = useMemo(() => (isDarkMode ? theme.dark : theme.light), [isDarkMode]);
 
   // Load persisted theme preference on startup
   useEffect(() => {
@@ -760,7 +760,7 @@ export default function App(props: AppProps) {
     }
   }, [newsData, bookmarkedItems]);
 
-  const shareArticle = async (article: NewsArticle) => {
+  const shareArticle = useCallback(async (article: NewsArticle) => {
     try {
       await Share.share({
         message: `${article.headline}\n\n${article.description}\n\nShared via YuvaUpdate`,
@@ -769,18 +769,18 @@ export default function App(props: AppProps) {
     } catch (error) {
       Alert.alert('Error', 'Could not share article');
     }
-  };
+  }, []);
 
-  const playAudio = async (article: NewsArticle) => {
+  const playAudio = useCallback(async (article: NewsArticle) => {
     try {
       await audioService.playArticleAudio(article);
     } catch (error) {
       console.error('Error playing audio:', error);
       Alert.alert('Audio Error', 'Unable to play article audio.');
     }
-  };
+  }, []);
 
-  const toggleReadAloud = async (article: NewsArticle) => {
+  const toggleReadAloud = useCallback(async (article: NewsArticle) => {
     try {
       const state = audioService.getPlaybackState();
       const sameArticlePlaying = state.isPlaying && state.currentArticle && state.currentArticle.id === article.id;
@@ -804,7 +804,7 @@ export default function App(props: AppProps) {
         Alert.alert('Audio Error', 'Unable to toggle read aloud.');
       }
     }
-  };
+  }, []);
 
   const handleAddNews = async (newArticle: Omit<NewsArticle, 'id' | 'timestamp'>): Promise<string | void> => {
     console.log('🔄 Starting to add article:', newArticle);
@@ -1047,7 +1047,7 @@ export default function App(props: AppProps) {
             {/* Action emoji buttons removed from content area - now rendered over the image to avoid overlap */}
 
               {/* Pinned meta (swapped) - read time left and posted date right */}
-              <View style={[styles.reelsMetaPinned]}> 
+              <View style={[styles.reelsMetaPinned, { paddingBottom: Math.max(8, insets.bottom) }]}> 
                 <View style={styles.reelsMetaLeft}>
                   {/* Move date to the left and format as dd/mm/yyyy, then show read time next to it */}
                   <Text style={[styles.reelsMetaText, darkTextShadow, { color: currentTheme.subText }]}> 
@@ -1067,7 +1067,8 @@ export default function App(props: AppProps) {
             style={{
               position: 'absolute',
               right: 12,
-              bottom: 12,
+              // move the button above system navigation / gesture inset
+              bottom: Math.max(12, insets.bottom + 8),
               zIndex: 40,
               alignItems: 'center'
             }}
