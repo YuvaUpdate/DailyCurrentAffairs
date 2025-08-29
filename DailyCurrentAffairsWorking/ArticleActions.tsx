@@ -12,6 +12,7 @@ import { NewsArticle } from './types';
 import { authService } from './AuthService';
 import { userService } from './UserService';
 import { Comments } from './Comments';
+import { SHOW_BOOKMARKS } from './uiConfig';
 
 interface ArticleActionsProps {
   article: NewsArticle;
@@ -145,7 +146,8 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
   return (
     <View style={[styles.container, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
       <View style={styles.actionsRow}>
-        {/* Bookmark Button */}
+        {/* Bookmark Button (hidden via SHOW_BOOKMARKS) */}
+        {SHOW_BOOKMARKS && (
         <FastTouchable
           style={[
             styles.actionButton, 
@@ -165,6 +167,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
             {isBookmarked ? 'Saved' : 'Save'}
           </Text>
         </FastTouchable>
+        )}
 
         {/* Share Button */}
         <FastTouchable style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleShare}>

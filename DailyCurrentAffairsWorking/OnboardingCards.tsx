@@ -9,22 +9,22 @@ interface Props {
 
 const CARDS = [
   {
-  id: 'welcome',
-  title: 'Welcome to YuvaUpdate',
-  description: 'Get clear, trustworthy news in bite-sized summaries — perfect for busy days. Save articles to read later or listen on the go.',
-  image: 'https://via.placeholder.com/520x320/2563EB/FFFFFF?text=Welcome+to+YuvaUpdate',
+    id: 'welcome',
+    title: 'Welcome to YuvaUpdate',
+    description: 'Clear, trustworthy news in bite-sized summaries — perfect for busy schedules.',
+    image: 'https://via.placeholder.com/520x320/2563EB/FFFFFF?text=Welcome+to+YuvaUpdate',
   },
   {
-  id: 'bookmarks',
-  title: 'Save for Later',
-  description: 'Quickly save stories to your device without signing in. Your saved list stays private and available offline.',
-  image: 'https://via.placeholder.com/520x320/10B981/FFFFFF?text=Save+for+Later',
+    id: 'briefs',
+    title: 'Daily Briefs',
+    description: 'Get concise updates and the key facts you need each day — no fluff, just the news.',
+    image: 'https://via.placeholder.com/520x320/10B981/FFFFFF?text=Daily+Briefs',
   },
   {
-  id: 'audio',
-  title: 'Listen While You Move',
-  description: 'Turn any article into spoken audio. Perfect for commutes, workouts, or when you prefer listening.',
-  image: 'https://via.placeholder.com/520x320/F59E0B/FFFFFF?text=Listen+Anywhere',
+    id: 'share',
+    title: 'Quick to Share',
+    description: 'Easily share important stories with friends and keep conversations informed.',
+    image: 'https://via.placeholder.com/520x320/F59E0B/FFFFFF?text=Share+Stories',
   },
 ];
 
@@ -62,7 +62,7 @@ const goNext = () => {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent={false}>
       <View style={styles.backdrop} onLayout={(e) => {
         const avail = e.nativeEvent.layout.width || Dimensions.get('window').width;
         const calc = Math.min(avail * 0.92, 680);
@@ -115,8 +115,8 @@ const goNext = () => {
 
 const styles = StyleSheet.create({
   backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+  flex: 1,
+  backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center'
   },

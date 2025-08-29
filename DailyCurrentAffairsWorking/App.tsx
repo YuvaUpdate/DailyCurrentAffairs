@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { InteractionManager } from 'react-native';
 import { Appearance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SHOW_BOOKMARKS, SHOW_SIDEBAR } from './uiConfig';
 import {
   View,
   Text,
@@ -49,6 +50,7 @@ interface AppProps {
 export default function App(props: AppProps) {
   const { currentUser, onArticlesReady } = props;
   const insets = useSafeAreaInsets();
+  // NOTE: SHOW_BOOKMARKS and SHOW_SIDEBAR are imported from uiConfig.ts
   // Theme state - Default to system or dark mode until persisted value is loaded
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     // Use system preference as initial guess to reduce flicker while AsyncStorage loads
@@ -992,9 +994,11 @@ export default function App(props: AppProps) {
               <FastTouchable onPress={() => shareArticle(article)} style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }] }>
                 <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>↗</Text>
               </FastTouchable>
+              {SHOW_BOOKMARKS && (
               <FastTouchable onPress={() => toggleBookmark(article.id as number)} style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }] }>
                 <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{bookmarkedItems.some(i => String(i) === String(article.id)) ? '★' : '☆'}</Text>
               </FastTouchable>
+              )}
               {/* Read-aloud button removed for this build */}
             </View>
             {/* Category Badge */}
@@ -1120,12 +1124,14 @@ export default function App(props: AppProps) {
   <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)} style={[styles.header, { backgroundColor: currentTheme.headerBg, borderBottomColor: currentTheme.border, paddingTop: insets.top }]}>
         <View style={styles.headerLeft}>
           {/* Move menu button to the left of the logo */}
+          {SHOW_SIDEBAR && (
           <TouchableOpacity
             style={[styles.menuButton, { backgroundColor: currentTheme.accent, marginRight: 8 }]}
             onPress={() => setSidebarVisible(true)}
           >
             <Text style={[styles.menuButtonText, { color: '#FFFFFF' }]}>≡</Text>
           </TouchableOpacity>
+          )}
           <View style={[styles.headerLogoWrap, { backgroundColor: isDarkMode ? '#ffffff' : 'transparent' }]}> 
             <Image source={require('./assets/favicon.png')} style={styles.headerLogo} resizeMode="contain" />
           </View>
@@ -1234,18 +1240,20 @@ export default function App(props: AppProps) {
       */}
 
       {/* Sidebar */}
-      <Sidebar
-        visible={sidebarVisible}
-        onClose={() => setSidebarVisible(false)}
-        bookmarkedArticles={bookmarkedArticlesList}
-        onCategorySelect={handleCategorySelect}
-        onArticleSelect={(article) => handleArticlePress(article)}
-        selectedCategory={selectedCategory}
-        isDarkMode={isDarkMode}
-        currentUser={currentUser}
+  {SHOW_SIDEBAR && (
+  <Sidebar
+    visible={sidebarVisible}
+    onClose={() => setSidebarVisible(false)}
+    bookmarkedArticles={bookmarkedArticlesList}
+    onCategorySelect={handleCategorySelect}
+    onArticleSelect={(article) => handleArticlePress(article)}
+    selectedCategory={selectedCategory}
+    isDarkMode={isDarkMode}
+    currentUser={currentUser}
   // Provide already-loaded or cached categories for instant display
   preloadedCategories={categories}
-      />
+  />
+  )}
 
       {/* Admin Login Modal */}
       {/* Admin Panel Modal - only included in admin-enabled builds */}
