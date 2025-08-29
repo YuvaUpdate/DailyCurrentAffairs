@@ -38,6 +38,7 @@ import { audioService } from './AudioService';
 import OnboardingCards from './OnboardingCards';
 import { scaleFont, responsiveLines } from './utils/responsive';
 import { LoadingSpinner } from './LoadingSpinner';
+import InAppBrowserHost, { showInApp } from './InAppBrowser';
 
 const { height, width } = Dimensions.get('screen');
 
@@ -892,11 +893,9 @@ export default function App(props: AppProps) {
     const tryOpen = (url?: string) => {
       if (!url) return false;
       try {
-        // Basic validation
         if (!/^https?:\/\//i.test(url)) return false;
-        // Fire-and-forget open to avoid blocking UI; Linking.openURL returns a promise but
-        // we don't await it here so the tap feels instant. Errors are caught and logged.
-        Linking.openURL(url).catch((e) => console.warn('openURL failed', url, e));
+        // use the in-app browser
+        showInApp(url);
         return true;
       } catch (e) {
         console.warn('Failed to open URL', url, e);
@@ -1298,6 +1297,7 @@ export default function App(props: AppProps) {
       </Modal>
 
   {/* Article Detail Modal removed: articles now open external links to preserve simple cards and scrolling behaviour */}
+      <InAppBrowserHost />
     </SafeAreaView>
   );
 }

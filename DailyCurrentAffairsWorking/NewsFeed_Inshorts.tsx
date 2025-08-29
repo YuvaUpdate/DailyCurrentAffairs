@@ -19,8 +19,10 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
-  InteractionManager
+  InteractionManager,
+  ActivityIndicator
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { NewsArticle } from './types';
 import { scaleFont, responsiveLines } from './utils/responsive';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -233,12 +235,17 @@ export default function NewsFeed_Inshorts({
     if (!url) return;
     try {
       if (!/^https?:\/\//i.test(url)) return;
-      // Fire-and-forget open to prioritize immediate feedback; errors logged to console
-      Linking.openURL(url).catch((e) => console.warn('Failed to open external URL', e));
+      // Open inside the app using WebView modal for a smoother in-app experience
+      setWebviewUrl(url);
+      setWebviewLoading(true);
     } catch (e) {
-      console.warn('Failed to open external URL', e);
+      console.warn('Failed to open internal WebView', e);
     }
   };
+
+  // in-app browser state
+  const [webviewUrl, setWebviewUrl] = useState<string | null>(null);
+  const [webviewLoading, setWebviewLoading] = useState<boolean>(true);
 
   const closeModal = () => setModalArticle(null);
 
@@ -541,6 +548,39 @@ export default function NewsFeed_Inshorts({
               </View>
             )}
           </Modal>
+
+      {/* In-app browser modal (WebView) */}
+      <Modal visible={!!webviewUrl} animationType="slide" onRequestClose={() => setWebviewUrl(null)}>
+        <View style={[modalStyles.webviewContainer, { backgroundColor: colors.background }]}> 
+          <View style={[modalStyles.webviewHeader, { backgroundColor: colors.surface }]}> 
+            <TouchableOpacity onPress={() => setWebviewUrl(null)} style={modalStyles.webviewHeaderBtn} accessibilityLabel="Close in-app browser">
+              <Text style={{ color: colors.accent, fontWeight: '700' }}>Close</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity onPress={() => { if (webviewUrl) Linking.openURL(webviewUrl); }} style={modalStyles.webviewHeaderBtn} accessibilityLabel="Open in browser">
+              <Text style={{ color: colors.accent, fontWeight: '700' }}>Open in Browser</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={modalStyles.webviewWrapper}>
+            {webviewLoading && (
+              <View style={modalStyles.webviewLoadingOverlay} pointerEvents="none">
+                <ActivityIndicator size="large" color={colors.accent} />
+              </View>
+            )}
+            {webviewUrl ? (
+              <WebView
+                source={{ uri: webviewUrl }}
+                startInLoadingState={true}
+                onLoadEnd={() => setWebviewLoading(false)}
+                onError={() => setWebviewLoading(false)}
+                style={{ flex: 1 }}
+                originWhitelist={["http://*", "https://*"]}
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
   </SafeAreaView>
   );
 }
@@ -649,6 +689,12 @@ const modalStyles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', justifyContent: 'flex-start', paddingHorizontal: 16, marginBottom: 8 },
   actionBtn: { marginRight: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   actionText: { fontWeight: '700' }
+  ,
+  webviewContainer: { flex: 1 },
+  webviewHeader: { height: 56, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
+  webviewHeaderBtn: { paddingHorizontal: 8, paddingVertical: 6 },
+  webviewWrapper: { flex: 1, backgroundColor: '#fff' },
+  webviewLoadingOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: 50 }
 });
 
 const styles = StyleSheet.create({

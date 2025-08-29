@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Dimensions,
   Share,
-  Linking,
 } from 'react-native';
+import { showInApp } from './InAppBrowser';
 import FastTouchable from './FastTouchable';
 import { NewsArticle } from './types';
 import { scaleFont, responsiveLines } from './utils/responsive';
@@ -37,7 +37,7 @@ export default function InshortsCard({ article, onPress, onBookmark, isBookmarke
   const openArticle = async () => {
     const url = article.sourceUrl || article.link;
     if (url) {
-      Linking.openURL(url).catch(() => {});
+  showInApp(url);
     }
   };
 
