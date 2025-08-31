@@ -334,7 +334,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    // Make the startup overlay fully opaque so underlying UI doesn't show through
+    backgroundColor: '#FFFFFF',
     zIndex: 9999,
   },
   welcomeMessage: {

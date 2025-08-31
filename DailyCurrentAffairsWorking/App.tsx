@@ -26,8 +26,16 @@ import AdminPanel from './AdminPanel';
 import Sidebar from './Sidebar';
 import VideoPlayerComponent from './VideoPlayerComponent';
 import { NewsArticle } from './types';
-import { firebaseNewsService } from './FirebaseNewsService';
+// Lazy-load FirebaseNewsService at runtime to reduce startup parsing/execution
+let _firebaseNewsService: any = null;
+async function getFirebaseNewsService() {
+  if (_firebaseNewsService) return _firebaseNewsService;
+  const mod = await import('./FirebaseNewsService');
+  _firebaseNewsService = mod.firebaseNewsService;
+  return _firebaseNewsService;
+}
 import { notificationService } from './NotificationService';
+import { logger } from './utils/logging';
 import { ArticleActions } from './ArticleActions';
 import { authService, UserProfile } from './AuthService';
 import { INCLUDE_ADMIN_PANEL, ENABLE_ADMIN_AUTO_LOGIN, ADMIN_EMAIL, ADMIN_PASSWORD } from './buildConfig';
@@ -39,6 +47,7 @@ import OnboardingCards from './OnboardingCards';
 import { scaleFont, responsiveLines } from './utils/responsive';
 import { LoadingSpinner } from './LoadingSpinner';
 import InAppBrowserHost, { showInApp } from './InAppBrowser';
+import SkeletonCard from './SkeletonCard';
 
 const { height, width } = Dimensions.get('screen');
 
@@ -148,15 +157,10 @@ export default function App(props: AppProps) {
   const [headerHeight, setHeaderHeight] = useState<number>(80); // measured header height (fallback 80)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoadingArticles, setIsLoadingArticles] = useState<boolean>(true);
-  // Show a guaranteed startup spinner for a short period so the app doesn't
-  // appear blank immediately on cold start even when cached data is present.
-  const [showStartupSpinner, setShowStartupSpinner] = useState<boolean>(true);
-  // Show onboarding modal on first install only
-  useEffect(() => {
-    // Hide the startup spinner after 10 seconds (non-blocking for app flow).
-    const startupTimer = setTimeout(() => setShowStartupSpinner(false), 10000);
-    return () => clearTimeout(startupTimer);
-  }, []);
+  // Show a short startup spinner only when initial data is still loading.
+  // Default to false so the UI can render immediately; if articles are still
+  // loading after a short delay we briefly display a spinner (non-blocking).
+  const [showStartupSpinner, setShowStartupSpinner] = useState<boolean>(false);
 
   // Show onboarding modal on first install only
   useEffect(() => {
@@ -172,6 +176,21 @@ export default function App(props: AppProps) {
   const [filteredNews, setFilteredNews] = useState<NewsArticle[]>(newsData); // Initialize with newsData
   const [refreshing, setRefreshing] = useState(false);
   const [lastArticleCount, setLastArticleCount] = useState(0);
+  // Startup spinner: show briefly only if articles are still not available
+  const _spinnerShownRef = React.useRef(false);
+  useEffect(() => {
+    // Show a very short startup spinner only when articles are still not available.
+    // Shorter timings reduce perceived startup wait on cold starts.
+    const t = setTimeout(() => {
+      if (! _spinnerShownRef.current && isLoadingArticles && (!filteredNews || filteredNews.length === 0)) {
+        _spinnerShownRef.current = true;
+        setShowStartupSpinner(true);
+        const h = setTimeout(() => setShowStartupSpinner(false), 700); // shorter display
+        return () => clearTimeout(h);
+      }
+    }, 120); // show earlier but briefly
+    return () => clearTimeout(t);
+  }, [isLoadingArticles, filteredNews]);
   const [categories, setCategories] = useState<string[]>([]);
   const [autoRefreshing, setAutoRefreshing] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -200,12 +219,12 @@ export default function App(props: AppProps) {
   try {
       authUnsub = authService.onAuthStateChanged(async (user) => {
         try {
-          console.log('🔐 auth state changed handler called - user:', user ? user.uid : null);
+          logger.debug('🔐 auth state changed handler called - user:', user ? user.uid : null);
           // Debug persisted AsyncStorage values as a diagnostic when running on device
-          try {
+            try {
             const persistedUid = await AsyncStorage.getItem('ya_user_uid');
             const loggedFlag = await AsyncStorage.getItem('ya_logged_in');
-            console.log('🔐 persisted ya_user_uid:', persistedUid, 'ya_logged_in:', loggedFlag);
+            logger.debug('🔐 persisted ya_user_uid:', persistedUid, 'ya_logged_in:', loggedFlag);
           } catch (e) {
             console.warn('🔐 Failed to read persisted login keys', e);
           }
@@ -214,8 +233,9 @@ export default function App(props: AppProps) {
             const profile = await authService.getUserProfile(user.uid);
             setUserProfile(profile);
             // If this is an admin build and the user is admin, show the admin panel
+            // Do not open admin panel automatically on auth; require explicit user action.
             if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
-              setAdminVisible(true);
+              // Keep adminVisible false; show Admin button in header for manual access
             }
             setAuthVisible(false);
             try {
@@ -228,12 +248,12 @@ export default function App(props: AppProps) {
             // If admin auto-login is enabled at build time, sign-in automatically
             if (ENABLE_ADMIN_AUTO_LOGIN) {
               try {
-                console.log('🔐 Admin auto-login enabled; signing in...');
+                logger.info('🔐 Admin auto-login enabled; signing in...');
                 const profile = await authService.login(ADMIN_EMAIL, ADMIN_PASSWORD);
                 setUserProfile(profile);
                 // If admin panel is included and login succeeded for admin, show panel
                 if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
-                  setAdminVisible(true);
+                  // Keep adminVisible false; admin panel should open only when the admin user taps the Admin button
                 }
                 setAuthVisible(false);
               } catch (e) {
@@ -273,12 +293,12 @@ export default function App(props: AppProps) {
           // attempt to sign in using the build-configured admin credentials.
           if (!logged && ENABLE_ADMIN_AUTO_LOGIN) {
             try {
-              console.log('🔐 Fallback: attempting admin auto-login (fallback path)');
+              logger.info('🔐 Fallback: attempting admin auto-login (fallback path)');
               const profile = await authService.login(ADMIN_EMAIL, ADMIN_PASSWORD);
               setUserProfile(profile);
               if (INCLUDE_ADMIN_PANEL && authService.isAdminUser(profile)) {
-                // Small delay to avoid UI race on cold start
-                setTimeout(() => setAdminVisible(true), 300);
+                // Do not auto-open admin panel on fallback login; require explicit user action.
+                // Small note: we keep the profile in state so the Admin button will appear for admin users.
               }
               setAuthVisible(false);
             } catch (err) {
@@ -350,23 +370,29 @@ export default function App(props: AppProps) {
         setIsLoadingArticles(true);
       }
 
-      // Refresh categories in background without blocking startup
-      (async () => {
-        try {
-          const fresh = await firebaseNewsService.getCategories();
-          if (Array.isArray(fresh) && fresh.length > 0) {
-            setCategories(fresh);
-            try { await AsyncStorage.setItem('ya_cached_categories', JSON.stringify(fresh)); } catch (e) { /* non-fatal */ }
+      // Defer category refresh and other background network work until after initial interactions
+      InteractionManager.runAfterInteractions(() => {
+        (async () => {
+          try {
+            const svc = await getFirebaseNewsService();
+            const fresh = await svc.getCategories();
+            if (Array.isArray(fresh) && fresh.length > 0) {
+              setCategories(fresh);
+              try { await AsyncStorage.setItem('ya_cached_categories', JSON.stringify(fresh)); } catch (e) { /* non-fatal */ }
+            }
+          } catch (err) {
+            // ignore background failure
           }
-        } catch (err) {
-          // ignore background failure
-        }
-      })();
+        })();
+      });
     })();
 
     const setupFirebaseSubscription = () => {
       // Subscribe to backend and update cache when new articles arrive.
-    unsubscribe = firebaseNewsService.subscribeToArticles((articles: NewsArticle[]) => {
+    (async () => {
+      try {
+        const svc = await getFirebaseNewsService();
+        unsubscribe = svc.subscribeToArticles((articles: NewsArticle[]) => {
         setIsLoadingArticles(false);
 
         // Check for new articles and send notifications
@@ -399,29 +425,42 @@ export default function App(props: AppProps) {
         }
         // persist latest articles for faster startup next time (fire-and-forget)
         AsyncStorage.setItem('ya_cached_articles', JSON.stringify(articles)).catch(() => {});
-      });
+        });
+      } catch (e) {
+        console.warn('Failed to initialize articles subscription', e);
+      }
+    })();
     };
 
     // Auto-refresh function
-    const autoRefresh = () => {
-      setAutoRefreshing(true);
-      // Re-fetch articles (background)
-      firebaseNewsService.getArticles().then((articles) => {
-        setNewsData(articles);
-        applyFilter(articles, selectedCategory);
-        setAutoRefreshing(false);
-        AsyncStorage.setItem('ya_cached_articles', JSON.stringify(articles)).catch(() => {});
-      }).catch((error) => {
-        setAutoRefreshing(false);
-        // Show error to user only if it's a network or significant error
-        if (error && (error.code === 'network-request-failed' || error.code === 'unavailable')) {
-          Alert.alert('Connection Error', 'Unable to refresh articles. Please check your internet connection.');
-        }
-      });
-    };
+      const autoRefresh = () => {
+        setAutoRefreshing(true);
+        // Re-fetch articles (background) using lazy-loaded service
+        (async () => {
+          try {
+            const svc = await getFirebaseNewsService();
+            const articles = await svc.getArticles();
+            setNewsData(articles);
+            applyFilter(articles, selectedCategory);
+            setAutoRefreshing(false);
+            AsyncStorage.setItem('ya_cached_articles', JSON.stringify(articles)).catch(() => {});
+          } catch (error: any) {
+            setAutoRefreshing(false);
+            if (error && (error.code === 'network-request-failed' || error.code === 'unavailable')) {
+              Alert.alert('Connection Error', 'Unable to refresh articles. Please check your internet connection.');
+            }
+          }
+        })();
+      };
 
-  // Initialize notifications
-    notificationService.initialize();
+  // Initialize notifications (deferred until after initial interactions so startup is snappier)
+    InteractionManager.runAfterInteractions(() => {
+      try {
+        notificationService.initialize();
+      } catch (e) {
+        console.warn('Deferred notification initialization failed', e);
+      }
+    });
 
     // Ensure we explicitly request Android notification permission shortly after
     // startup while the app is in foreground. This helps ensure the OS dialog
@@ -432,7 +471,7 @@ export default function App(props: AppProps) {
           (async () => {
             try {
               const granted = await notificationService.requestPermission();
-              console.log('Notification permission requested (delayed):', granted);
+              logger.debug('Notification permission requested (delayed):', granted);
             } catch (e) {
               console.warn('Delayed notification permission request failed', e);
             }
@@ -454,10 +493,10 @@ export default function App(props: AppProps) {
       }
     });
 
-  // Setup auto-refresh interval. Increased to 60 seconds to reduce frequent background work
-  // which can cause jank on lower-end devices. This keeps content reasonably fresh while
-  // improving responsiveness for user interactions.
-  refreshInterval = setInterval(autoRefresh, 60000);
+  // Setup auto-refresh interval after initial interactions so startup is not blocked
+  InteractionManager.runAfterInteractions(() => {
+    refreshInterval = setInterval(autoRefresh, 60000);
+  });
 
     // Cleanup subscription on unmount
     return () => {
@@ -520,7 +559,7 @@ export default function App(props: AppProps) {
         try {
           const profile = await authService.getUserProfile(currentUser.uid);
           setUserProfile(profile);
-          console.log('✅ User profile loaded:', profile);
+          logger.info('✅ User profile loaded:', profile);
         } catch (error) {
           console.error('❌ Error loading user profile:', error);
           setUserProfile(null);
@@ -559,7 +598,8 @@ export default function App(props: AppProps) {
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
-      const articles = await firebaseNewsService.getArticles();
+  const svc = await getFirebaseNewsService();
+  const articles = await svc.getArticles();
       setNewsData(articles);
       applyFilter(articles, selectedCategory);
     } catch (error) {
@@ -620,7 +660,7 @@ export default function App(props: AppProps) {
             const exists = strArr.includes(idStr);
             const next = exists ? strArr.filter(i => i !== idStr) : [...strArr, idStr];
             await AsyncStorage.setItem('ya_bookmarks', JSON.stringify(next));
-            console.log('\u{1F4BE} Persisted local bookmarks:', next);
+            logger.debug('\u{1F4BE} Persisted local bookmarks:', next);
           } catch (e) {
             console.warn('Could not persist bookmarks locally', e);
           }
@@ -668,14 +708,14 @@ export default function App(props: AppProps) {
         }
 
         if (uidToUse) {
-          console.log('Loading bookmarks for uid:', uidToUse);
+          logger.debug('Loading bookmarks for uid:', uidToUse);
           let bookmarks = await userService.getUserBookmarks(uidToUse);
-          console.log('Retrieved bookmarks from server:', bookmarks.length);
+          logger.debug('Retrieved bookmarks from server:', bookmarks.length);
           // fallback: if no bookmarks in collection, check user profile bookmarks array
-          if (bookmarks.length === 0) {
+            if (bookmarks.length === 0) {
             const profileBookmarks = await userService.getUserProfileBookmarks(uidToUse);
             if (profileBookmarks && profileBookmarks.length > 0) {
-              console.log('Fallback to profile bookmarks:', profileBookmarks.length);
+              logger.debug('Fallback to profile bookmarks:', profileBookmarks.length);
               bookmarks = profileBookmarks.map(b => ({ articleId: b } as any));
             }
           }
@@ -684,7 +724,7 @@ export default function App(props: AppProps) {
             const n = Number(aid);
             return Number.isFinite(n) ? n : aid;
           });
-          console.log('Bookmark ids loaded:', ids);
+          logger.debug('Bookmark ids loaded:', ids);
           setBookmarkedItems(ids);
 
           // Merge local AsyncStorage bookmarks into Firestore (if any)
@@ -694,12 +734,12 @@ export default function App(props: AppProps) {
               const localIds = JSON.parse(rawLocal) as (string | number)[];
               const serverSet = new Set(ids.map(i => String(i)));
               const toAdd = localIds.filter(li => !serverSet.has(String(li)));
-              if (toAdd.length > 0) {
-                console.log('Merging local bookmarks into server:', toAdd);
+        if (toAdd.length > 0) {
+        logger.info('Merging local bookmarks into server:', toAdd);
                 for (const aid of toAdd) {
                   try {
                     await userService.addBookmark(uidToUse, aid);
-                    console.log('Merged local bookmark to server:', aid);
+          logger.debug('Merged local bookmark to server:', aid);
                   } catch (e) {
                     console.warn('Failed to merge bookmark', aid, e);
                   }
@@ -728,7 +768,7 @@ export default function App(props: AppProps) {
                 return Number.isFinite(n) ? n : p;
               });
               setBookmarkedItems(normalized);
-              console.log('\u{1F50D} Loaded local bookmarks (normalized):', normalized);
+              logger.debug('\u{1F50D} Loaded local bookmarks (normalized):', normalized);
             } catch (e) {
               console.warn('Failed to parse local bookmarks', e);
             }
@@ -810,13 +850,14 @@ export default function App(props: AppProps) {
   }, []);
 
   const handleAddNews = async (newArticle: Omit<NewsArticle, 'id' | 'timestamp'>): Promise<string | void> => {
-    console.log('🔄 Starting to add article:', newArticle);
-    console.log('🔄 Platform:', Platform.OS);
-    console.log('User Agent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A');
+  logger.info('🔄 Starting to add article:', newArticle);
+  logger.debug('🔄 Platform:', Platform.OS);
+  logger.debug('User Agent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A');
 
     try {
-      const docId = await firebaseNewsService.addArticle(newArticle);
-      console.log('✅ Article added to Firebase with ID:', docId);
+      const svc = await getFirebaseNewsService();
+      const docId = await svc.addArticle(newArticle);
+  logger.info('✅ Article added to Firebase with ID:', docId);
       Alert.alert('Success', 'News article added successfully!');
       return docId;
     } catch (error: any) {
@@ -861,9 +902,10 @@ export default function App(props: AppProps) {
   const handleBulkAddNews = async (articles: NewsArticle[]): Promise<void> => {
     // Add multiple articles to Firebase
     try {
+      const svc = await getFirebaseNewsService();
       await Promise.all(
         articles.map(article => 
-          firebaseNewsService.addArticle({
+          svc.addArticle({
             headline: article.headline,
             description: article.description,
             image: article.image,
@@ -872,7 +914,7 @@ export default function App(props: AppProps) {
           })
         )
       );
-      console.log('✅ Bulk articles added to Firebase');
+  logger.info('✅ Bulk articles added to Firebase');
       Alert.alert('Success', `${articles.length} articles added successfully!`);
     } catch (error: any) {
       console.error('❌ Error adding bulk articles:', error);
@@ -928,12 +970,14 @@ export default function App(props: AppProps) {
   const renderNewsCard = (article: NewsArticle, index: number) => {
 
   // Responsive limits for description and controls
-  const descLines = responsiveLines(screenData.height, 10, 7);
+  // Allow more lines to accommodate ~100-word summaries on larger screens without breaking layout
+  const descLines = responsiveLines(screenData.height, 12, 8);
   // Compute a safe max height for the description: use the container ratio
   // but ensure it's at least large enough for descLines * lineHeight (+ padding)
   const descLineHeight = 22; // matches styles.reelsDescription.lineHeight
   const desiredDescHeight = descLines * descLineHeight + 8; // small padding to avoid clipping
-  const descMaxHeight = Math.round(Math.max((screenData.height - headerHeight) * 0.38, desiredDescHeight));
+  // Increase the fraction used for description height so summaries have more room
+  const descMaxHeight = Math.round(Math.max((screenData.height - headerHeight) * 0.45, desiredDescHeight));
   const isBookmarked = bookmarkedItems.some(i => String(i) === String(article.id));
   // Format timestamp as dd/mm/yyyy where possible
   const formatDate = (ts: string) => {
@@ -983,8 +1027,8 @@ export default function App(props: AppProps) {
                 source={{ uri: article.image || 'https://via.placeholder.com/400x300?text=No+Image' }} 
                 style={[styles.fullScreenImage, { minHeight: 120 }]} 
                 resizeMode="cover"
-                onError={(error) => console.log('Image loading error:', error)}
-                onLoad={() => console.log('Image loaded successfully:', article.image)}
+                onError={(error) => logger.debug('Image loading error:', error)}
+                onLoad={() => logger.debug('Image loaded successfully:', article.image)}
               />
             )}
             
@@ -1025,26 +1069,15 @@ export default function App(props: AppProps) {
               </Text>
               
               {/* Short summary: boxed, responsive and truncated to reasonable lines */}
-              <View style={[styles.reelsDescriptionBox, { maxHeight: descMaxHeight, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' }]}>
-                <Text style={[styles.reelsDescription, darkTextShadow, { color: currentTheme.subText, fontSize: scaleFont(15), lineHeight: 22 }]} numberOfLines={descLines}>
-                  {article.description}
+              {/* Allow description box to grow to its content height so full description is visible */}
+              <View style={[styles.reelsDescriptionBox, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' }]}>
+                <Text style={[styles.reelsDescription, darkTextShadow, { color: currentTheme.subText, fontSize: scaleFont(15), lineHeight: 22 }]}>
+                  {article.description || 'No description available.'}
                 </Text>
               </View>
               
-              {/* Tap button inline below description so it doesn't push the meta and keeps description visible */}
-              <View style={{ width: '100%', marginTop: 6 }}>
-                <FastTouchable
-                  style={[
-                    styles.reelsTapButton,
-                    { backgroundColor: 'rgba(37,99,235,0.08)' }
-                  ]}
-                  onPress={() => handleArticlePress(article)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.reelsTapText, { color: currentTheme.text }]}>Tap to know more</Text>
-                  <Text style={[styles.reelsTapIcon, { color: currentTheme.text }]}>→</Text>
-                </FastTouchable>
-              </View>
+              {/* Removed inline 'Tap to know more' button to free up vertical space for summaries */}
+              {/* description area expands into the space previously reserved for the button */}
             </FastTouchable>
 
             {/* Action emoji buttons removed from content area - now rendered over the image to avoid overlap */}
@@ -1069,10 +1102,12 @@ export default function App(props: AppProps) {
             pointerEvents="box-none"
             style={{
               position: 'absolute',
-              right: 12,
+              // nudge left a bit to avoid covering right-aligned meta text
+              right: 56,
               // move the button above system navigation / gesture inset
               bottom: Math.max(12, insets.bottom + 8),
-              zIndex: 40,
+              // keep it clickable but allow reelsMetaPinned to sit above visually
+              zIndex: 30,
               alignItems: 'center'
             }}
           >
@@ -1189,8 +1224,8 @@ export default function App(props: AppProps) {
           const screenHeight = screenData.height - headerHeight;
           const newIndex = Math.round(scrollY / screenHeight);
           
-          if (newIndex !== currentIndex && newIndex >= 0 && newIndex < filteredNews.length) {
-            console.log(`Scroll: ${scrollY}px, Screen: ${screenHeight}px, Index: ${currentIndex} → ${newIndex}, Total: ${filteredNews.length}`);
+            if (newIndex !== currentIndex && newIndex >= 0 && newIndex < filteredNews.length) {
+            logger.debug(`Scroll: ${scrollY}px, Screen: ${screenHeight}px, Index: ${currentIndex} → ${newIndex}, Total: ${filteredNews.length}`);
             setCurrentIndex(newIndex);
           }
         }}
@@ -1201,17 +1236,19 @@ export default function App(props: AppProps) {
           const screenHeight = screenData.height - headerHeight;
           const newIndex = Math.round(scrollY / screenHeight);
           const finalIndex = Math.max(0, Math.min(newIndex, filteredNews.length - 1));
-          console.log(`Scroll End: ${scrollY}px, Screen: ${screenHeight}px, Final Index: ${finalIndex}, Total: ${filteredNews.length}`);
+          logger.debug(`Scroll End: ${scrollY}px, Screen: ${screenHeight}px, Final Index: ${finalIndex}, Total: ${filteredNews.length}`);
           setCurrentIndex(finalIndex);
         }}
         scrollEventThrottle={16}
       >
         {filteredNews.length === 0 ? (
           isLoadingArticles ? (
-            <View style={[styles.emptyContainer, { height: screenData.height - headerHeight, justifyContent: 'center', alignItems: 'center' }]}>
-              <ActivityIndicator size="large" color={currentTheme.accent} />
-              <Text style={[styles.emptyText, { color: currentTheme.text, marginTop: 12 }]}>Loading articles…</Text>
-            </View>
+            <>
+              {/* Render a few skeleton cards to improve perceived load time */}
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
           ) : (
             <View style={[styles.emptyContainer, { height: screenData.height - headerHeight }]}> 
               <Text style={[styles.emptyText, { color: currentTheme.text }]}>
@@ -1482,7 +1519,6 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     lineHeight: 20,
-    flex: 1,
     fontWeight: '400',
     opacity: 0.85,
     marginBottom: 12, // Increased from 8 to 12
@@ -1492,7 +1528,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     marginBottom: 8,
-    overflow: 'hidden',
+  // allow the text to flow naturally; previously this hid overflowing lines
+  // which could cause the system to ellipsize text in some layouts
+  overflow: 'visible',
   },
   readMoreButton: {
     borderWidth: 1,
@@ -2162,9 +2200,9 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   contentTouchArea: {
-  // leave ample bottom padding so long descriptions don't underlap
-  // the pinned "Tap to know more" button which is absolutely positioned
-  paddingBottom: 96,
+  // Reduced bottom padding now that the inline 'Tap to know more' button is removed.
+  // Keep some padding for the pinned meta and safe-area, but allow longer descriptions to show.
+  paddingBottom: 56,
   },
   reelsHeadline: {
   fontSize: 18,
@@ -2206,10 +2244,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingRight: 80, // leave room for floating top button on the right
-    zIndex: 22,
-    elevation: 6,
+  paddingHorizontal: 20,
+  // Increase right padding so the floating 'Top' button doesn't overlap the
+  // posted date/meta on smaller screens. Keep a comfortable gap for touch.
+  paddingRight: 120, // leave more room for floating top button on the right
+  zIndex: 60, // raise above floating elements so meta remains visible
+  elevation: 12,
   },
   // (reelsTapButton/reelsTapText/reelsTapIcon defined earlier — duplicates removed)
 });

@@ -6,6 +6,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 // to the native headless JS context and background message delivery.
 import './firebaseBackgroundHandler';
 
+// Configure logging early: silence verbose logs on production builds to avoid
+// runtime cost from thousands of console statements on device.
+import './utils/logging';
+
 import AppWrapper from './AppWrapper';
 
 // Wrap the top-level app with SafeAreaProvider so useSafeAreaInsets() works

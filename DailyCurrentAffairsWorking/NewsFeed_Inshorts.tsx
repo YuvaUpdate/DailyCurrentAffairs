@@ -376,17 +376,29 @@ export default function NewsFeed_Inshorts({
             </View>
           </TouchableOpacity>
 
-          <FastTouchable
-            accessibilityLabel={`Open article ${article.headline}`}
-            activeOpacity={0.92}
-            onPress={() => openModalWithLoading(article)}
+          <View
             style={[styles.contentContainer, { backgroundColor: colors.surface }]}
             onLayout={(e) => onContentLayout(article.id, e.nativeEvent.layout.height)}
           >
             <Text style={[styles.headline, { color: colors.text, fontSize: scaleFont(22), lineHeight: scaleFont(28) }]} numberOfLines={2}>{article.headline}</Text>
-            <Text style={[styles.description, { color: colors.text, fontSize: scaleFont(16), lineHeight: 22 }]} numberOfLines={responsiveLines(screenHeight, 20, 12)}>{article.description}</Text>
-            <Text style={[styles.meta, { color: colors.subText }]}>{formatMetadata(article)}</Text>
-          </FastTouchable>
+
+            {/* Make description scrollable within the card to avoid native clipping
+                while keeping the overall page height stable. */}
+            <ScrollView
+              nestedScrollEnabled={true}
+              style={{ maxHeight: Math.max(80, screenHeight - dynH - 84) }}
+              contentContainerStyle={{ paddingBottom: 6 }}
+            >
+              <Text style={[styles.description, { color: colors.text, fontSize: scaleFont(16), lineHeight: 22 }]}>{article.description}</Text>
+              <Text style={[styles.meta, { color: colors.subText, marginTop: 8 }]}>{formatMetadata(article)}</Text>
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 6 }}>
+              <TouchableOpacity onPress={() => openModalWithLoading(article)} style={{ paddingHorizontal: 8, paddingVertical: 6 }} accessibilityLabel={`Open full article ${article.headline}`}>
+                <Text style={{ color: colors.accent, fontWeight: '700' }}>Read more</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
         {/* Floating count and bottom nav are rendered globally */}
@@ -557,14 +569,12 @@ export default function NewsFeed_Inshorts({
               <Text style={{ color: colors.accent, fontWeight: '700' }}>Close</Text>
             </TouchableOpacity>
             <View style={{ flex: 1 }} />
-            <TouchableOpacity onPress={() => { if (webviewUrl) Linking.openURL(webviewUrl); }} style={modalStyles.webviewHeaderBtn} accessibilityLabel="Open in browser">
-              <Text style={{ color: colors.accent, fontWeight: '700' }}>Open in Browser</Text>
-            </TouchableOpacity>
+            {/* External open removed to keep browsing inside the app */}
           </View>
 
           <View style={modalStyles.webviewWrapper}>
             {webviewLoading && (
-              <View style={modalStyles.webviewLoadingOverlay} pointerEvents="none">
+              <View style={[modalStyles.webviewLoadingOverlay, { backgroundColor: colors.surface }]} pointerEvents="none">
                 <ActivityIndicator size="large" color={colors.accent} />
               </View>
             )}
@@ -714,7 +724,7 @@ const styles = StyleSheet.create({
   contentContainer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 0 },
   headline: { fontSize: 30, fontWeight: '900', marginBottom: 6, lineHeight: 38 },
   // Slightly larger description for improved readability; increase fontSize a bit
-  description: { fontSize: 16, lineHeight: 22, marginBottom: 2 },
+  description: { fontSize: 16, lineHeight: 22, marginBottom: 2, flexShrink: 0 },
   meta: { fontSize: 12, marginBottom: 0 },
   actionsRow: { flexDirection: 'row', marginTop: 6 },
   actionBtn: { marginRight: 12, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
@@ -730,7 +740,8 @@ const styles = StyleSheet.create({
     height: screenHeight, 
     width: screenWidth, 
     borderRadius: 12, 
-    overflow: 'hidden',
+  // allow text to expand within card without platform clipping/ellipsize
+  overflow: 'visible',
   boxShadow: 'none',
   elevation: 0,
     margin: 0,

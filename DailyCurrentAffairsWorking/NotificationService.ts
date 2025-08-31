@@ -1,4 +1,5 @@
 import { Alert, Platform, NativeModules, PermissionsAndroid, Linking } from 'react-native';
+import { logger } from './utils/logging';
 
 const { NativeNotificationModule } = (NativeModules as any) || {};
 const LOG_TAG = 'NotificationService';
@@ -59,16 +60,16 @@ export class NotificationService {
       // On Android 13+ (API 33+) we must request POST_NOTIFICATIONS at runtime
       if (Platform.OS === 'android') {
         const sdk = Number(Platform.Version) || 0;
-        console.log('[NotificationService] Android SDK version:', sdk);
+  logger.debug('[NotificationService] Android SDK version:', sdk);
         if (sdk >= 33) {
           try {
-            console.log('[NotificationService] Checking POST_NOTIFICATIONS permission');
+            logger.debug('[NotificationService] Checking POST_NOTIFICATIONS permission');
             const has = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS as any);
-            console.log('[NotificationService] POST_NOTIFICATIONS already granted?', has);
+            logger.debug('[NotificationService] POST_NOTIFICATIONS already granted?', has);
             if (has) return true;
-            console.log('[NotificationService] Requesting POST_NOTIFICATIONS permission');
+            logger.debug('[NotificationService] Requesting POST_NOTIFICATIONS permission');
             const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS as any);
-            console.log('[NotificationService] POST_NOTIFICATIONS request result:', result);
+            logger.debug('[NotificationService] POST_NOTIFICATIONS request result:', result);
             if (result === PermissionsAndroid.RESULTS.GRANTED) return true;
 
             // If permission denied, show an in-app prompt with a button into app settings
@@ -111,15 +112,17 @@ export class NotificationService {
   // Send local notification for new articles
   async sendNewArticleNotification(article: any) {
     try {
-    console.log(`[${LOG_TAG}] sendNewArticleNotification called (platform=${Platform.OS})`, article && article.headline);
+  logger.debug(`[${LOG_TAG}] sendNewArticleNotification called (platform=${Platform.OS})`, article && article.headline);
+    // Build a unified notification title (prefer headline; avoid a lone "New Article" string)
+    const notifTitle = article && article.headline ? article.headline : 'News Update';
     // If running on native and native module present, use it to post a local notification
       if (Platform.OS !== 'web' && NativeNotificationModule && NativeNotificationModule.showNotification) {
-        const title = article.headline ? `New Article: ${article.headline}` : 'New Article';
+        const title = notifTitle;
         const body = article.headline || article.summary || '';
-        try {
-      console.log(`[${LOG_TAG}] Calling NativeNotificationModule.showNotification`, { title, body });
-      await NativeNotificationModule.showNotification(title, body, { article: JSON.stringify(article) });
-      console.log(`[${LOG_TAG}] NativeNotificationModule.showNotification resolved`);
+    try {
+    logger.debug(`[${LOG_TAG}] Calling NativeNotificationModule.showNotification`, { title, body });
+    await NativeNotificationModule.showNotification(title, body, { article: JSON.stringify(article) });
+    logger.debug(`[${LOG_TAG}] NativeNotificationModule.showNotification resolved`);
           return;
         } catch (e) {
           console.warn('Native notification failed, falling back to Alert', e);
@@ -128,23 +131,23 @@ export class NotificationService {
 
       // Web/browser behavior
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification('New Article Posted! 📰', {
+        const notification = new Notification(notifTitle, {
           body: article.headline,
           icon: '/assets/icon.png',
           badge: '/assets/icon.png',
-          tag: 'new-article',
+          tag: 'news-update',
           requireInteraction: false,
           silent: false,
         });
 
-        setTimeout(() => { notification.close(); }, 5000);
+  setTimeout(() => { notification.close(); }, 5000);
         notification.onclick = () => { window.focus(); notification.close(); this.notifySubscribers(article); };
         return;
       }
 
       // Fallback to Alert on native if nothing else works
       Alert.alert(
-        '📰 New Article Posted!',
+        '📰 News Update',
         article.headline,
         [
           { text: 'Later', style: 'cancel' },
@@ -169,15 +172,15 @@ export class NotificationService {
 
   // Initialize notifications: request permission and setup FCM topic subscription + foreground handler
   async initialize() {
-  console.log(`[${LOG_TAG}] initialize() called`);
+  logger.info(`[${LOG_TAG}] initialize() called`);
     const hasPermission = await this.requestPermission();
-    if (hasPermission) console.log('✅ Notification permissions granted'); else console.log('❌ Notification permissions denied');
+    if (hasPermission) logger.info('✅ Notification permissions granted'); else logger.info('❌ Notification permissions denied');
 
     // Subscribe to FCM topic 'news-updates' so the server function can broadcast to all devices
     if (Platform.OS !== 'web') {
       const client = getMessagingClient();
-      console.log(`[${LOG_TAG}] messaging import shape:`, typeof messaging, Object.keys(messaging || {}));
-      console.log(`[${LOG_TAG}] resolved messaging client:`, client ? Object.keys(client) : null);
+  logger.debug(`[${LOG_TAG}] messaging import shape:`, typeof messaging, Object.keys(messaging || {}));
+  logger.debug(`[${LOG_TAG}] resolved messaging client:`, client ? Object.keys(client) : null);
 
       if (client) {
         try {
@@ -199,7 +202,7 @@ export class NotificationService {
                 console.error('Error handling foreground message', e);
               }
             });
-            console.log(`[${LOG_TAG}] attached foreground onMessage handler`);
+            logger.info(`[${LOG_TAG}] attached foreground onMessage handler`);
           } else {
             console.warn(`[${LOG_TAG}] messaging client has no onMessage method`);
           }
@@ -208,7 +211,7 @@ export class NotificationService {
           if (typeof client.subscribeToTopic === 'function') {
             try {
               await client.subscribeToTopic('news-updates');
-              console.log('Subscribed to topic: news-updates');
+              logger.info('Subscribed to topic: news-updates');
             } catch (e) {
               console.warn('Failed to subscribe to topic news-updates', e);
             }
@@ -219,7 +222,7 @@ export class NotificationService {
           console.warn('Messaging onMessage handler not available', err);
         }
       } else {
-        console.log(`[${LOG_TAG}] No messaging client available; skipping FCM handlers`);
+        logger.debug(`[${LOG_TAG}] No messaging client available; skipping FCM handlers`);
       }
     }
 

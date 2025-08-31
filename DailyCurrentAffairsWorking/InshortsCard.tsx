@@ -11,6 +11,7 @@ import { showInApp } from './InAppBrowser';
 import FastTouchable from './FastTouchable';
 import { NewsArticle } from './types';
 import { scaleFont, responsiveLines } from './utils/responsive';
+// ...existing code... (truncate helper removed to show full descriptions)
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -78,7 +79,13 @@ export default function InshortsCard({ article, onPress, onBookmark, isBookmarke
 
       <View style={styles.body}>
         <Text numberOfLines={2} style={styles.headline}>{article.headline}</Text>
-  <Text numberOfLines={responsiveLines(screenHeight, 12, 8)} style={[styles.description, { fontSize: scaleFont(15), lineHeight: 22 }]}>{article.description}</Text>
+  {/* Show more lines to allow ~100 words to display on the homepage while preserving responsiveness.
+      responsiveLines(...) still controls the baseline, but we ensure a minimum of 10 lines which
+      accomodates roughly 100 words on most screen widths. This avoids fixed heights and preserves scrolling. */}
+  {/* Show full description (no truncation) per user request */}
+  <Text style={[styles.description, { fontSize: scaleFont(15), lineHeight: 22 }]}>
+    {article.description || 'No description available.'}
+  </Text>
 
         {/* Dev-only visual marker to verify this component is the one rendered */}
         {__DEV__ && (
@@ -144,6 +151,8 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: 12,
     paddingVertical: 10,
+    // allow description text to flow and wrap without being clipped by parent
+    overflow: 'visible',
   },
   headline: {
     color: '#fff',
