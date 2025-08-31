@@ -955,6 +955,16 @@ export default function App(props: AppProps) {
     Alert.alert('No external link', 'This article does not have an external link to open.');
   };
 
+  const getDomainFromUrl = (url?: string) => {
+    try {
+      if (!url) return '';
+      const u = new URL(url);
+      return u.hostname.replace('www.', '');
+    } catch (e) {
+      return '';
+    }
+  };
+
   // Scroll feed to top and reset index
   const scrollToTop = () => {
     try {
@@ -1044,6 +1054,15 @@ export default function App(props: AppProps) {
               )}
               {/* Read-aloud button removed for this build */}
             </View>
+            {/* Date overlay on image */}
+            <View style={styles.reelsDateBadge} pointerEvents="none">
+              <Text style={styles.reelsDateText}>{formatDate(article.timestamp)}</Text>
+              {article.source ? (
+                <Text style={styles.reelsSourceText}>{article.source}</Text>
+              ) : (
+                <Text style={styles.reelsSourceText}>{getDomainFromUrl(article.sourceUrl)}</Text>
+              )}
+            </View>
             {/* Category Badge */}
             <View style={styles.reelsCategoryBadge}>
               <Text style={styles.reelsCategoryText}>{article.category}</Text>
@@ -1085,10 +1104,8 @@ export default function App(props: AppProps) {
               {/* Pinned meta (swapped) - read time left and posted date right */}
               <View style={[styles.reelsMetaPinned, { paddingBottom: Math.max(8, insets.bottom) }]}> 
                 <View style={styles.reelsMetaLeft}>
-                  {/* Move date to the left and format as dd/mm/yyyy, then show read time next to it */}
-                  <Text style={[styles.reelsMetaText, darkTextShadow, { color: currentTheme.subText }]}> 
-                    {formatDate(article.timestamp)}{article.readTime ? ` · ${article.readTime}` : ''}
-                  </Text>
+                  {/* Date moved onto image; meta left intentionally left blank to avoid duplication */}
+                  <Text style={[styles.reelsMetaText, darkTextShadow, { color: currentTheme.subText }]}> </Text>
                 </View>
                 <View style={styles.reelsMetaRight}>
                   {/* intentionally left blank to avoid overlap with floating Top button */}
@@ -1096,18 +1113,40 @@ export default function App(props: AppProps) {
               </View>
               {/* Tap button intentionally rendered inline above meta (moved into content area) */}
           </View>
+          {/* Absolute-positioned Tap button so long descriptions don't push it off-screen */}
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: 'absolute',
+              left: 20,
+              right: 20,
+              // move closer to the bottom so it appears lower on the card
+              bottom: Math.max(4, insets.bottom + 8),
+              zIndex: 70,
+              alignItems: 'center'
+            }}
+          >
+            <FastTouchable
+              style={[styles.reelsTapButton, styles.reelsTapButtonSmall, { backgroundColor: 'rgba(37,99,235,0.08)' }]}
+              onPress={() => handleArticlePress(article)}
+              activeOpacity={0.9}
+            >
+              <Text style={[styles.reelsTapText, styles.reelsTapTextSmall, { color: currentTheme.text }]}>Tap to know more</Text>
+              <Text style={[styles.reelsTapIcon, styles.reelsTapIconSmall, { color: currentTheme.text }]}>→</Text>
+            </FastTouchable>
+          </View>
         {/* Floating 'Top' button shown on cards at index >= 3 */}
         {index >= 3 && (
           <View
             pointerEvents="box-none"
             style={{
               position: 'absolute',
-              // nudge left a bit to avoid covering right-aligned meta text
-              right: 56,
-              // move the button above system navigation / gesture inset
-              bottom: Math.max(12, insets.bottom + 8),
-              // keep it clickable but allow reelsMetaPinned to sit above visually
-              zIndex: 30,
+              // move to bottom-left of the card to avoid the bottom-centered Tap button
+              left: 12,
+              // position above the bottom tap button area
+              bottom: Math.max(12, insets.bottom + 72),
+              // ensure it sits above other overlays
+              zIndex: 120,
               alignItems: 'center'
             }}
           >
@@ -2017,6 +2056,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700'
   },
+  // Small variants for compact display
+  reelsTapButtonSmall: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    minWidth: 140,
+  },
+  reelsTapTextSmall: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginRight: 6,
+  },
+  reelsTapIconSmall: {
+    fontSize: 14,
+    fontWeight: '700'
+  },
   floatingActionIcon: {
     fontSize: 18,
     fontWeight: '600',
@@ -2175,6 +2230,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     textTransform: 'uppercase',
+  },
+  reelsDateBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    zIndex: 35,
+    alignItems: 'flex-start',
+    maxWidth: '64%',
+  },
+  reelsDateText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  reelsSourceText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '500',
+    maxWidth: '100%',
   },
   reelsVideoBadge: {
     position: 'absolute',

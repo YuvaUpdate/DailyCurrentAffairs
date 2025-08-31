@@ -39,12 +39,15 @@ interface AdminPanelProps {
 export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews, onLogout, currentUser }: AdminPanelProps) {
   // Limits for admin text inputs
   const HEADLINE_MAX = 200;
-  const DESCRIPTION_MAX = 1000;
+  // Description limit (in words)
+  const DESCRIPTION_WORD_MAX = 80;
   const READTIME_MAX = 50;
   const SOURCEURL_MAX = 1000;
+  const SOURCE_NAME_MAX = 100;
   const [headline, setHeadline] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [source, setSource] = useState('');
   const [category, setCategory] = useState('');
   const [readTime, setReadTime] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
@@ -76,6 +79,19 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   const [isRefreshingAnalytics, setIsRefreshingAnalytics] = useState(false);
 
   const isSmallScreen = width && width < 420;
+
+  // Helper to limit text to a maximum number of words
+  const limitWords = (text: string, maxWords: number) => {
+    if (!text) return '';
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    if (words.length <= maxWords) return words.join(' ');
+    return words.slice(0, maxWords).join(' ');
+  };
+
+  const getWordCount = (text: string) => {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  };
 
   useEffect(() => {
     // Load analytics when AdminPanel mounts
@@ -170,8 +186,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
 
     const newArticle = {
       headline: headline.substring(0, HEADLINE_MAX),
-      description: description.substring(0, DESCRIPTION_MAX),
+  description: limitWords(description, DESCRIPTION_WORD_MAX),
       image: mediaUrl,
+  source: source.substring(0, SOURCE_NAME_MAX),
       category,
       readTime: (readTime || '2 min read').substring(0, READTIME_MAX),
       sourceUrl: sourceUrl.substring(0, SOURCEURL_MAX),
@@ -194,6 +211,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       headline: articlePayload.headline,
       description: articlePayload.description,
       image: articlePayload.image,
+  source: (articlePayload.source as any) || '',
       category: articlePayload.category,
       readTime: articlePayload.readTime,
       sourceUrl: articlePayload.sourceUrl,
@@ -328,8 +346,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   const handleEditNews = (article: NewsArticle) => {
     setEditingNews(article);
     setHeadline(article.headline);
-    setDescription(article.description);
+  setDescription(limitWords(article.description || '', DESCRIPTION_WORD_MAX));
     setImageUrl(article.image);
+  setSource(article.source || '');
     setCategory(article.category);
     setReadTime(article.readTime || '');
     setSourceUrl(article.sourceUrl || '');
@@ -622,7 +641,8 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                 <Text style={styles.label}>Headline</Text>
                 <TextInput value={headline} onChangeText={setHeadline} style={styles.input} maxLength={HEADLINE_MAX} />
                 <Text style={styles.label}>Description</Text>
-                <TextInput value={description} onChangeText={setDescription} style={[styles.input, styles.textArea]} multiline maxLength={DESCRIPTION_MAX} />
+                <TextInput value={description} onChangeText={(t) => setDescription(limitWords(t || '', DESCRIPTION_WORD_MAX))} style={[styles.input, styles.textArea]} multiline />
+                <Text style={styles.characterCount}>{getWordCount(description)} / {DESCRIPTION_WORD_MAX} words</Text>
                 <Text style={styles.label}>Category</Text>
                 <ScrollView horizontal style={styles.categoryScroll}>
                   {categories.map(cat => (
@@ -631,6 +651,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                     </FastTouchable>
                   ))}
                 </ScrollView>
+
+                <Text style={styles.label}>Source (e.g., Times of India)</Text>
+                <TextInput placeholder="Source name" value={source} onChangeText={(t) => setSource((t || '').slice(0, SOURCE_NAME_MAX))} style={styles.input} />
 
                 <Text style={styles.label}>Media</Text>
                 <View style={styles.mediaSourceToggle}>
@@ -693,7 +716,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                           <Text style={styles.previewMetaText}>{category || 'Uncategorized'}</Text>
                           <Text style={styles.previewMetaText}>{readTime || '—'}</Text>
                         </View>
-                        {sourceUrl ? (
+                        {source ? (
+                          <Text style={[styles.previewMetaText, { marginTop: 8 }]} numberOfLines={1}>{source}</Text>
+                        ) : sourceUrl ? (
                           <Text style={[styles.previewMetaText, { marginTop: 8 }]} numberOfLines={1}>{sourceUrl}</Text>
                         ) : null}
                       </View>

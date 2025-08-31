@@ -11,6 +11,7 @@ export interface NewsArticle {
   mediaType?: 'image' | 'video'; // Type of media content
   mediaPath?: string; // Firebase storage path for potential deletion
   sourceUrl?: string;
+  source?: string; // Human-readable source name (e.g., Times of India)
   readTime?: string;
   fullText?: string;
 }

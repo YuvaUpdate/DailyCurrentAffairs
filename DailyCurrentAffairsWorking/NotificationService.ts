@@ -117,8 +117,9 @@ export class NotificationService {
     const notifTitle = article && article.headline ? article.headline : 'News Update';
     // If running on native and native module present, use it to post a local notification
       if (Platform.OS !== 'web' && NativeNotificationModule && NativeNotificationModule.showNotification) {
-        const title = notifTitle;
-        const body = article.headline || article.summary || '';
+  const title = notifTitle;
+  // Avoid repeating the headline in the notification body; show no body or a short summary if provided
+  const body = article.summary || '';
     try {
     logger.debug(`[${LOG_TAG}] Calling NativeNotificationModule.showNotification`, { title, body });
     await NativeNotificationModule.showNotification(title, body, { article: JSON.stringify(article) });
@@ -132,7 +133,8 @@ export class NotificationService {
       // Web/browser behavior
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         const notification = new Notification(notifTitle, {
-          body: article.headline,
+          // Avoid duplicating the headline in the body
+          body: article.summary || '',
           icon: '/assets/icon.png',
           badge: '/assets/icon.png',
           tag: 'news-update',
