@@ -4,7 +4,7 @@
     "slug": "DailyCurrentAffairsWorking",
     "version": "1.0.0",
     "orientation": "portrait",
-  "icon": "./assets/favicon.png",
+    "icon": "./assets/favicon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -21,7 +21,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-  "package": "com.nareshkumarbalamurugan.yuvaupdate",
+      "package": "com.nareshkumarbalamurugan.yuvaupdate",
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -33,6 +33,9 @@
       "eas": {
         "projectId": "eb4eb9b3-ba6a-410b-aec4-83a429779add"
       }
-    }
+    },
+    "plugins": [
+      "expo-audio"
+    ]
   }
 }

@@ -38,28 +38,50 @@ function OnboardingCards({ visible = true, onClose }: Props) {
 
 const goNext = () => {
   if (transitioningRef.current) return;
-    if (index < CARDS.length - 1) {
-      const next = index + 1;
-      // update UI immediately so pagination/dots reflect the tap right away
-      setIndex(next);
-      transitioningRef.current = true;
-
-      // schedule the scroll on the next frame so the state update can paint first
-      requestAnimationFrame(() => {
-        try {
-          scrollRef.current?.scrollTo({ x: next * modalWidth, y: 0, animated: true } as any);
-        } catch (e) {
-          // ignore - index already updated
-        }
-      });
-
-      // safety: clear the transitioning flag after a short delay; it's also cleared in onMomentumScrollEnd
-      setTimeout(() => { transitioningRef.current = false; }, 450);
-    } else {
-      // final action: close. Keep this synchronous so UI can respond promptly; let the parent handle async persistence.
-      onClose();
+  
+  if (index < CARDS.length - 1) {
+    const next = index + 1;
+    transitioningRef.current = true;
+    
+    // Immediate state update for instant feedback
+    setIndex(next);
+    
+    // Immediate scroll without animation for faster response
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ x: next * modalWidth, y: 0, animated: false });
     }
-  };
+    
+    // Reset transition flag quickly
+    setTimeout(() => {
+      transitioningRef.current = false;
+    }, 50);
+  } else {
+    // Close immediately on last card
+    onClose();
+  }
+};
+
+const goPrev = () => {
+  if (transitioningRef.current) return;
+  
+  if (index > 0) {
+    const prev = index - 1;
+    transitioningRef.current = true;
+    
+    // Immediate state update for instant feedback
+    setIndex(prev);
+    
+    // Immediate scroll without animation for faster response
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ x: prev * modalWidth, y: 0, animated: false });
+    }
+    
+    // Reset transition flag quickly
+    setTimeout(() => {
+      transitioningRef.current = false;
+    }, 50);
+  }
+};
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
@@ -103,7 +125,13 @@ const goNext = () => {
               ))}
             </View>
 
-            <FastTouchable style={styles.button} onPress={goNext}>
+            <FastTouchable 
+              style={styles.button} 
+              onPress={goNext}
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+              delayPressIn={0}
+              delayPressOut={0}
+            >
               <Text style={styles.buttonText}>{index === CARDS.length - 1 ? 'Get started' : 'Next'}</Text>
             </FastTouchable>
           </View>

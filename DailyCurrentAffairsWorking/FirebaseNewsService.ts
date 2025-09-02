@@ -267,12 +267,14 @@ export class FirebaseNewsService {
       })) as NewsArticle[];
     } catch (error: any) {
       console.error('Error getting articles:', error);
-      // If Firestore rules deny access, return local fallback so app isn't empty
-      if (error && error.code === 'permission-denied') {
-        console.warn('Firestore permission denied: returning local fallback articles');
+      // If Firestore rules deny access OR network issues, return local fallback so app isn't empty
+      if (error && (error.code === 'permission-denied' || error.code === 'unavailable' || error.message?.includes('offline') || error.message?.includes('network'))) {
+        console.warn('Firestore unavailable (offline/network/permission): returning local fallback articles');
         return this.fallbackArticles;
       }
-      return [];
+      // For any other error, also return fallback to prevent blank pages
+      console.warn('Firestore error, returning fallback articles to prevent blank page');
+      return this.fallbackArticles;
     }
   }
 
@@ -360,7 +362,8 @@ export class FirebaseNewsService {
       return Array.from(categories);
     } catch (error) {
       console.error('Error getting categories:', error);
-      return [];
+      // Return fallback categories when offline or network issues
+      return ['Technology', 'Sports', 'Business', 'Health', 'Entertainment', 'Politics'];
     }
   }
 

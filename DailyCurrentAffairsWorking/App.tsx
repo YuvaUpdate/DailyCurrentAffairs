@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { InteractionManager } from 'react-native';
 import { Appearance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ import {
   StatusBar,
   Linking,
   Modal,
+  FlatList,
 } from 'react-native';
 import FastTouchable from './FastTouchable';
 import AdminPanel from './AdminPanel';
@@ -48,6 +49,7 @@ import { scaleFont, responsiveLines } from './utils/responsive';
 import { LoadingSpinner } from './LoadingSpinner';
 import InAppBrowserHost, { showInApp } from './InAppBrowser';
 import SkeletonCard from './SkeletonCard';
+import OptimizedImage from './OptimizedImage';
 
 const { height, width } = Dimensions.get('screen');
 
@@ -67,7 +69,7 @@ export default function App(props: AppProps) {
     const sys = Appearance.getColorScheme();
     return sys === 'light' ? false : true;
   });
-  const [isThemeLoaded, setIsThemeLoaded] = useState(false);
+  const [isThemeLoaded, setIsThemeLoaded] = useState(true); // Start immediately loaded
   const THEME_KEY = 'ya_theme';
   const [screenData, setScreenData] = useState(Dimensions.get('screen'));
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -108,24 +110,27 @@ export default function App(props: AppProps) {
   };
 
   // Memoize theme object to avoid re-creating style-related objects on every render
+  // Memoized theme to prevent unnecessary re-renders
   const currentTheme = useMemo(() => (isDarkMode ? theme.dark : theme.light), [isDarkMode]);
+  
+  // Memoized screen data to prevent layout recalculations
+  const memoizedScreenData = useMemo(() => screenData, [screenData.width, screenData.height]);
 
-  // Load persisted theme preference on startup
+  // Load persisted theme preference on startup - IMMEDIATE
   useEffect(() => {
-    (async () => {
-      try {
-        const stored = await AsyncStorage.getItem(THEME_KEY);
+    // Set theme loaded immediately for faster startup
+    setIsThemeLoaded(true);
+    
+    // Load theme in background
+    AsyncStorage.getItem(THEME_KEY)
+      .then((stored) => {
         if (stored === 'light') {
           setIsDarkMode(false);
         } else if (stored === 'dark') {
           setIsDarkMode(true);
         }
-      } catch (e) {
-        console.warn('Failed to read persisted theme', e);
-      } finally {
-        setIsThemeLoaded(true);
-      }
-    })();
+      })
+      .catch((e) => console.warn('Failed to read persisted theme', e));
   }, []);
 
   // Helper to persist theme changes
@@ -162,16 +167,16 @@ export default function App(props: AppProps) {
   // loading after a short delay we briefly display a spinner (non-blocking).
   const [showStartupSpinner, setShowStartupSpinner] = useState<boolean>(false);
 
-  // Show onboarding modal on first install only
+  // Show onboarding modal on first install only - IMMEDIATE CHECK
   useEffect(() => {
-    (async () => {
-      try {
-        const seen = await AsyncStorage.getItem('ya_seen_onboarding_v1');
+    AsyncStorage.getItem('ya_seen_onboarding_v1')
+      .then((seen) => {
         if (!seen) setShowOnboarding(true);
-      } catch (e) {
-        // ignore
-      }
-    })();
+      })
+      .catch(() => {
+        // On error, assume first time and show onboarding
+        setShowOnboarding(true);
+      });
   }, []);
   const [filteredNews, setFilteredNews] = useState<NewsArticle[]>(newsData); // Initialize with newsData
   const [refreshing, setRefreshing] = useState(false);
@@ -179,35 +184,28 @@ export default function App(props: AppProps) {
   // Startup spinner: show briefly only if articles are still not available
   const _spinnerShownRef = React.useRef(false);
   useEffect(() => {
-    // Show a very short startup spinner only when articles are still not available.
-    // Shorter timings reduce perceived startup wait on cold starts.
-    const t = setTimeout(() => {
-      if (! _spinnerShownRef.current && isLoadingArticles && (!filteredNews || filteredNews.length === 0)) {
-        _spinnerShownRef.current = true;
-        setShowStartupSpinner(true);
-        const h = setTimeout(() => setShowStartupSpinner(false), 700); // shorter display
-        return () => clearTimeout(h);
-      }
-    }, 120); // show earlier but briefly
-    return () => clearTimeout(t);
+    // Immediate startup - no delays
+    if (isLoadingArticles && (!filteredNews || filteredNews.length === 0)) {
+      setShowStartupSpinner(true);
+      const h = setTimeout(() => setShowStartupSpinner(false), 200); // Much shorter display
+      return () => clearTimeout(h);
+    }
   }, [isLoadingArticles, filteredNews]);
   const [categories, setCategories] = useState<string[]>([]);
   const [autoRefreshing, setAutoRefreshing] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<FlatList>(null);
   const [playbackStateLocal, setPlaybackStateLocal] = useState(audioService.getPlaybackState());
   // Ensure we only call the onArticlesReady callback once
   const articlesReadyCalled = React.useRef(false);
 
-  // Hide the startup spinner as soon as articles are available or loading finishes
+  // Hide the startup spinner IMMEDIATELY when any articles are available
   useEffect(() => {
-    try {
-      if (!isLoadingArticles || (filteredNews && filteredNews.length > 0)) {
-        setShowStartupSpinner(false);
-      }
-    } catch (e) {
-      // ignore
+    // Show content immediately if we have any articles at all
+    if (filteredNews && filteredNews.length > 0) {
+      setShowStartupSpinner(false);
+      setIsLoadingArticles(false);
     }
-  }, [isLoadingArticles, filteredNews]);
+  }, [filteredNews]);
 
   // Firebase real-time subscription with auto-refresh
   useEffect(() => {
@@ -590,7 +588,7 @@ export default function App(props: AppProps) {
     applyFilter(newsData, category);
     setCurrentIndex(0);
     if (scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ y: 0, animated: true });
+      scrollViewRef.current.scrollToOffset({ offset: 0, animated: true });
     }
   }, [newsData, applyFilter]);
 
@@ -967,17 +965,84 @@ export default function App(props: AppProps) {
 
   // Scroll feed to top and reset index
   const scrollToTop = () => {
+    console.log('🚀 scrollToTop button pressed');
+    Alert.alert('Scroll to Top', 'Button pressed successfully!');
     try {
       if (scrollViewRef.current) {
-        scrollViewRef.current.scrollTo({ y: 0, animated: true });
+        console.log('📜 FlatList ref found, scrolling to top...');
+        scrollViewRef.current.scrollToOffset({ offset: 0, animated: true });
+        console.log('✅ Scroll command sent successfully');
+      } else {
+        console.warn('❌ scrollViewRef.current is null');
       }
       setCurrentIndex(0);
+      console.log('🔄 Current index reset to 0');
     } catch (e) {
-      console.warn('scrollToTop failed', e);
+      console.error('❌ scrollToTop failed:', e);
     }
   };
 
-  const renderNewsCard = (article: NewsArticle, index: number) => {
+  // Ultra-optimized scroll handlers with throttling
+  const handleScroll = useCallback((event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const screenHeight = memoizedScreenData.height - headerHeight;
+    const newIndex = Math.round(scrollY / screenHeight);
+    
+    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < filteredNews.length) {
+      setCurrentIndex(newIndex);
+    }
+  }, [currentIndex, filteredNews.length, memoizedScreenData.height, headerHeight]);
+
+  const handleMomentumScrollEnd = useCallback((event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const screenHeight = memoizedScreenData.height - headerHeight;
+    const newIndex = Math.round(scrollY / screenHeight);
+    const finalIndex = Math.max(0, Math.min(newIndex, filteredNews.length - 1));
+    setCurrentIndex(finalIndex);
+  }, [filteredNews.length, memoizedScreenData.height, headerHeight]);
+
+  // Ultra-optimized memoized news card component
+  const MemoizedNewsCard = memo(({ article, index }: { article: NewsArticle; index: number }) => {
+    const descLines = responsiveLines(memoizedScreenData.height, 12, 8);
+    const descLineHeight = 22;
+    const desiredDescHeight = descLines * descLineHeight + 8;
+    const descMaxHeight = Math.round(Math.max((memoizedScreenData.height - headerHeight) * 0.45, desiredDescHeight));
+    const isBookmarked = bookmarkedItems.some(i => String(i) === String(article.id));
+    
+    const formatDate = useCallback((ts: string) => {
+      try {
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return ts;
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      } catch (e) {
+        return ts;
+      }
+    }, []);
+
+    const darkTextShadow = useMemo(() => 
+      isDarkMode
+        ? ({
+            textShadowColor: 'rgba(0,0,0,0.8)',
+            textShadowOffset: { width: 1, height: 1 },
+            textShadowRadius: 3,
+            textShadow: '1px 1px 3px rgba(0,0,0,0.8)'
+          } as any)
+        : ({} as any),
+      [isDarkMode]
+    );
+
+    return renderNewsCard(article, index);
+  }, (prevProps, nextProps) => {
+    return (
+      prevProps.article.id === nextProps.article.id &&
+      prevProps.index === nextProps.index
+    );
+  });
+
+  const renderNewsCard = useCallback((article: NewsArticle, index: number) => {
 
   // Responsive limits for description and controls
   // Allow more lines to accommodate ~100-word summaries on larger screens without breaking layout
@@ -1025,7 +1090,7 @@ export default function App(props: AppProps) {
         <View style={styles.reelsCard}>
           {/* Large Background Image */}
           <View style={[styles.fullImageContainer, { height: Math.min(Math.round(screenData.height * 0.28), 220), minHeight: 140, flex: 0, backgroundColor: '#eeeeee' }]}>
-            {article.mediaType === 'video' ? (
+            {article.image && (article.image.includes('.mp4') || article.image.includes('.webm')) ? (
               <VideoPlayerComponent
                 videoUrl={article.image}
                 style={styles.fullScreenImage}
@@ -1039,16 +1104,27 @@ export default function App(props: AppProps) {
                 resizeMode="cover"
                 onError={(error) => logger.debug('Image loading error:', error)}
                 onLoad={() => logger.debug('Image loaded successfully:', article.image)}
+                fadeDuration={100}
+                progressiveRenderingEnabled={true}
+                defaultSource={require('./assets/favicon.png')}
               />
             )}
             
             {/* Emoji action buttons over the image (bottom-right) - single-colored, professional glyphs */}
             <View style={styles.reelsEmojiContainerImage} pointerEvents="box-none">
-              <FastTouchable onPress={() => shareArticle(article)} style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }] }>
+              <FastTouchable 
+                onPress={() => shareArticle(article)} 
+                style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>↗</Text>
               </FastTouchable>
               {SHOW_BOOKMARKS && (
-              <FastTouchable onPress={() => toggleBookmark(article.id as number)} style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }] }>
+              <FastTouchable 
+                onPress={() => toggleBookmark(article.id as number)} 
+                style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
                 <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{bookmarkedItems.some(i => String(i) === String(article.id)) ? '★' : '☆'}</Text>
               </FastTouchable>
               )}
@@ -1081,58 +1157,95 @@ export default function App(props: AppProps) {
             <FastTouchable 
               onPress={() => handleArticlePress(article)}
               style={styles.contentTouchArea}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               {/* Headline */}
-              <Text style={[styles.reelsHeadline, darkTextShadow, { color: currentTheme.text }]} numberOfLines={2}>
+              <Text 
+                style={[styles.reelsHeadline, darkTextShadow, { color: currentTheme.text }]} 
+                numberOfLines={2}
+                maxFontSizeMultiplier={1.2}
+                allowFontScaling={false}
+              >
                 {article.headline}
               </Text>
               
               {/* Short summary: boxed, responsive and truncated to reasonable lines */}
-              {/* Allow description box to grow to its content height so full description is visible */}
               <View style={[styles.reelsDescriptionBox, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' }]}>
-                <Text style={[styles.reelsDescription, darkTextShadow, { color: currentTheme.subText, fontSize: scaleFont(15), lineHeight: 22 }]}>
+                <Text 
+                  style={[styles.reelsDescription, darkTextShadow, { color: currentTheme.subText, fontSize: scaleFont(14), lineHeight: 20 }]}
+                  numberOfLines={15}
+                  maxFontSizeMultiplier={1.2}
+                  allowFontScaling={false}
+                >
                   {article.description || 'No description available.'}
                 </Text>
               </View>
               
-              {/* Removed inline 'Tap to know more' button to free up vertical space for summaries */}
-              {/* description area expands into the space previously reserved for the button */}
-            </FastTouchable>
-
-            {/* Action emoji buttons removed from content area - now rendered over the image to avoid overlap */}
-
-              {/* Pinned meta (swapped) - read time left and posted date right */}
-              <View style={[styles.reelsMetaPinned, { paddingBottom: Math.max(8, insets.bottom) }]}> 
-                <View style={styles.reelsMetaLeft}>
-                  {/* Date moved onto image; meta left intentionally left blank to avoid duplication */}
-                  <Text style={[styles.reelsMetaText, darkTextShadow, { color: currentTheme.subText }]}> </Text>
+              {/* Meta info - read time and date */}
+              <View style={{ 
+                flexDirection: 'row', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginTop: 10,
+                paddingHorizontal: 4
+              }}>
+                <View>
+                  {article.readTime && (
+                    <Text 
+                      style={[styles.reelsMetaText, { color: currentTheme.subText, fontSize: 12 }]}
+                      maxFontSizeMultiplier={1.2}
+                      allowFontScaling={false}
+                    >
+                      {article.readTime}
+                    </Text>
+                  )}
                 </View>
-                <View style={styles.reelsMetaRight}>
-                  {/* intentionally left blank to avoid overlap with floating Top button */}
+                <View>
+                  <Text 
+                    style={[styles.reelsMetaText, { color: currentTheme.subText, fontSize: 12 }]}
+                    maxFontSizeMultiplier={1.2}
+                    allowFontScaling={false}
+                  >
+                    {formatDate(article.timestamp)}
+                  </Text>
                 </View>
               </View>
-              {/* Tap button intentionally rendered inline above meta (moved into content area) */}
-          </View>
-          {/* Absolute-positioned Tap button so long descriptions don't push it off-screen */}
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: 'absolute',
-              left: 20,
-              right: 20,
-              // move closer to the bottom so it appears lower on the card
-              bottom: Math.max(4, insets.bottom + 8),
-              zIndex: 70,
-              alignItems: 'center'
-            }}
-          >
-            <FastTouchable
-              style={[styles.reelsTapButton, styles.reelsTapButtonSmall, { backgroundColor: 'rgba(37,99,235,0.08)' }]}
-              onPress={() => handleArticlePress(article)}
-              activeOpacity={0.9}
-            >
-              <Text style={[styles.reelsTapText, styles.reelsTapTextSmall, { color: currentTheme.text }]}>Tap to know more</Text>
-              <Text style={[styles.reelsTapIcon, styles.reelsTapIconSmall, { color: currentTheme.text }]}>→</Text>
+              
+              {/* Tap button inline below meta */}
+              <View style={{ width: '100%', marginTop: 10 }}>
+                <View
+                  style={[
+                    styles.reelsTapButton,
+                    { 
+                      backgroundColor: isDarkMode ? 'rgba(37,99,235,0.2)' : 'rgba(37,99,235,0.12)',
+                      borderColor: isDarkMode ? 'rgba(37,99,235,0.4)' : 'rgba(37,99,235,0.25)',
+                      borderWidth: 1,
+                      elevation: 3,
+                      shadowColor: '#000',
+                      shadowOpacity: 0.15,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowRadius: 3,
+                      minHeight: 42,
+                      paddingVertical: 10
+                    }
+                  ]}
+                >
+                  <Text 
+                    style={[styles.reelsTapText, { color: currentTheme.text, fontSize: 14, fontWeight: '600' }]}
+                    maxFontSizeMultiplier={1.2}
+                    allowFontScaling={false}
+                  >
+                    Tap to know more
+                  </Text>
+                  <Text 
+                    style={[styles.reelsTapIcon, { color: currentTheme.text, fontSize: 15 }]}
+                    maxFontSizeMultiplier={1.2}
+                    allowFontScaling={false}
+                  >
+                    →
+                  </Text>
+                </View>
+              </View>
             </FastTouchable>
           </View>
         {/* Floating 'Top' button shown on cards at index >= 3 */}
@@ -1154,6 +1267,7 @@ export default function App(props: AppProps) {
             <FastTouchable
               onPress={scrollToTop}
               accessibilityLabel="Scroll to top"
+              activeOpacity={0.7}
               style={{
                 width: 36,
                 height: 36,
@@ -1170,7 +1284,13 @@ export default function App(props: AppProps) {
                 shadowRadius: 4
               }}
             >
-              <Text style={{ color: isDarkMode ? currentTheme.accent : '#fff', fontSize: 14, fontWeight: '700' }}>▲</Text>
+              <Text 
+                style={{ color: isDarkMode ? currentTheme.accent : '#fff', fontSize: 14, fontWeight: '700' }}
+                maxFontSizeMultiplier={1.2}
+                allowFontScaling={false}
+              >
+                ▲
+              </Text>
             </FastTouchable>
           </View>
         )}
@@ -1178,7 +1298,7 @@ export default function App(props: AppProps) {
       </View>
 
     );
-  };
+  }, [currentTheme, isDarkMode, bookmarkedItems, screenData.height, headerHeight, responsiveLines, toggleBookmark, shareArticle, handleArticlePress, getDomainFromUrl]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
@@ -1220,6 +1340,7 @@ export default function App(props: AppProps) {
           <FastTouchable 
             style={[styles.themeButton, { backgroundColor: currentTheme.accent }]}
             onPress={toggleTheme}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
             <Text style={[styles.themeButtonText, { color: '#FFFFFF' }]}>{isDarkMode ? '☀' : '☽'}</Text>
           </FastTouchable>
@@ -1228,6 +1349,7 @@ export default function App(props: AppProps) {
             <FastTouchable 
               style={[styles.adminButton, { backgroundColor: currentTheme.accent }]}
               onPress={handleAdminAccess}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
             >
               <Text style={[styles.adminButtonText, { color: '#FFFFFF' }]}> 
                 Admin
@@ -1238,52 +1360,45 @@ export default function App(props: AppProps) {
         </View>
       </View>
 
-      {/* Instagram-like Vertical Scroll Feed */}
-  {/* Startup overlay moved to AppWrapper to avoid duplicate overlays */}
-      <ScrollView
+      {/* Ultra-High-Performance FlatList Feed */}
+      <FlatList
         ref={scrollViewRef}
+        data={filteredNews}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item, index }) => renderNewsCard(item, index)}
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         pagingEnabled={true}
-  snapToInterval={screenData.height - headerHeight}
-  snapToAlignment="start"
+        snapToInterval={screenData.height - headerHeight}
+        snapToAlignment="start"
         decelerationRate="fast"
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={1}
+        updateCellsBatchingPeriod={25}
+        windowSize={2}
+        initialNumToRender={1}
+        disableIntervalMomentum={true}
+        disableScrollViewPanResponder={false}
+        getItemLayout={(data, index) => ({
+          length: screenData.height - headerHeight,
+          offset: (screenData.height - headerHeight) * index,
+          index,
+        })}
+        scrollEventThrottle={8}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={currentTheme.accent}
             colors={[currentTheme.accent]}
+            progressBackgroundColor={currentTheme.surface}
           />
         }
-        onScroll={(event) => {
-          // Real-time scroll tracking for smoother dot updates
-          const scrollY = event.nativeEvent.contentOffset.y;
-          // Use the measured headerHeight so paging math stays consistent when header size changes
-          const screenHeight = screenData.height - headerHeight;
-          const newIndex = Math.round(scrollY / screenHeight);
-          
-            if (newIndex !== currentIndex && newIndex >= 0 && newIndex < filteredNews.length) {
-            logger.debug(`Scroll: ${scrollY}px, Screen: ${screenHeight}px, Index: ${currentIndex} → ${newIndex}, Total: ${filteredNews.length}`);
-            setCurrentIndex(newIndex);
-          }
-        }}
-        onMomentumScrollEnd={(event) => {
-          // Final scroll position tracking
-          const scrollY = event.nativeEvent.contentOffset.y;
-          // Use measured headerHeight here too so index calculations remain accurate
-          const screenHeight = screenData.height - headerHeight;
-          const newIndex = Math.round(scrollY / screenHeight);
-          const finalIndex = Math.max(0, Math.min(newIndex, filteredNews.length - 1));
-          logger.debug(`Scroll End: ${scrollY}px, Screen: ${screenHeight}px, Final Index: ${finalIndex}, Total: ${filteredNews.length}`);
-          setCurrentIndex(finalIndex);
-        }}
-        scrollEventThrottle={16}
-      >
-        {filteredNews.length === 0 ? (
+        onScroll={handleScroll}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        ListEmptyComponent={
           isLoadingArticles ? (
             <>
-              {/* Render a few skeleton cards to improve perceived load time */}
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
@@ -1298,10 +1413,8 @@ export default function App(props: AppProps) {
               </Text>
             </View>
           )
-        ) : (
-          filteredNews.map((article, index) => renderNewsCard(article, index))
-        )}
-      </ScrollView>
+        }
+      />
 
   {/* Page Indicator removed per request */}
 
@@ -1535,15 +1648,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   contentContainer: {
-    height: '55%', // Increased to accommodate read more button
+    height: '68%', // Increased to accommodate longer description and button
     paddingHorizontal: 20,
-  paddingVertical: 12,
-  // leave extra bottom padding so absolutely positioned buttons
-  // don't overlap text or get clipped visually
-  paddingBottom: 72,
-  justifyContent: 'space-between',
-    flex: 1,
-    minHeight: 240, // Increased for better spacing
+    paddingVertical: 12,
+    paddingBottom: 12,
+    justifyContent: 'flex-start',
+    minHeight: 320,
+    maxHeight: '68%',
   },
   articleContentTouch: {
     flex: 1,
@@ -2279,9 +2390,9 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   contentTouchArea: {
-  // Reduced bottom padding now that the inline 'Tap to know more' button is removed.
-  // Keep some padding for the pinned meta and safe-area, but allow longer descriptions to show.
-  paddingBottom: 56,
+  // Compact padding for inline button layout
+  paddingBottom: 4,
+  flex: 1,
   },
   reelsHeadline: {
   fontSize: 18,
