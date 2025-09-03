@@ -35,7 +35,17 @@ async function getFirebaseNewsService() {
   _firebaseNewsService = mod.firebaseNewsService;
   return _firebaseNewsService;
 }
-import { notificationService } from './NotificationService';
+// Do not import the service singleton at module load time. Instantiate after startup.
+let firebaseNotificationService: any = null;
+const createFirebaseNotificationService = async () => {
+  if (firebaseNotificationService) return firebaseNotificationService;
+  const mod = await import('./FirebaseNotificationService');
+  const Service = mod.default || mod;
+  firebaseNotificationService = new Service();
+  return firebaseNotificationService;
+};
+import { notificationSender } from './NotificationSender';
+import './firebaseBackgroundHandler'; // Initialize background handler
 import { logger } from './utils/logging';
 import { ArticleActions } from './ArticleActions';
 import { authService, UserProfile } from './AuthService';
@@ -50,6 +60,8 @@ import { LoadingSpinner } from './LoadingSpinner';
 import InAppBrowserHost, { showInApp } from './InAppBrowser';
 import SkeletonCard from './SkeletonCard';
 import OptimizedImage from './OptimizedImage';
+import { expoPushService } from './ExpoPushService';
+import * as Notifications from 'expo-notifications';
 
 const { height, width } = Dimensions.get('screen');
 
@@ -118,6 +130,16 @@ export default function App(props: AppProps) {
 
   // Load persisted theme preference on startup - IMMEDIATE
   useEffect(() => {
+    // Initialize Expo push token early (non-blocking)
+    (async () => {
+      try { 
+        console.log('🔔 App: Initializing ExpoPushService...');
+        await expoPushService.init(); 
+        console.log('🔔 App: ExpoPushService initialized successfully');
+      } catch(e) { 
+        console.warn('🔔 App: ExpoPushService init failed:', e);
+      }
+    })();
     // Set theme loaded immediately for faster startup
     setIsThemeLoaded(true);
     
@@ -209,6 +231,16 @@ export default function App(props: AppProps) {
 
   // Firebase real-time subscription with auto-refresh
   useEffect(() => {
+    // Notification response listener (open article on tap later)
+    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+      try {
+        const articleId = resp.notification.request.content.data?.articleId as string | undefined;
+        if (articleId) {
+          console.log('🔔 Notification tapped (Expo) articleId=', articleId);
+          // TODO: integrate navigation to article (needs nav infra)
+        }
+      } catch(err) { console.warn('Notification response error', err); }
+    });
     // On mount: subscribe to Firebase auth state so we rely on the native SDK
     // persistence rather than a separate AsyncStorage flag. This avoids the
     // APK always asking for login after restart if the SDK already has a
@@ -397,7 +429,16 @@ export default function App(props: AppProps) {
         if (articles.length > lastArticleCount && lastArticleCount > 0) {
           const newArticles = articles.slice(0, articles.length - lastArticleCount);
           newArticles.forEach((article: NewsArticle) => {
-            notificationService.sendNewArticleNotification(article);
+            // Send notification to all users via Firebase Cloud Function
+            notificationSender.sendNotificationToAllUsers({
+              title: article.headline,
+              body: article.category,
+              data: {
+                articleId: article.id?.toString(),
+                category: article.category,
+                type: 'news'
+              }
+            });
           });
         }
 
@@ -451,13 +492,16 @@ export default function App(props: AppProps) {
         })();
       };
 
-  // Initialize notifications (deferred until after initial interactions so startup is snappier)
+    // Initialize Firebase notifications (deferred until after initial interactions so startup is snappier)
     InteractionManager.runAfterInteractions(() => {
-      try {
-        notificationService.initialize();
-      } catch (e) {
-        console.warn('Deferred notification initialization failed', e);
-      }
+      (async () => {
+        try {
+          const svc = await createFirebaseNotificationService();
+          await svc.initialize();
+        } catch (e) {
+          console.warn('Deferred notification initialization failed', e);
+        }
+      })();
     });
 
     // Ensure we explicitly request Android notification permission shortly after
@@ -467,12 +511,14 @@ export default function App(props: AppProps) {
       if (Platform.OS === 'android') {
         setTimeout(() => {
           (async () => {
-            try {
-              const granted = await notificationService.requestPermission();
-              logger.debug('Notification permission requested (delayed):', granted);
-            } catch (e) {
-              console.warn('Delayed notification permission request failed', e);
-            }
+              try {
+                // Test notification status after initialization
+                const svc = await createFirebaseNotificationService();
+                await svc.testNotificationStatus();
+                logger.debug('Firebase notification status tested');
+              } catch (e) {
+                console.warn('Firebase notification test failed', e);
+              }
           })();
         }, 1200);
       }
@@ -498,6 +544,7 @@ export default function App(props: AppProps) {
 
     // Cleanup subscription on unmount
     return () => {
+  try { sub.remove(); } catch(_) {}
       if (unsubscribe) {
         unsubscribe();
       }

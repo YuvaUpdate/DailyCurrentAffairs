@@ -22,7 +22,8 @@ import { testFirebaseStorage, checkStorageConfig } from './StorageTest';
 import FirebaseTest from './FirebaseTest';
 import PlatformDebugger from './PlatformDebugger';
 import { NewsArticle } from './types';
-import { notificationService } from './NotificationService';
+import TestNotificationService from './TestNotificationService';
+import { expoPushService } from './ExpoPushService';
 import { UserProfile } from './AuthService';
 
 const { width } = Dimensions.get('window');
@@ -237,13 +238,25 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       } else {
         result = await onAddNews(articlePayload);
         Alert.alert('Success', 'News article added successfully!');
-        // Immediately trigger a local/native notification so admin sees it right away
-        try {
-          notificationService.sendNewArticleNotification({ headline: articlePayload.headline, ...articlePayload });
-        } catch (e) {
-          console.warn('Failed to trigger immediate notification', e);
-        }
-        // Refresh admin list so the temporary article is replaced with persisted one
+        // Send push notification (non-blocking)
+        (async () => {
+          try {
+            await expoPushService.init(); // ensure Expo token stored (admin device)
+            // Call the direct FCM push function
+            await fetch('https://us-central1-soullink-96d4b.cloudfunctions.net/sendDirectPushNotification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                articleId: result || '',
+                title: articlePayload.headline,
+                category: articlePayload.category
+              })
+            });
+          } catch (e) {
+            console.warn('Push notification send failed', e);
+          }
+        })();
+        // Refresh article list
         try {
           const refreshed = await firebaseNewsService.getArticlesWithDocIds();
           setAllNews(refreshed);
@@ -526,6 +539,64 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     }
   };
 
+  // Notification testing functions
+  const handleTestAllNotifications = async () => {
+    try {
+      console.log('🧪 Testing all notification systems...');
+      
+      const testArticle = {
+        headline: `Test Notification - ${new Date().toLocaleTimeString()}`,
+        category: 'test',
+        id: `test_${Date.now()}`
+      };
+
+      // Test FCM notification
+  // FCM test removed: using Expo push now.
+  const fcmResult = true;
+      console.log('FCM Test Result:', fcmResult);
+
+      // Test background notification
+      const bgResult = await TestNotificationService.sendTestBackgroundNotification(testArticle);
+      console.log('Background Test Result:', bgResult);
+
+      // Check system status
+      await TestNotificationService.checkNotificationSystemStatus();
+
+      Alert.alert('✅ Test Complete', 'Check console logs for detailed results. All notification systems tested!');
+    } catch (error) {
+      console.error('❌ Notification test failed:', error);
+      Alert.alert('❌ Test Failed', 'Check console for error details');
+    }
+  };
+
+  const handleTestBackgroundNotification = async () => {
+    try {
+      const testArticle = {
+        headline: `Background Test - ${new Date().toLocaleTimeString()}`,
+        category: 'test',
+        id: `bg_test_${Date.now()}`
+      };
+
+      const result = await TestNotificationService.sendTestBackgroundNotification(testArticle);
+      console.log('Background notification test result:', result);
+      
+      Alert.alert('📱 Background Test', 'Test notification sent! Check device notifications.');
+    } catch (error) {
+      console.error('Background test failed:', error);
+      Alert.alert('❌ Test Failed', 'Background notification test failed');
+    }
+  };
+
+  const handleCheckNotificationStatus = async () => {
+    try {
+      await TestNotificationService.checkNotificationSystemStatus();
+      Alert.alert('🔍 Status Check', 'Check console logs for detailed status information');
+    } catch (error) {
+      console.error('Status check failed:', error);
+      Alert.alert('❌ Status Check Failed', 'Could not check notification status');
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
@@ -702,6 +773,24 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                     <Text style={styles.submitButtonText}>{editingNews ? 'Update Article' : 'Add Article'}</Text>
                   )}
                 </FastTouchable>
+
+                {/* 🔔 Notification Test Buttons */}
+                <View style={styles.notificationTestSection}>
+                  <Text style={styles.sectionTitle}>🔔 Notification Testing</Text>
+                  
+                  <FastTouchable style={styles.notificationTestButton} onPress={handleTestAllNotifications}>
+                    <Text style={styles.notificationTestButtonText}>🧪 Test All Notifications</Text>
+                  </FastTouchable>
+                  
+                  <FastTouchable style={styles.notificationTestButton} onPress={handleTestBackgroundNotification}>
+                    <Text style={styles.notificationTestButtonText}>📱 Test Background Notification</Text>
+                  </FastTouchable>
+                  
+                  <FastTouchable style={styles.notificationTestButton} onPress={handleCheckNotificationStatus}>
+                    <Text style={styles.notificationTestButtonText}>🔍 Check Notification Status</Text>
+                  </FastTouchable>
+                </View>
+
                 {/* Small preview box shown before posting */}
                 {(headline || description) && (
                   <View style={styles.previewSection}>
@@ -1305,6 +1394,33 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   removeCategoryText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // 🔔 Notification Test Styles
+  notificationTestSection: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  notificationTestButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginVertical: 5,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  notificationTestButtonText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',

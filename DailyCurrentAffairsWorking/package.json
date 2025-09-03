@@ -4,13 +4,15 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/image-utils": "^0.7.6",
     "@expo/metro-runtime": "~5.0.4",
     "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-community/voice": "^1.1.9",
     "@react-native-firebase/app": "^23.0.1",
     "@react-native-firebase/auth": "^23.0.1",
     "@react-native-firebase/firestore": "^23.0.1",
@@ -18,7 +20,6 @@
     "expo": "53.0.22",
     "expo-audio": "~0.4.9",
     "expo-av": "^15.1.7",
-    "expo-dev-client": "~5.2.4",
     "expo-image-picker": "^16.1.4",
     "expo-speech": "^13.1.7",
     "expo-status-bar": "~2.2.3",
@@ -30,9 +31,10 @@
     "react-native-safe-area-context": "5.4.0",
     "react-native-tts": "^4.1.1",
     "react-native-vector-icons": "^10.3.0",
-    "react-native-voice": "^0.3.0",
     "react-native-web": "^0.20.0",
-    "react-native-webview": "13.13.5"
+    "react-native-webview": "13.13.5",
+    "expo-notifications": "~0.31.4",
+    "expo-device": "~7.1.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

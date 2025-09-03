@@ -1,7 +1,11 @@
-package com.nareshkumarbalamurugan.yuvaupdate
+package com.nareshkumarbalamurugan.YuvaUpdate
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
 
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
@@ -24,9 +28,7 @@ class MainApplication : Application(), ReactApplication {
             override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
             // Packages that cannot be autolinked yet can be added manually here, for example:
-            packages.add(com.nareshkumarbalamurugan.yuvaupdate.NativeTtsPackage())
-            // Native notifications (local) for Android
-            packages.add(com.nareshkumarbalamurugan.yuvaupdate.NativeNotificationPackage())
+            // packages.add(MyReactNativePackage())
             return packages
           }
 
@@ -50,6 +52,39 @@ class MainApplication : Application(), ReactApplication {
       load()
     }
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
+    createNotificationChannels()
+  }
+
+  private fun createNotificationChannels() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      
+      // Create news notifications channel
+      val newsChannel = NotificationChannel(
+        "news-notifications",
+        "News Updates",
+        NotificationManager.IMPORTANCE_HIGH
+      ).apply {
+        description = "Notifications for news articles and updates"
+        enableLights(true)
+        enableVibration(true)
+        setShowBadge(true)
+      }
+      
+      // Create default channel
+      val defaultChannel = NotificationChannel(
+        "default",
+        "Default Notifications", 
+        NotificationManager.IMPORTANCE_DEFAULT
+      ).apply {
+        description = "Default notification channel"
+        enableLights(true)
+        enableVibration(true)
+      }
+      
+      notificationManager.createNotificationChannel(newsChannel)
+      notificationManager.createNotificationChannel(defaultChannel)
+    }
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {

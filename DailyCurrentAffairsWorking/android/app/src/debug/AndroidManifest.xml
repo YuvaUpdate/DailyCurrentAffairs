@@ -3,9 +3,5 @@
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 
-    <application android:usesCleartextTraffic="true" tools:targetApi="28" tools:ignore="GoogleAppIndexingWarning" tools:replace="android:usesCleartextTraffic">
-        <!-- Debug manifest: do not add a second LAUNCHER activity here. We remove the dev-launcher activity only. -->
-        <!-- Remove dev-launcher VIEW/BROWSE intent filters that cause Expo UI to open -->
-        <activity android:name="expo.modules.devlauncher.launcher.DevLauncherActivity" tools:node="remove" />
-    </application>
+    <application android:usesCleartextTraffic="true" tools:targetApi="28" tools:ignore="GoogleAppIndexingWarning" tools:replace="android:usesCleartextTraffic" />
 </manifest>

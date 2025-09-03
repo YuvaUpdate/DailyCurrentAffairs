@@ -1,70 +1,55 @@
-import { AppRegistry, Platform } from 'react-native';
+import messaging from '@react-native-firebase/messaging';
+import { isFirebaseReady } from './firebaseInit';
 
-// Lazy require to avoid bundling firebase if not present at runtime
-let messaging: any = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  messaging = require('@react-native-firebase/messaging');
-} catch (e) {
-  messaging = null;
-}
+/**
+ * Background message handler for Firebase messaging
+ * This runs when the app is in background or completely closed
+ */
 
-// Attempt to use the messaging client shape normalization from NotificationService
-function getMessagingClient() {
-  if (!messaging) return null;
+// Wait for Firebase to be initialized before setting up background handler
+const setupBackgroundHandler = () => {
   try {
-    if (typeof messaging === 'function') return messaging();
-    if (messaging.default && typeof messaging.default === 'function') return messaging.default();
-    return messaging;
-  } catch (e) {
-    return null;
-  }
-}
-
-// Background message handler: invoked by native Firebase Messaging when a data or notification
-// message arrives while the app is in the background or killed. We try to show a native
-// notification via the existing NativeNotificationModule if available. This file is small
-// and designed to be bundled at app startup.
-
-async function backgroundMessageHandler(remoteMessage: any) {
-  try {
-    const { NativeModules } = require('react-native');
-    const { NativeNotificationModule } = (NativeModules as any) || {};
-
-    const notification = remoteMessage?.notification;
-    const data = remoteMessage?.data;
-
-    const title = (notification && (notification.title || notification.body)) || (data && data.title) || 'New Article';
-    const body = (notification && notification.body) || (data && data.body) || (data && data.article && JSON.parse(data.article).headline) || '';
-
-    if (Platform.OS !== 'web' && NativeNotificationModule && NativeNotificationModule.showNotification) {
-      try {
-        await NativeNotificationModule.showNotification(title, body, { article: data && data.article });
-        return Promise.resolve();
-      } catch (e) {
-        // swallow and continue to fallback
-      }
+    if (!isFirebaseReady()) {
+      console.log('⚠ Firebase not ready for background handler, will retry...');
+      setTimeout(setupBackgroundHandler, 1000);
+      return;
     }
 
-    // If no native module, try to use messaging to display (some setups handle notifications automatically)
-    return Promise.resolve();
-  } catch (e) {
-    return Promise.resolve();
-  }
-}
+    messaging().setBackgroundMessageHandler(async (remoteMessage) => {
+      console.log('📱 Background message received:', {
+        title: remoteMessage.notification?.title,
+        body: remoteMessage.notification?.body,
+        data: remoteMessage.data,
+        messageId: remoteMessage.messageId,
+        timestamp: new Date().toISOString()
+      });
 
-const client = getMessagingClient();
-if (client && typeof client.setBackgroundMessageHandler === 'function') {
-  try {
-    client.setBackgroundMessageHandler(backgroundMessageHandler);
-  } catch (e) {
-    // ignore
-  }
-}
+      // Process the background message
+      try {
+        // You can add custom background processing logic here
+        // For example: save to local storage, update badge count, etc.
+        
+        if (remoteMessage.data?.articleId) {
+          console.log('📰 Background: New article available:', remoteMessage.data.articleId);
+          // Could save article ID for later processing
+        }
 
-// Also register a headless task in case native expects a named headless task
-try {
-  AppRegistry.registerHeadlessTask('RNFirebaseBackgroundMessage', () => backgroundMessageHandler);
-} catch (e) {
-  // ignore registration errors on platforms that don't support headless tasks
-}
+        if (remoteMessage.data?.type === 'breaking-news') {
+          console.log('🚨 Background: Breaking news notification');
+          // Handle breaking news differently
+        }
+
+      } catch (error) {
+        console.error('❌ Error processing background message:', error);
+      }
+    });
+
+    console.log('✅ Firebase background message handler registered');
+    
+  } catch (error) {
+    console.error('❌ Failed to setup background message handler:', error);
+  }
+};
+
+// Setup immediately if Firebase is ready, otherwise wait
+setupBackgroundHandler();

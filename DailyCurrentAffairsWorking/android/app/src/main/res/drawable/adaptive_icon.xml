@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Use the PNG as the adaptive icon foreground so launchers show the intended image -->
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/adaptive_icon_png"
-    android:gravity="center" />

@@ -1,9 +1,11 @@
+// Initialize Firebase FIRST - before any other imports that might use Firebase
+import './firebaseInit';
+
 import { registerRootComponent } from 'expo';
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Register background FCM handler before the React root so it is available
-// to the native headless JS context and background message delivery.
+// Register background FCM handler after Firebase is initialized
 import './firebaseBackgroundHandler';
 
 // Configure logging early: silence verbose logs on production builds to avoid

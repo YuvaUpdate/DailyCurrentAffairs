@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive icon: use a background color and an inset foreground so the visible artwork stays inside the safe area -->
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- a simple solid background color (use system white as default) -->
-    <!-- use supplied background image so the full artwork appears under masks -->
-    <background android:drawable="@drawable/ic_background_new" />
-    <!-- foreground uses an inset wrapper so launchers won't cut the artwork by the icon mask -->
-    <foreground android:drawable="@drawable/ic_foreground_new" />
-</adaptive-icon>

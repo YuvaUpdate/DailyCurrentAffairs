@@ -4,11 +4,11 @@
     "slug": "DailyCurrentAffairsWorking",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/favicon.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash-icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -21,9 +21,10 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.nareshkumarbalamurugan.yuvaupdate",
+      "package": "com.nareshkumarbalamurugan.YuvaUpdate",
       "allowBackup": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -35,7 +36,14 @@
       }
     },
     "plugins": [
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/adaptive-icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ]
   }
 }

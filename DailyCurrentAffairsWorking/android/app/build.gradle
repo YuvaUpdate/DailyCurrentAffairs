@@ -1,8 +1,9 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
-// Apply Google services plugin to populate Firebase default options from google-services.json
-apply plugin: 'com.google.gms.google-services'
+// Apply Google Services plugin so google-services.json is processed and the
+// native Firebase App is created at startup (fixes 'No Firebase App [DEFAULT]')
+apply plugin: "com.google.gms.google-services"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -89,16 +90,24 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.nareshkumarbalamurugan.yuvaupdate'
+    namespace 'com.nareshkumarbalamurugan.YuvaUpdate'
     defaultConfig {
-        applicationId 'com.nareshkumarbalamurugan.yuvaupdate'
+        applicationId 'com.nareshkumarbalamurugan.YuvaUpdate'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 2
-    versionName "1.0.1"
+        versionCode 1
+        versionName "1.0.0"
     }
     signingConfigs {
         debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        release {
+            // For now, use debug keystore for release builds to maintain Firebase compatibility
+            // In production, replace this with your actual release keystore
             storeFile file('debug.keystore')
             storePassword 'android'
             keyAlias 'androiddebugkey'
@@ -110,14 +119,10 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
-            // Turn off resource shrinking and code minification for testing.
-            // This helps determine if R8/ProGuard is stripping expo module registries
-            // that the runtime needs (e.g. EXNativeModulesProxy / expo-speech).
-            shrinkResources false
-            minifyEnabled false
+            // Use release signing config instead of debug
+            signingConfig signingConfigs.release
+            shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
+            minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
         }
@@ -127,19 +132,9 @@ android {
             useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
         }
     }
-
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
-
-    // Disable lint checks for release to avoid failing the CI lintVital task
-    // (Some CI environments run lintVitalReport before assembleRelease and
-    // variant-matching or lint issues in node_modules can cause the build to fail.)
-    lint {
-        checkReleaseBuilds false
-        abortOnError false
-    }
-
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native';
+
 // Runtime shim: some compiled JS (bundle) may pass an object/map for the `edges` prop
 // to the native RNCSafeAreaView which expects an array. Patch the module export at
 // startup to coerce a map -> array so the native view manager receives the right
