@@ -84,6 +84,7 @@ const LoadingDots = () => {
 export default function AppWrapper() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Welcome to YuvaUpdate! ⭐');
   // startup overlay removed to avoid duplicate logo screen.
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [articlesReady, setArticlesReady] = useState(false);
@@ -91,7 +92,7 @@ export default function AppWrapper() {
   // Track when the startup overlay was shown so we can guarantee a
   // minimum visible duration to avoid flicker when articles load very fast.
   const startupShownAt = useRef<number>(Date.now());
-  const MIN_VISIBLE_MS = 1200; // keep overlay for at least 1.2s
+  const MIN_VISIBLE_MS = 3000; // keep overlay for 3s to ensure smooth startup experience
   // We no longer force a public login flow. App will run for guests and
   // read local bookmarks from AsyncStorage. Admins can sign in via the
   // small Admin button which opens the AuthScreen as a modal.
@@ -106,11 +107,24 @@ export default function AppWrapper() {
     // Start auth state observer so components (like App) can react to
     // admin sign-in events. We don't force authentication here.
     checkAuthState();
+    
+    // Progressive loading messages with engaging content
+    const messageTimers = [
+      setTimeout(() => setLoadingMessage('Curating fresh news for you ⚡'), 600),
+      setTimeout(() => setLoadingMessage('Connecting to trusted sources ⭐'), 1400),
+      setTimeout(() => setLoadingMessage('Preparing your personalized feed ⚪'), 2200),
+      setTimeout(() => setLoadingMessage('Ready to explore! ▶'), 2800),
+    ];
+    
     // Extend startup fallback timeout: wait up to 15s for articles to arrive
     const fallback = setTimeout(() => {
       if (!articlesReady) setLoading(false);
     }, 15000);
-    return () => clearTimeout(fallback);
+    
+    return () => {
+      messageTimers.forEach(timer => clearTimeout(timer));
+      clearTimeout(fallback);
+    };
   }, []);
 
   const checkAuthState = async () => {
@@ -192,13 +206,18 @@ export default function AppWrapper() {
         }, remaining);
       }} />
 
-  {/* Wrapper-level startup overlay: keep a safe overlay until articles signal ready
-      or the 15s fallback fires. This ensures the loading UI appears reliably on cold start. */}
+  {/* Enhanced startup loading with dynamic initialization messages */}
   {loading && (
     <Animated.View style={[styles.loadingOverlay, { opacity: 1 }]} pointerEvents="auto">
       <View style={{ alignItems: 'center' }}>
         <Image source={require('./assets/favicon.png')} style={{ width: 96, height: 96, marginBottom: 16, resizeMode: 'contain' }} />
-        <LoadingSpinner size="large" color="#2E7D32" message="Loading YuvaUpdate..." />
+        <LoadingSpinner size="large" color="#2E7D32" message={loadingMessage} />
+        <Text style={{ color: '#666', fontSize: 14, marginTop: 12, textAlign: 'center', maxWidth: 300 }}>
+          {loadingMessage}
+        </Text>
+        <Text style={{ color: '#999', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+          Setting up your personalized news experience
+        </Text>
       </View>
     </Animated.View>
   )}

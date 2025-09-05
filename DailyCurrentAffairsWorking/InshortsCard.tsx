@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   Dimensions,
   Share,
 } from 'react-native';
 import { showInApp } from './InAppBrowser';
 import FastTouchable from './FastTouchable';
+import OptimizedImage from './OptimizedImage';
+import TextToSpeechService from './TextToSpeechService';
 import { NewsArticle } from './types';
 import { scaleFont, responsiveLines } from './utils/responsive';
 // ...existing code... (truncate helper removed to show full descriptions)
@@ -24,6 +25,59 @@ interface InshortsCardProps {
 
 export default function InshortsCard({ article, onPress, onBookmark, isBookmarked }: InshortsCardProps) {
   const imageHeight = Math.round(screenHeight * 0.45);
+  const [isReading, setIsReading] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const ttsService = TextToSpeechService.getInstance();
+
+  useEffect(() => {
+    // Check TTS status periodically when reading
+    let statusTimer: NodeJS.Timeout;
+    if (isReading) {
+      statusTimer = setInterval(() => {
+        const status = ttsService.getStatus();
+        if (!status.isPlaying && isReading) {
+          setIsReading(false);
+          setIsPaused(false);
+        }
+        setIsPaused(status.isPaused);
+      }, 1000);
+    }
+    return () => clearInterval(statusTimer);
+  }, [isReading]);
+
+  const handleReadAloud = async () => {
+    try {
+      if (isReading && !isPaused) {
+        // Currently reading - pause it
+        await ttsService.pause();
+        setIsPaused(true);
+      } else if (isReading && isPaused) {
+        // Currently paused - resume it
+        await ttsService.resume();
+        setIsPaused(false);
+      } else {
+        // Not reading - start reading
+        setIsReading(true);
+        setIsPaused(false);
+        await ttsService.readArticle(article.headline, article.description || '');
+        // Will be updated by useEffect when reading finishes
+      }
+    } catch (error) {
+      console.log('TTS Error:', error);
+      setIsReading(false);
+      setIsPaused(false);
+    }
+  };
+
+  const stopReading = async () => {
+    try {
+      await ttsService.stop();
+      setIsReading(false);
+      setIsPaused(false);
+    } catch (error) {
+      console.log('TTS Stop Error:', error);
+    }
+  };
 
   const getHostname = (raw?: string) => {
     if (!raw) return null;
@@ -55,7 +109,7 @@ export default function InshortsCard({ article, onPress, onBookmark, isBookmarke
   return (
     <FastTouchable activeOpacity={0.95} onPress={() => onPress?.(article)} style={styles.card}>
       <View style={styles.imageWrap}>
-        <Image
+        <OptimizedImage
           source={{ uri: article.image || article.imageUrl || 'https://via.placeholder.com/800x600' }}
           style={[styles.image, { height: imageHeight }]}
           resizeMode="cover"
@@ -74,6 +128,16 @@ export default function InshortsCard({ article, onPress, onBookmark, isBookmarke
           <FastTouchable onPress={share} style={styles.iconButton}>
             <Text style={styles.iconText}>↗</Text>
           </FastTouchable>
+          <FastTouchable onPress={handleReadAloud} style={[styles.iconButton, isReading && styles.iconButtonActive]}>
+            <Text style={[styles.iconText, isReading && styles.iconTextActive]}>
+              {isReading ? (isPaused ? '▶' : '⏸') : '🔊'}
+            </Text>
+          </FastTouchable>
+          {isReading && (
+            <FastTouchable onPress={stopReading} style={styles.iconButton}>
+              <Text style={styles.iconText}>⏹</Text>
+            </FastTouchable>
+          )}
         </View>
       </View>
 
@@ -113,9 +177,14 @@ const styles = StyleSheet.create({
   imageWrap: {
     width: '100%',
     backgroundColor: '#222',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   image: {
     width: '100%',
+    alignSelf: 'center',
+    transform: [{ translateX: 0 }],
   },
   chip: {
     position: 'absolute',
@@ -147,6 +216,12 @@ const styles = StyleSheet.create({
   iconText: {
     color: '#fff',
     fontWeight: '700',
+  },
+  iconButtonActive: {
+    backgroundColor: 'rgba(46, 125, 50, 0.8)', // Green background when active
+  },
+  iconTextActive: {
+    color: '#4CAF50', // Green text when active
   },
   body: {
     paddingHorizontal: 12,

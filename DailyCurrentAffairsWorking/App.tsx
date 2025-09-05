@@ -3,6 +3,7 @@ import { InteractionManager } from 'react-native';
 import { Appearance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SHOW_BOOKMARKS, SHOW_SIDEBAR } from './uiConfig';
+import InitializationService from './InitializationService';
 import {
   View,
   Text,
@@ -47,6 +48,7 @@ const createFirebaseNotificationService = async () => {
 import { notificationSender } from './NotificationSender';
 import './firebaseBackgroundHandler'; // Initialize background handler
 import { logger } from './utils/logging';
+import TextToSpeechService from './TextToSpeechService';
 import { ArticleActions } from './ArticleActions';
 import { authService, UserProfile } from './AuthService';
 import { INCLUDE_ADMIN_PANEL, ENABLE_ADMIN_AUTO_LOGIN, ADMIN_EMAIL, ADMIN_PASSWORD } from './buildConfig';
@@ -60,6 +62,7 @@ import { LoadingSpinner } from './LoadingSpinner';
 import InAppBrowserHost, { showInApp } from './InAppBrowser';
 import SkeletonCard from './SkeletonCard';
 import OptimizedImage from './OptimizedImage';
+import ImageAlignmentHelper from './ImageAlignmentHelper';
 import { expoPushService } from './ExpoPushService';
 import * as Notifications from 'expo-notifications';
 
@@ -189,16 +192,39 @@ export default function App(props: AppProps) {
   // loading after a short delay we briefly display a spinner (non-blocking).
   const [showStartupSpinner, setShowStartupSpinner] = useState<boolean>(false);
 
-  // Show onboarding modal on first install only - IMMEDIATE CHECK
+  // Show onboarding modal on first install only - SMART INITIALIZATION CHECK
   useEffect(() => {
-    AsyncStorage.getItem('ya_seen_onboarding_v1')
-      .then((seen) => {
-        if (!seen) setShowOnboarding(true);
-      })
-      .catch(() => {
-        // On error, assume first time and show onboarding
-        setShowOnboarding(true);
-      });
+    const initializeOnboarding = async () => {
+      try {
+        // Wait for all services to be properly initialized
+        const initService = InitializationService.getInstance();
+        console.log('🎯 Waiting for services to initialize before onboarding...');
+        
+        await initService.waitForReady();
+        console.log('✅ All services ready, checking onboarding status');
+        
+        // Now check if we should show onboarding
+        const seen = await AsyncStorage.getItem('ya_seen_onboarding_v1');
+        if (!seen) {
+          console.log('� Showing onboarding - services are ready!');
+          setShowOnboarding(true);
+        } else {
+          console.log('👍 Onboarding already seen, skipping');
+        }
+      } catch (error) {
+        console.log('⚠️ Error during onboarding initialization:', error);
+        // Fallback: show onboarding anyway after a delay
+        setTimeout(() => {
+          AsyncStorage.getItem('ya_seen_onboarding_v1')
+            .then((seen) => {
+              if (!seen) setShowOnboarding(true);
+            })
+            .catch(() => setShowOnboarding(true));
+        }, 6000);
+      }
+    };
+    
+    initializeOnboarding();
   }, []);
   const [filteredNews, setFilteredNews] = useState<NewsArticle[]>(newsData); // Initialize with newsData
   const [refreshing, setRefreshing] = useState(false);
@@ -217,6 +243,12 @@ export default function App(props: AppProps) {
   const [autoRefreshing, setAutoRefreshing] = useState(false);
   const scrollViewRef = useRef<FlatList>(null);
   const [playbackStateLocal, setPlaybackStateLocal] = useState(audioService.getPlaybackState());
+  
+  // TTS state
+  const [readingArticleId, setReadingArticleId] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const ttsService = TextToSpeechService.getInstance();
+  
   // Ensure we only call the onArticlesReady callback once
   const articlesReadyCalled = React.useRef(false);
 
@@ -497,7 +529,10 @@ export default function App(props: AppProps) {
       (async () => {
         try {
           const svc = await createFirebaseNotificationService();
+          // Clear any existing handlers before initializing to prevent duplicates
+          await svc.clearAllNotificationHandlers();
           await svc.initialize();
+          console.log('✅ Firebase notification service initialized with cleanup');
         } catch (e) {
           console.warn('Deferred notification initialization failed', e);
         }
@@ -595,6 +630,24 @@ export default function App(props: AppProps) {
       }
     });
     return () => unsub();
+  }, []);
+
+  // TTS cleanup when component unmounts
+  useEffect(() => {
+    // Set up TTS state change callback
+    ttsService.setOnStateChange((isPlaying, isPaused) => {
+      if (!isPlaying) {
+        // TTS finished or stopped
+        setReadingArticleId(null);
+        setIsPaused(false);
+      }
+    });
+
+    return () => {
+      ttsService.stop();
+      setReadingArticleId(null);
+      setIsPaused(false);
+    };
   }, []);
 
   // Load user profile when currentUser changes
@@ -870,29 +923,28 @@ export default function App(props: AppProps) {
 
   const toggleReadAloud = useCallback(async (article: NewsArticle) => {
     try {
-      const state = audioService.getPlaybackState();
-      const sameArticlePlaying = state.isPlaying && state.currentArticle && state.currentArticle.id === article.id;
-
-      if (sameArticlePlaying) {
-        await audioService.stopAudio();
-        return;
-      }
-
-      // If another article is playing, stop then play the requested one
-      if (state.isPlaying || state.isPaused) {
-        await audioService.stopAudio();
-      }
-      await audioService.playArticleAudio(article);
-    } catch (error) {
-      console.error('Error toggling read aloud:', error);
-      const message = (error && (error as any).message) || String(error);
-      if (message.includes('Speech functionality is not available')) {
-        Alert.alert('Audio Not Available', 'Text-to-speech is not included in this APK. Please install and configure expo-speech and rebuild the app.');
+      const articleId = String(article.id);
+      
+      if (readingArticleId === articleId) {
+        // If currently reading this article, stop it
+        ttsService.stop();
+        setReadingArticleId(null);
+        setIsPaused(false);
       } else {
-        Alert.alert('Audio Error', 'Unable to toggle read aloud.');
+        // Stop any current reading and start new one
+        ttsService.stop();
+        setReadingArticleId(articleId);
+        setIsPaused(false);
+        
+        await ttsService.readArticle(article.headline, article.description || '');
       }
+    } catch (error) {
+      console.error('Error with TTS:', error);
+      setReadingArticleId(null);
+      setIsPaused(false);
+      Alert.alert('TTS Error', 'Unable to read article aloud.');
     }
-  }, []);
+  }, [readingArticleId, ttsService]);
 
   const handleAddNews = async (newArticle: Omit<NewsArticle, 'id' | 'timestamp'>): Promise<string | void> => {
   logger.info('🔄 Starting to add article:', newArticle);
@@ -1013,7 +1065,6 @@ export default function App(props: AppProps) {
   // Scroll feed to top and reset index
   const scrollToTop = () => {
     console.log('🚀 scrollToTop button pressed');
-    Alert.alert('Scroll to Top', 'Button pressed successfully!');
     try {
       if (scrollViewRef.current) {
         console.log('📜 FlatList ref found, scrolling to top...');
@@ -1136,7 +1187,16 @@ export default function App(props: AppProps) {
         {/* Full-screen Reels-style Layout */}
         <View style={styles.reelsCard}>
           {/* Large Background Image */}
-          <View style={[styles.fullImageContainer, { height: Math.min(Math.round(screenData.height * 0.28), 220), minHeight: 140, flex: 0, backgroundColor: '#eeeeee' }]}>
+          <View style={[
+            styles.fullImageContainer, 
+            ImageAlignmentHelper.getContainerAlignmentStyles(),
+            { 
+              height: Math.min(Math.round(screenData.height * 0.28), 220), 
+              minHeight: 140, 
+              flex: 0, 
+              backgroundColor: '#eeeeee' 
+            }
+          ]}>
             {article.image && (article.image.includes('.mp4') || article.image.includes('.webm')) ? (
               <VideoPlayerComponent
                 videoUrl={article.image}
@@ -1145,15 +1205,18 @@ export default function App(props: AppProps) {
                 autoPlay={false}
               />
             ) : (
-              <Image 
+              <OptimizedImage 
                 source={{ uri: article.image || 'https://via.placeholder.com/400x300?text=No+Image' }} 
-                style={[styles.fullScreenImage, { minHeight: 120 }]} 
+                style={[
+                  styles.fullScreenImage, 
+                  ImageAlignmentHelper.getImageAlignmentStyles(),
+                  { minHeight: 120 }
+                ]} 
                 resizeMode="cover"
                 onError={(error) => logger.debug('Image loading error:', error)}
                 onLoad={() => logger.debug('Image loaded successfully:', article.image)}
                 fadeDuration={100}
                 progressiveRenderingEnabled={true}
-                defaultSource={require('./assets/favicon.png')}
               />
             )}
             
@@ -1175,7 +1238,20 @@ export default function App(props: AppProps) {
                 <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{bookmarkedItems.some(i => String(i) === String(article.id)) ? '★' : '☆'}</Text>
               </FastTouchable>
               )}
-              {/* Read-aloud button removed for this build */}
+              {/* TTS Read-aloud button */}
+              <FastTouchable 
+                onPress={() => toggleReadAloud(article)} 
+                style={[styles.reelsEmojiButton, { 
+                  backgroundColor: readingArticleId === String(article.id)
+                    ? '#FF6B6B' 
+                    : currentTheme.accent 
+                }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>
+                  {readingArticleId === String(article.id) ? '⏹️' : '🔊'}
+                </Text>
+              </FastTouchable>
             </View>
             {/* Date overlay on image */}
             <View style={styles.reelsDateBadge} pointerEvents="none">
@@ -2366,13 +2442,13 @@ const styles = StyleSheet.create({
   fullImageContainer: {
     flex: 1,
     position: 'relative',
-    width: '100%',
-    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   fullScreenImage: {
-    width: '100%',
-    height: '100%',
     borderRadius: 12,
+    alignSelf: 'center',
   },
   reelsCategoryBadge: {
     position: 'absolute',

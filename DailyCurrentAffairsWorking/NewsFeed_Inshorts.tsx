@@ -7,7 +7,6 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Image,
   Animated,
   PanResponder,
   StatusBar,
@@ -23,6 +22,10 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import OptimizedImage from './OptimizedImage';
+import ImagePrefetchService from './ImagePrefetchService';
+import ImageAlignmentHelper from './ImageAlignmentHelper';
+import TextToSpeechService from './TextToSpeechService';
 import { NewsArticle } from './types';
 import { scaleFont, responsiveLines } from './utils/responsive';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -69,6 +72,24 @@ export default function NewsFeed_Inshorts({
     })();
   }, []);
 
+  // Initial image prefetching when articles load
+  useEffect(() => {
+    if (articles && articles.length > 0) {
+      InteractionManager.runAfterInteractions(() => {
+        const prefetchService = ImagePrefetchService.getInstance();
+        // Prefetch first 5 article images immediately for faster initial loading
+        const initialImageUrls = articles
+          .slice(0, 5)
+          .map(article => article.image || article.imageUrl)
+          .filter(Boolean) as string[];
+        
+        if (initialImageUrls.length > 0) {
+          prefetchService.prefetchImages(initialImageUrls);
+        }
+      });
+    }
+  }, [articles]);
+
   const transitioningRef = useRef(false);
 
   const completeOnboarding = useCallback(() => {
@@ -93,6 +114,11 @@ export default function NewsFeed_Inshorts({
   const [activeTab, setActiveTab] = useState('Top');
   const [modalArticle, setModalArticle] = useState<NewsArticle | null>(null);
   const [isModalLoading, setIsModalLoading] = useState<boolean>(false);
+  
+  // TTS state
+  const [readingArticleId, setReadingArticleId] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const ttsService = TextToSpeechService.getInstance();
 
   // Animated scroll position for a right-side progress bar
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -230,6 +256,36 @@ export default function NewsFeed_Inshorts({
   const displayedArticles = activeTab === 'Top'
     ? articles
     : articles.filter(a => (a.category || '').toLowerCase() === activeTab.toLowerCase());
+  
+  // Image prefetching for better performance
+  const prefetchService = ImagePrefetchService.getInstance();
+  
+  useEffect(() => {
+    // Prefetch images for upcoming articles to improve loading speed
+    if (displayedArticles && displayedArticles.length > 0) {
+      InteractionManager.runAfterInteractions(() => {
+        // Get next 3-5 articles to prefetch based on current index
+        const nextArticles = displayedArticles.slice(currentIndex + 1, currentIndex + 6);
+        const imageUrls = nextArticles
+          .map(article => article.image || article.imageUrl)
+          .filter(Boolean) as string[];
+        
+        if (imageUrls.length > 0) {
+          prefetchService.prefetchImages(imageUrls);
+        }
+      });
+    }
+  }, [currentIndex, displayedArticles]);
+
+  // TTS cleanup when articles change
+  useEffect(() => {
+    return () => {
+      ttsService.stop();
+      setReadingArticleId(null);
+      setIsPaused(false);
+    };
+  }, [currentIndex]);
+  
   const openExternal = (article: NewsArticle) => {
     const url = article.sourceUrl || article.link || article.image || '';
     if (!url) return;
@@ -263,6 +319,31 @@ export default function NewsFeed_Inshorts({
       await Share.share({ message, title: article.headline });
     } catch (e) {
       console.warn('Share failed', e);
+    }
+  };
+
+  const handleReadAloud = async (article: NewsArticle) => {
+    const articleId = String(article.id);
+    
+    if (readingArticleId === articleId) {
+      if (isPaused) {
+        ttsService.resume();
+        setIsPaused(false);
+      } else {
+        ttsService.pause();
+        setIsPaused(true);
+      }
+    } else {
+      try {
+        ttsService.stop();
+        setReadingArticleId(articleId);
+        setIsPaused(false);
+        
+        await ttsService.readArticle(article.headline, article.description);
+      } catch (error) {
+        console.log('TTS Error:', error);
+        setReadingArticleId(null);
+      }
     }
   };
 
@@ -331,7 +412,7 @@ export default function NewsFeed_Inshorts({
             style={[styles.imageWrapper, { height: dynH, backgroundColor: colors.surface }]}
             onPress={() => openExternal(article)}
           >
-            <Image
+            <OptimizedImage
               source={{ uri: article.image || article.imageUrl || 'https://via.placeholder.com/600x900?text=No+Image' }}
               style={[styles.image, {
                 height: dynH,
@@ -366,12 +447,56 @@ export default function NewsFeed_Inshorts({
 
             {/* Small action icons positioned relative to image height (avoid overlapping status bar) */}
 
-            <View style={[styles.iconColumn, { top: Math.max(8, dynH - 48), pointerEvents: 'box-none' }]}>
-              <TouchableOpacity onPress={() => onBookmarkToggle && onBookmarkToggle(article.id)} style={[styles.iconCircle, { backgroundColor: colors.surface ?? undefined }]}> 
+            <View style={[styles.iconColumn, { top: Math.max(8, dynH - 120), pointerEvents: 'box-none' }]}>
+              <TouchableOpacity onPress={() => onBookmarkToggle && onBookmarkToggle(article.id)} style={[styles.iconCircle, { 
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: bookmarkedArticles.has(article.id) ? (isDark ? '#ff7675' : '#e53935') : 'rgba(0,0,0,0.1)',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3
+              }]}> 
                 <Text style={[styles.iconText, { color: colors.text }, bookmarkedArticles.has(article.id) && { color: isDark ? '#ff7675' : '#e53935' }]}>{bookmarkedArticles.has(article.id) ? 'Saved' : 'Save'}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => shareArticle(article)} style={styles.iconCircle}>
+              <TouchableOpacity onPress={() => shareArticle(article)} style={[styles.iconCircle, { 
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: 'rgba(0,0,0,0.1)',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3
+              }]}>
                 <Text style={[styles.iconText, { color: colors.text }]}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => handleReadAloud(article)} 
+                style={[styles.iconCircle, { 
+                  backgroundColor: readingArticleId === String(article.id) ? (colors.accent + '30') : colors.surface,
+                  borderWidth: 1,
+                  borderColor: readingArticleId === String(article.id) ? colors.accent : 'rgba(0,0,0,0.1)',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                  elevation: 3
+                }]}
+                accessibilityLabel={`Read article aloud`}
+              >
+                <Text style={{ 
+                  fontSize: 18,
+                  color: readingArticleId === String(article.id) ? colors.accent : colors.text 
+                }}>
+                  {readingArticleId === String(article.id) ? (isPaused ? '▶️' : '⏸️') : '🔊'}
+                </Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -404,7 +529,7 @@ export default function NewsFeed_Inshorts({
         {/* Floating count and bottom nav are rendered globally */}
       </View>
     );
-  }, [colors, bookmarkedArticles, getImageHeightFor, onBookmarkToggle, shareArticle, formatMetadata, openExternal, onContentLayout, isDark]);
+  }, [colors, bookmarkedArticles, getImageHeightFor, onBookmarkToggle, shareArticle, handleReadAloud, formatMetadata, openExternal, onContentLayout, isDark, readingArticleId, isPaused]);
 
   // overlay + card colors for onboarding (theme-aware)
   const overlayBg = isDark ? 'rgba(2,6,23,0.72)' : 'rgba(255,255,255,0.98)';
@@ -552,6 +677,9 @@ export default function NewsFeed_Inshorts({
               onBookmarkToggle={onBookmarkToggle}
               bookmarkedArticles={bookmarkedArticles}
               shareArticle={shareArticle}
+              handleReadAloud={handleReadAloud}
+              readingArticleId={readingArticleId}
+              isPaused={isPaused}
               onReady={() => setIsModalLoading(false)}
             />
             {isModalLoading && (
@@ -595,7 +723,29 @@ export default function NewsFeed_Inshorts({
   );
 }
 
-  function SafeModalContent({ article, onClose, colors, onBookmarkToggle, bookmarkedArticles, shareArticle, onReady }: { article: NewsArticle | null, onClose: () => void, colors?: any, onBookmarkToggle?: ((id: string | number) => void) | undefined, bookmarkedArticles?: Set<string | number>, shareArticle?: (a: NewsArticle) => void, onReady?: () => void }) {
+  function SafeModalContent({ 
+    article, 
+    onClose, 
+    colors, 
+    onBookmarkToggle, 
+    bookmarkedArticles, 
+    shareArticle, 
+    handleReadAloud,
+    readingArticleId,
+    isPaused,
+    onReady 
+  }: { 
+    article: NewsArticle | null, 
+    onClose: () => void, 
+    colors?: any, 
+    onBookmarkToggle?: ((id: string | number) => void) | undefined, 
+    bookmarkedArticles?: Set<string | number>, 
+    shareArticle?: (a: NewsArticle) => void,
+    handleReadAloud?: (article: NewsArticle) => void,
+    readingArticleId?: string | null,
+    isPaused?: boolean,
+    onReady?: () => void 
+  }) {
     const scheme = useColorScheme();
     const systemDark = scheme === 'dark';
     const isDark = colors ? (colors.background && colors.background !== '#f3f4f6') : systemDark;
@@ -628,7 +778,7 @@ export default function NewsFeed_Inshorts({
       <View style={[modalStyles.container, { backgroundColor: bg }]}> 
         <Animated.View style={{ opacity: modalAnim, transform: [{ translateY: modalAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
           <ScrollView contentContainerStyle={modalStyles.scroll}>
-            <Image source={{ uri: article.image || article.imageUrl }} style={modalStyles.image} resizeMode="cover" onLoad={() => { if (onReady) { try { onReady(); } catch (e) {} } }} />
+            <OptimizedImage source={{ uri: article.image || article.imageUrl || 'https://via.placeholder.com/400x300' }} style={modalStyles.image} resizeMode="cover" onLoad={() => { if (onReady) { try { onReady(); } catch (e) {} } }} />
             <Text style={[modalStyles.title, { color: text }]}>{article.headline}</Text>
             <Text style={[modalStyles.meta, { color: subText }]}>{(article.readTime ? article.readTime + ' • ' : '') + (article.category || '')}</Text>
             <View style={modalStyles.divider} />
@@ -655,6 +805,24 @@ export default function NewsFeed_Inshorts({
                 style={[modalStyles.actionBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)', borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)' }]}
               >
                 <Text style={[modalStyles.actionText, { color: accent }]}>Share</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                accessibilityLabel="Read article aloud"
+                onPress={() => { if (article && handleReadAloud) handleReadAloud(article); }}
+                style={[modalStyles.actionBtn, { 
+                  backgroundColor: readingArticleId === String(article.id) ? (accent + '20') : (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)'), 
+                  borderColor: readingArticleId === String(article.id) ? accent : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)')
+                }]}
+              >
+                <Text style={[modalStyles.actionText, { 
+                  color: readingArticleId === String(article.id) ? accent : accent,
+                  fontWeight: readingArticleId === String(article.id) ? '600' : 'normal',
+                  flexDirection: 'row',
+                  alignItems: 'center'
+                }]}>
+                  {readingArticleId === String(article.id) ? (isPaused ? '▶️ Resume' : '⏸️ Pause') : '🔊 Listen'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -718,8 +886,13 @@ const styles = StyleSheet.create({
   tabTextActive: {  },
   bookmarkBtn: { marginLeft: 12, padding: 6 },
   bookmarkText: { fontSize: 16 },
-  imageWrapper: { width: '100%', position: 'relative', overflow: 'hidden' },
-  image: { width: '100%' },
+  imageWrapper: { 
+    ...ImageAlignmentHelper.getContainerAlignmentStyles(),
+    height: 'auto' // Allow container to size based on content
+  },
+  image: { 
+    ...ImageAlignmentHelper.getImageAlignmentStyles()
+  },
   imageOverlay: { position: 'absolute', left: 0, right: 0, zIndex: 10 },
   contentContainer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 0 },
   headline: { fontSize: 30, fontWeight: '900', marginBottom: 6, lineHeight: 38 },
@@ -747,7 +920,17 @@ const styles = StyleSheet.create({
     margin: 0,
   },
   iconColumn: { position: 'absolute', right: 12, zIndex: 30, alignItems: 'center' },
-  iconCircle: { padding: 8, borderRadius: 20, marginVertical: 6, boxShadow: 'none', elevation: 0 },
+  iconCircle: { 
+    padding: 8, 
+    borderRadius: 20, 
+    marginVertical: 4, 
+    boxShadow: 'none', 
+    elevation: 2,
+    minWidth: 44,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
   iconText: { fontSize: 14, fontWeight: '600' },
   categoryChip: {
     position: 'absolute',

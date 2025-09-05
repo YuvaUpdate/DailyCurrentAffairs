@@ -25,6 +25,7 @@ import { NewsArticle } from './types';
 import TestNotificationService from './TestNotificationService';
 import { expoPushService } from './ExpoPushService';
 import { UserProfile } from './AuthService';
+import { NotificationSender } from './NotificationSender';
 
 const { width } = Dimensions.get('window');
 
@@ -78,6 +79,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     uploads: 0,
   });
   const [isRefreshingAnalytics, setIsRefreshingAnalytics] = useState(false);
+  
+  // Rate limiting for notifications to prevent duplicates
+  const [lastNotificationTime, setLastNotificationTime] = useState(0);
 
   const isSmallScreen = width && width < 420;
 
@@ -236,22 +240,36 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
         const refreshed = await firebaseNewsService.getArticlesWithDocIds();
         setAllNews(refreshed);
       } else {
+        console.log('🔄 Adding new article:', articlePayload.headline);
         result = await onAddNews(articlePayload);
+        console.log('✅ Article added with result:', result);
         Alert.alert('Success', 'News article added successfully!');
-        // Send push notification (non-blocking)
+        // Send push notification (non-blocking with rate limiting)
         (async () => {
           try {
+            // Rate limiting: prevent sending notifications more than once per 10 seconds
+            const now = Date.now();
+            const timeSinceLastNotification = now - lastNotificationTime;
+            const MIN_NOTIFICATION_INTERVAL = 10000; // 10 seconds
+            
+            if (timeSinceLastNotification < MIN_NOTIFICATION_INTERVAL) {
+              console.log('⏭️ Rate limiting: Skipping notification (too soon after last one)');
+              return;
+            }
+            
+            setLastNotificationTime(now);
+            console.log('🔔 Starting notification process...');
             await expoPushService.init(); // ensure Expo token stored (admin device)
-            // Call the direct FCM push function
-            await fetch('https://us-central1-soullink-96d4b.cloudfunctions.net/sendDirectPushNotification', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                articleId: result || '',
-                title: articlePayload.headline,
-                category: articlePayload.category
-              })
+            
+            // Send proper notification using NotificationSender
+            await NotificationSender.sendNewArticleNotification({
+              id: result || '',
+              headline: articlePayload.headline,
+              category: articlePayload.category,
+              docId: result
             });
+            console.log('✅ Notification sent successfully');
+            
           } catch (e) {
             console.warn('Push notification send failed', e);
           }

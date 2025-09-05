@@ -1,6 +1,7 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, Modal, StyleSheet, Dimensions, ScrollView } from 'react-native';
 import FastTouchable from './FastTouchable';
+import InitializationService from './InitializationService';
 
 interface Props {
   visible?: boolean;
@@ -33,6 +34,38 @@ function OnboardingCards({ visible = true, onClose }: Props) {
   const [index, setIndex] = useState(0);
   const scrollRef = useRef<ScrollView | null>(null);
   const transitioningRef = useRef(false);
+  const [servicesReady, setServicesReady] = useState(false);
+
+  // Check if services are ready when component mounts
+  useEffect(() => {
+    const initService = InitializationService.getInstance();
+    const checkStatus = () => {
+      const status = initService.getStatus();
+      setServicesReady(status.isReady);
+      // Only log once when ready, not continuously
+      if (status.isReady && !servicesReady) {
+        console.log('✅ OnboardingCards: All services ready');
+      }
+    };
+    
+    checkStatus();
+    // Check periodically but stop once ready or after timeout
+    const statusTimer = setInterval(() => {
+      checkStatus();
+      // Stop checking after services are ready
+      if (servicesReady) {
+        clearInterval(statusTimer);
+      }
+    }, 1000); // Check every 1 second instead of 500ms
+    
+    // Cleanup after 10 seconds max
+    const cleanupTimer = setTimeout(() => clearInterval(statusTimer), 10000);
+    
+    return () => {
+      clearInterval(statusTimer);
+      clearTimeout(cleanupTimer);
+    };
+  }, [servicesReady]);
 
   // Memoize modal width calculation
   const modalWidth = useMemo(() => MODAL_WIDTH, []);
@@ -45,12 +78,23 @@ function OnboardingCards({ visible = true, onClose }: Props) {
     </View>
   ), [modalWidth]);
 
-  // Optimized navigation functions
+  // Optimized navigation functions with service readiness check
   const goNext = useCallback(() => {
-    if (transitioningRef.current) return;
+    console.log('🔄 goNext called, index:', index, 'transitioning:', transitioningRef.current, 'servicesReady:', servicesReady);
+    
+    if (transitioningRef.current) {
+      console.log('⏸️ Already transitioning, ignoring');
+      return;
+    }
+    
+    if (!servicesReady) {
+      console.log('⚠️ Services not ready yet, waiting...');
+      return;
+    }
     
     if (index < CARDS.length - 1) {
       const next = index + 1;
+      console.log('➡️ Moving to next card:', next);
       transitioningRef.current = true;
       setIndex(next);
       
@@ -60,11 +104,13 @@ function OnboardingCards({ visible = true, onClose }: Props) {
       
       setTimeout(() => {
         transitioningRef.current = false;
+        console.log('✅ Transition complete');
       }, 50);
     } else {
+      console.log('🏁 Last card, closing onboarding');
       onClose();
     }
-  }, [index, modalWidth, onClose]);
+  }, [index, modalWidth, onClose, servicesReady]);
 
   const goPrev = useCallback(() => {
     if (transitioningRef.current) return;
@@ -118,13 +164,23 @@ function OnboardingCards({ visible = true, onClose }: Props) {
             </View>
 
             <FastTouchable 
-              style={styles.button} 
-              onPress={goNext}
+              style={[styles.button, !servicesReady && styles.buttonDisabled]} 
+              onPress={() => {
+                console.log('🔘 Button pressed! Services ready:', servicesReady);
+                if (servicesReady) {
+                  goNext();
+                } else {
+                  console.log('⏰ Services not ready, button disabled');
+                }
+              }}
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
               delayPressIn={0}
               delayPressOut={0}
+              disabled={!servicesReady}
             >
-              <Text style={styles.buttonText}>{index === CARDS.length - 1 ? 'Get started' : 'Next'}</Text>
+              <Text style={[styles.buttonText, !servicesReady && styles.buttonTextDisabled]}>
+                {!servicesReady ? 'Initializing...' : (index === CARDS.length - 1 ? 'Get started' : 'Next')}
+              </Text>
             </FastTouchable>
           </View>
         </View>
@@ -210,6 +266,13 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontWeight: '700',
     fontSize: 16,
+  },
+  buttonDisabled: {
+    backgroundColor: '#94a3b8',
+    opacity: 0.7,
+  },
+  buttonTextDisabled: {
+    color: '#d1d5db',
   }
 });
 

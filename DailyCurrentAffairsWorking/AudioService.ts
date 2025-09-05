@@ -1,4 +1,5 @@
 import { Platform, Alert } from 'react-native';
+import * as Speech from 'expo-speech';
 import { NewsArticle } from './types';
 
 export interface AudioSettings {
@@ -56,10 +57,9 @@ class AudioService {
   private getSpeechProvider(): any | null {
     if (this.speechProvider !== undefined) return this.speechProvider;
 
-    // 1) expo-speech (preferred, API: speak/stop/getAvailableVoicesAsync/isSpeakingAsync)
-    const expoSpeech = this.safeRequire('expo' + '-speech');
-    if (expoSpeech) {
-      this.speechProvider = { type: 'expo', impl: expoSpeech };
+    // 1) expo-speech (preferred, directly imported)
+    if (Speech) {
+      this.speechProvider = { type: 'expo', impl: Speech };
       return this.speechProvider;
     }
 

@@ -17,6 +17,9 @@ const getMessaging = async () => {
 class FirebaseNotificationService {
   private isInitialized = false;
   private fcmToken: string | null = null;
+  private processedNotifications: Set<string> = new Set(); // Track processed notification IDs
+  private messageHandlerUnsubscribe: (() => void) | null = null;
+  private backgroundHandlerUnsubscribe: (() => void) | null = null;
 
   /**
    * Initialize Firebase messaging service
@@ -64,7 +67,8 @@ class FirebaseNotificationService {
   await messagingMod2().subscribeToTopic('news-updates');
       console.log('✅ Subscribed to news-updates topic');
 
-  // Set up message handlers
+  // Set up message handlers (with cleanup first)
+  await this.cleanupExistingHandlers();
   await this.setupMessageHandlers();
 
       this.isInitialized = true;
@@ -128,19 +132,127 @@ class FirebaseNotificationService {
   }
 
   /**
+   * Clean up all existing message handlers to prevent duplicates
+   */
+  private async cleanupExistingHandlers(): Promise<void> {
+    console.log('🧹 Cleaning up all existing notification handlers...');
+    
+    // Clear our tracked handlers
+    if (this.messageHandlerUnsubscribe) {
+      this.messageHandlerUnsubscribe();
+      this.messageHandlerUnsubscribe = null;
+    }
+
+    if (this.backgroundHandlerUnsubscribe) {
+      this.backgroundHandlerUnsubscribe();
+      this.backgroundHandlerUnsubscribe = null;
+    }
+
+    // Clear the processed notifications cache to start fresh
+    this.processedNotifications.clear();
+    console.log('✅ All notification handlers cleaned up');
+  }
+
+  /**
    * Set up foreground and background message handlers
    */
   private async setupMessageHandlers(): Promise<void> {
-    // Handle foreground messages - only log, don't show alerts
-    (await getMessaging())().onMessage(async (remoteMessage: any) => {
+    // Clean up existing handlers first
+    if (this.messageHandlerUnsubscribe) {
+      this.messageHandlerUnsubscribe();
+      this.messageHandlerUnsubscribe = null;
+      console.log('🧹 Cleaned up existing foreground message handler');
+    }
+
+    if (this.backgroundHandlerUnsubscribe) {
+      this.backgroundHandlerUnsubscribe();
+      this.backgroundHandlerUnsubscribe = null;
+      console.log('🧹 Cleaned up existing background message handler');
+    }
+
+    // Handle foreground messages
+    this.messageHandlerUnsubscribe = (await getMessaging())().onMessage(async (remoteMessage: any) => {
       console.log('📥 Foreground message received:', {
         title: remoteMessage.notification?.title,
         body: remoteMessage.notification?.body,
-        data: remoteMessage.data
+        data: remoteMessage.data,
+        sentTime: remoteMessage.sentTime,
+        messageId: remoteMessage.messageId
       });
 
-      // Don't show alert - let the user see it naturally in-app
-      // Background notifications will show in notification panel automatically
+      // AGGRESSIVE deduplication and old notification filtering
+      const messageId = remoteMessage.messageId;
+      const dataUniqueKey = remoteMessage.data?.uniqueKey;
+      const articleId = remoteMessage.data?.articleId;
+      const title = remoteMessage.notification?.title;
+      const sentTime = remoteMessage.sentTime || Date.now();
+      
+      // Block notifications older than 2 minutes
+      const now = Date.now();
+      const twoMinutesAgo = now - (2 * 60 * 1000);
+      if (sentTime < twoMinutesAgo) {
+        console.log('⏰ Blocking old notification (older than 2 minutes)');
+        return;
+      }
+      
+      // Create multiple deduplication keys
+      const dedupKeys = [
+        messageId,
+        dataUniqueKey,
+        articleId && `article_${articleId}`,
+        title && `title_${title.substring(0, 30)}`,
+        // App session dedup - same title in this app session
+        title && `session_${title}`
+      ].filter(Boolean);
+      
+      // Check if any of these keys have been processed
+      const alreadyProcessed = dedupKeys.some(key => this.processedNotifications.has(key));
+      if (alreadyProcessed) {
+        console.log('🔄 Skipping duplicate notification - already processed');
+        return;
+      }
+      
+      // Add all keys to processed set
+      dedupKeys.forEach(key => this.processedNotifications.add(key));
+      
+      // Clean up old entries to prevent memory growth (keep only last 200 entries)
+      if (this.processedNotifications.size > 200) {
+        const entries = Array.from(this.processedNotifications);
+        const toRemove = entries.slice(0, this.processedNotifications.size - 150);
+        toRemove.forEach(key => this.processedNotifications.delete(key));
+        console.log('🧹 Cleaned up old processed notification cache');
+      }
+
+      // More aggressive filtering for old notifications
+      const currentTime = Date.now();
+      const messageSentTime = remoteMessage.sentTime || 0;
+      
+      // Only allow notifications from the last 2 minutes
+      const isOldNotification = (currentTime - messageSentTime) > (2 * 60 * 1000); // 2 minutes
+      
+      // Also check if the notification data has a timestamp
+      if (remoteMessage.data?.timestamp) {
+        try {
+          const dataTimestamp = new Date(remoteMessage.data.timestamp).getTime();
+          const isOldByDataTimestamp = (now - dataTimestamp) > (2 * 60 * 1000);
+          if (isOldByDataTimestamp) {
+            console.log('⏭️ Skipping old notification by data timestamp:', remoteMessage.notification?.title);
+            return;
+          }
+        } catch (e) {
+          // Ignore timestamp parsing errors
+        }
+      }
+
+      if (isOldNotification) {
+        console.log('⏭️ Skipping old notification by sent time:', remoteMessage.notification?.title);
+        return;
+      }
+
+      console.log('✅ Processing new notification:', remoteMessage.notification?.title);
+
+      // Don't show alerts when app is open - just log
+      // Background notifications will still appear in notification tray automatically
     });
 
     // Handle notification tap when app is in background
@@ -255,6 +367,16 @@ class FirebaseNotificationService {
     } catch (error) {
       console.error('❌ Status test failed:', error);
     }
+  }
+
+  /**
+   * Public method to clear all notification handlers and cache
+   * Use this if you're getting duplicate notifications
+   */
+  async clearAllNotificationHandlers(): Promise<void> {
+    console.log('🚨 Emergency cleanup: Clearing ALL notification handlers');
+    await this.cleanupExistingHandlers();
+    console.log('✅ Emergency cleanup complete');
   }
 }
 
