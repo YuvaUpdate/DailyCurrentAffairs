@@ -49,6 +49,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   const [headline, setHeadline] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [source, setSource] = useState('');
   const [category, setCategory] = useState('');
   const [readTime, setReadTime] = useState('');
@@ -186,18 +187,19 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     if (uploadedMedia) {
       mediaUrl = uploadedMedia.url;
     } else if (!mediaUrl) {
-      mediaUrl = `https://via.placeholder.com/400x300/667eea/ffffff?text=${encodeURIComponent(category)}`;
+      mediaUrl = `https://picsum.photos/400/300?random=${Math.floor(Math.random() * 1000)}`;
     }
 
     const newArticle = {
       headline: headline.substring(0, HEADLINE_MAX),
-  description: limitWords(description, DESCRIPTION_WORD_MAX),
+      description: limitWords(description, DESCRIPTION_WORD_MAX),
       image: mediaUrl,
-  source: source.substring(0, SOURCE_NAME_MAX),
+      youtubeUrl: youtubeUrl || undefined, // Add YouTube URL
+      source: source.substring(0, SOURCE_NAME_MAX),
       category,
       readTime: (readTime || '2 min read').substring(0, READTIME_MAX),
       sourceUrl: sourceUrl.substring(0, SOURCEURL_MAX),
-      mediaType: uploadedMedia?.type || 'image', // Add media type info
+      mediaType: youtubeUrl ? 'youtube' : (uploadedMedia?.type || 'image'), // Set media type to youtube if URL provided
       mediaPath: uploadedMedia?.path, // Store path for potential deletion
     };
 
@@ -216,7 +218,8 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       headline: articlePayload.headline,
       description: articlePayload.description,
       image: articlePayload.image,
-  source: (articlePayload.source as any) || '',
+      youtubeUrl: articlePayload.youtubeUrl,
+      source: (articlePayload.source as any) || '',
       category: articlePayload.category,
       readTime: articlePayload.readTime,
       sourceUrl: articlePayload.sourceUrl,
@@ -287,6 +290,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       setHeadline('');
       setDescription('');
       setImageUrl('');
+      setYoutubeUrl('');
       setCategory('');
       setReadTime('');
       setSourceUrl('');
@@ -377,9 +381,10 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   const handleEditNews = (article: NewsArticle) => {
     setEditingNews(article);
     setHeadline(article.headline);
-  setDescription(limitWords(article.description || '', DESCRIPTION_WORD_MAX));
+    setDescription(limitWords(article.description || '', DESCRIPTION_WORD_MAX));
     setImageUrl(article.image);
-  setSource(article.source || '');
+    setYoutubeUrl(article.youtubeUrl || '');
+    setSource(article.source || '');
     setCategory(article.category);
     setReadTime(article.readTime || '');
     setSourceUrl(article.sourceUrl || '');
@@ -454,7 +459,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
 
     const article = {
       ...quickArticle,
-      image: `https://via.placeholder.com/400x300/667eea/ffffff?text=${encodeURIComponent(quickArticle.category)}`,
+      image: `https://picsum.photos/400/300?random=${Math.floor(Math.random() * 1000)}`,
       sourceUrl: `https://example.com/news/${quickArticle.headline.replace(/\s+/g, '-').toLowerCase()}`,
     };
 
@@ -754,7 +759,23 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                   </FastTouchable>
                 </View>
 
-                {mediaSource === 'url' && <TextInput placeholder="Image URL" value={imageUrl} onChangeText={setImageUrl} style={styles.input} />}
+                {mediaSource === 'url' && (
+                  <View>
+                    <TextInput placeholder="Image URL" value={imageUrl} onChangeText={setImageUrl} style={styles.input} />
+                    <TextInput 
+                      placeholder="YouTube URL (Optional - for video content)" 
+                      value={youtubeUrl} 
+                      onChangeText={setYoutubeUrl} 
+                      style={[styles.input, { marginTop: 8 }]} 
+                      placeholderTextColor="#888"
+                    />
+                    {youtubeUrl && (
+                      <Text style={styles.helperText}>
+                        📺 YouTube video will be embedded. Image URL will be used as fallback thumbnail.
+                      </Text>
+                    )}
+                  </View>
+                )}
                 {mediaSource === 'upload' && (
                   <View>
                     <FastTouchable style={styles.uploadButton} onPress={handleMediaUpload}>
@@ -815,7 +836,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                     <Text style={styles.previewTitle}>Preview</Text>
                     <View style={styles.previewCard}>
                       {/** Preview image */}
-                      <Image source={{ uri: uploadedMedia?.url || imageUrl || `https://via.placeholder.com/400x200/667eea/ffffff?text=${encodeURIComponent(category || 'Preview')}` }} style={styles.previewImage} />
+                      <Image source={{ uri: uploadedMedia?.url || imageUrl || `https://picsum.photos/400/200?random=${Math.floor(Math.random() * 1000)}` }} style={styles.previewImage} />
                       <View style={styles.previewContent}>
                         <Text style={styles.previewHeadline}>{headline || 'Headline preview'}</Text>
                         <Text style={styles.previewDescription} numberOfLines={3}>{description || 'Description preview will appear here.'}</Text>
@@ -993,12 +1014,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     color: '#ffffff',
-  fontSize: 12,
+    fontSize: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
+  helperText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 5,
+    marginHorizontal: 5,
+    fontStyle: 'italic',
+  },
   textArea: {
-  height: 120,
+    height: 120,
     textAlignVertical: 'top',
   },
   categoryScroll: {

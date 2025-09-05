@@ -27,6 +27,7 @@ import FastTouchable from './FastTouchable';
 import AdminPanel from './AdminPanel';
 import Sidebar from './Sidebar';
 import VideoPlayerComponent from './VideoPlayerComponent';
+import YouTubePlayer from './YouTubePlayer';
 import { NewsArticle } from './types';
 // Lazy-load FirebaseNewsService at runtime to reduce startup parsing/execution
 let _firebaseNewsService: any = null;
@@ -1197,7 +1198,17 @@ export default function App(props: AppProps) {
               backgroundColor: '#eeeeee' 
             }
           ]}>
-            {article.image && (article.image.includes('.mp4') || article.image.includes('.webm')) ? (
+            {article.mediaType === 'youtube' && article.youtubeUrl ? (
+              <YouTubePlayer
+                youtubeUrl={article.youtubeUrl}
+                thumbnailImage={article.image}
+                style={[
+                  styles.fullScreenImage,
+                  ImageAlignmentHelper.getImageAlignmentStyles(),
+                  { minHeight: 300 }
+                ]}
+              />
+            ) : article.image && (article.image.includes('.mp4') || article.image.includes('.webm')) ? (
               <VideoPlayerComponent
                 videoUrl={article.image}
                 style={styles.fullScreenImage}
@@ -1267,10 +1278,12 @@ export default function App(props: AppProps) {
               <Text style={styles.reelsCategoryText}>{article.category}</Text>
             </View>
             
-            {/* Video Badge for videos */}
-            {article.mediaType === 'video' && (
+            {/* Video Badge for videos and YouTube */}
+            {(article.mediaType === 'video' || article.mediaType === 'youtube') && (
               <View style={styles.reelsVideoBadge}>
-                <Text style={styles.reelsVideoBadgeText}>VIDEO</Text>
+                <Text style={styles.reelsVideoBadgeText}>
+                  {article.mediaType === 'youtube' ? 'YOUTUBE' : 'VIDEO'}
+                </Text>
               </View>
             )}
           </View>

@@ -6,9 +6,10 @@ export interface NewsArticle {
   image: string;
   imageUrl?: string; // Alternative image URL
   link?: string; // External news link
+  youtubeUrl?: string; // YouTube video URL
   category: string;
   timestamp: string;
-  mediaType?: 'image' | 'video'; // Type of media content
+  mediaType?: 'image' | 'video' | 'youtube'; // Type of media content
   mediaPath?: string; // Firebase storage path for potential deletion
   sourceUrl?: string;
   source?: string; // Human-readable source name (e.g., Times of India)
