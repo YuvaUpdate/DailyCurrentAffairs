@@ -13,8 +13,8 @@ export class ImagePrefetchService {
   private prefetchQueue = new Set<string>();
   private readonly CACHE_KEY = 'image_prefetch_cache';
   private readonly CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
-  private readonly MAX_CACHE_SIZE = 100; // Maximum cached images
-  private readonly MAX_CONCURRENT_PREFETCH = 3; // Limit concurrent prefetch operations
+  private readonly MAX_CACHE_SIZE = 300; // Increased cache size for faster image loading
+  private readonly MAX_CONCURRENT_PREFETCH = 8; // Increased concurrent prefetch for faster loading
 
   static getInstance(): ImagePrefetchService {
     if (!ImagePrefetchService.instance) {

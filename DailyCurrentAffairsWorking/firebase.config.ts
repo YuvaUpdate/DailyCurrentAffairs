@@ -7,13 +7,12 @@ import { getStorage } from 'firebase/storage';
 // Your web app's Firebase configuration
 // From your Firebase Console - Web App setup
 const firebaseConfig = {
-  apiKey: "AIzaSyD3tc1EKESzh4ITdCbM3a5NSlZa4vDnVBY",
-  authDomain: "soullink-96d4b.firebaseapp.com",
-  projectId: "soullink-96d4b",
-  storageBucket: "soullink-96d4b.firebasestorage.app",
-  messagingSenderId: "321937432406",
-  appId: "1:321937432406:web:bfcd94fbdba69acf5380f7",
-  measurementId: "G-ZTNBPPYRLS"
+  apiKey: "AIzaSyAr0-reXFa5nLRAv2AdNbHMC9w-1LAtgsk",
+  authDomain: "yuvaupdate-3762b.firebaseapp.com",
+  projectId: "yuvaupdate-3762b",
+  storageBucket: "yuvaupdate-3762b.firebasestorage.app",
+  messagingSenderId: "970590845048",
+  appId: "1:970590845048:android:2d51c7c3fcae508edbd58d"
 };
 
 // Initialize Firebase

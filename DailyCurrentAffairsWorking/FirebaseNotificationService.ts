@@ -251,8 +251,8 @@ class FirebaseNotificationService {
 
       console.log('✅ Processing new notification:', remoteMessage.notification?.title);
 
-      // Don't show alerts when app is open - just log
-      // Background notifications will still appear in notification tray automatically
+      // Show notification even when app is in foreground for better user experience
+      this.showLocalNotification(remoteMessage);
     });
 
     // Handle notification tap when app is in background

@@ -58,6 +58,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthScreen } from './AuthScreen';
 import { audioService } from './AudioService';
 import OnboardingCards from './OnboardingCards';
+import { testFirebaseConnection } from './firebase-debug';
 import { scaleFont, responsiveLines } from './utils/responsive';
 import { LoadingSpinner } from './LoadingSpinner';
 import InAppBrowserHost, { showInApp } from './InAppBrowser';
@@ -134,16 +135,17 @@ export default function App(props: AppProps) {
 
   // Load persisted theme preference on startup - IMMEDIATE
   useEffect(() => {
-    // Initialize Expo push token early (non-blocking)
-    (async () => {
-      try { 
-        console.log('🔔 App: Initializing ExpoPushService...');
-        await expoPushService.init(); 
-        console.log('🔔 App: ExpoPushService initialized successfully');
-      } catch(e) { 
-        console.warn('🔔 App: ExpoPushService init failed:', e);
-      }
-    })();
+    // DISABLED: ExpoPushService conflicts with Firebase Cloud Messaging
+    // Using Firebase Cloud Messaging only for APK builds
+    // (async () => {
+    //   try { 
+    //     console.log('🔔 App: Initializing ExpoPushService...');
+    //     await expoPushService.init(); 
+    //     console.log('🔔 App: ExpoPushService initialized successfully');
+    //   } catch(e) { 
+    //     console.warn('🔔 App: ExpoPushService init failed:', e);
+    //   }
+    // })();
     // Set theme loaded immediately for faster startup
     setIsThemeLoaded(true);
     
@@ -157,6 +159,12 @@ export default function App(props: AppProps) {
         }
       })
       .catch((e) => console.warn('Failed to read persisted theme', e));
+  }, []);
+
+  // Expose Firebase test function globally for debugging
+  useEffect(() => {
+    (global as any).testFirebaseConnection = testFirebaseConnection;
+    console.log('🔬 Firebase debug function exposed globally. Use: testFirebaseConnection()');
   }, []);
 
   // Helper to persist theme changes
@@ -458,23 +466,9 @@ export default function App(props: AppProps) {
         unsubscribe = svc.subscribeToArticles((articles: NewsArticle[]) => {
         setIsLoadingArticles(false);
 
-        // Check for new articles and send notifications
-        if (articles.length > lastArticleCount && lastArticleCount > 0) {
-          const newArticles = articles.slice(0, articles.length - lastArticleCount);
-          newArticles.forEach((article: NewsArticle) => {
-            // Send notification to all users via Firebase Cloud Function
-            notificationSender.sendNotificationToAllUsers({
-              title: article.headline,
-              body: article.category,
-              data: {
-                articleId: article.id?.toString(),
-                category: article.category,
-                type: 'news'
-              }
-            });
-          });
-        }
-
+        // Note: Notifications are now handled by AdminPanel when articles are added
+        // No need to send notifications here as they're sent immediately when created
+        
         setNewsData(articles);
         setLastArticleCount(articles.length);
         applyFilter(articles, selectedCategory);
@@ -1217,7 +1211,7 @@ export default function App(props: AppProps) {
               />
             ) : (
               <OptimizedImage 
-                source={{ uri: article.image || 'https://via.placeholder.com/400x300?text=No+Image' }} 
+                source={{ uri: article.image || 'https://picsum.photos/400/300?random=5' }} 
                 style={[
                   styles.fullScreenImage, 
                   ImageAlignmentHelper.getImageAlignmentStyles(),
@@ -1568,14 +1562,7 @@ export default function App(props: AppProps) {
   <Sidebar
     visible={sidebarVisible}
     onClose={() => setSidebarVisible(false)}
-    bookmarkedArticles={bookmarkedArticlesList}
-    onCategorySelect={handleCategorySelect}
-    onArticleSelect={(article) => handleArticlePress(article)}
-    selectedCategory={selectedCategory}
     isDarkMode={isDarkMode}
-    currentUser={currentUser}
-  // Provide already-loaded or cached categories for instant display
-  preloadedCategories={categories}
   />
   )}
 

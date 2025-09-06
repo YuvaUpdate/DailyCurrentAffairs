@@ -19,7 +19,7 @@ export class FirebaseNewsService {
       id: 1,
       headline: 'Local: Major Tech Breakthrough Announced',
       description: 'Offline fallback: a summary of the latest tech news for offline or restricted environments.',
-      image: 'https://via.placeholder.com/400x300/667eea/ffffff?text=Tech+News',
+      image: 'https://picsum.photos/400/300?random=15',
       category: 'Technology',
       readTime: '2 min read',
       timestamp: new Date().toLocaleDateString()
@@ -28,7 +28,7 @@ export class FirebaseNewsService {
       id: 2,
       headline: 'Local: Championship Finals This Weekend',
       description: 'Offline fallback: sports highlights to keep the feed populated while Firestore is unavailable.',
-      image: 'https://via.placeholder.com/400x300/f093fb/ffffff?text=Sports+News',
+      image: 'https://picsum.photos/400/300?random=16',
       category: 'Sports',
       readTime: '1 min read',
       timestamp: new Date().toLocaleDateString()
@@ -37,7 +37,7 @@ export class FirebaseNewsService {
       id: 3,
       headline: 'Local: Market Reaches All-Time High',
       description: 'Offline fallback business summary.',
-      image: 'https://via.placeholder.com/400x300/4ade80/ffffff?text=Business+News',
+      image: 'https://picsum.photos/400/300?random=17',
       category: 'Business',
       readTime: '3 min read',
       timestamp: new Date().toLocaleDateString()

@@ -26,7 +26,7 @@ const OptimizedImage = memo(({
   progressiveRenderingEnabled = true,
   loadingIndicatorSource,
   showLoadingIndicator = false,
-  placeholder = 'https://via.placeholder.com/400x300/f0f0f0/999999?text=Loading...'
+  placeholder = 'https://picsum.photos/400/300?random=1'
 }: OptimizedImageProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -63,15 +63,19 @@ const OptimizedImage = memo(({
   };
 
   const handleError = (error: any) => {
+    // Silently handle network errors - don't log them
     setHasError(true);
     setIsLoading(false);
     
-    // Try placeholder if main image fails
-    if (source.uri !== placeholder) {
+    // Try placeholder if main image fails and it's a different URL
+    if (source.uri !== placeholder && !source.uri?.includes('picsum.photos')) {
       setImageSource({ uri: placeholder });
     }
     
-    onError?.(error);
+    // Only call onError for non-network errors or if explicitly requested
+    if (onError && !error?.nativeEvent?.error?.includes('ERR_NAME_NOT_RESOLVED')) {
+      onError(error);
+    }
   };
 
   const getImageStyle = () => {

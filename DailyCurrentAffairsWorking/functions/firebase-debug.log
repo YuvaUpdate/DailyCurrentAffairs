@@ -1,0 +1,74 @@
+[debug] [2025-09-06T10:31:02.683Z] ----------------------------------------------------------------------
+[debug] [2025-09-06T10:31:02.685Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\nares\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js functions:shell
+[debug] [2025-09-06T10:31:02.685Z] CLI Version:   14.15.1
+[debug] [2025-09-06T10:31:02.685Z] Platform:      win32
+[debug] [2025-09-06T10:31:02.685Z] Node Version:  v20.9.0
+[debug] [2025-09-06T10:31:02.685Z] Time:          Sat Sep 06 2025 16:01:02 GMT+0530 (India Standard Time)
+[debug] [2025-09-06T10:31:02.685Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-09-06T10:31:02.836Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-09-06T10:31:02.836Z] > authorizing via signed-in user (jogen1349@gmail.com)
+[debug] [2025-09-06T10:31:02.837Z] [iam] checking project yuvaupdate-3762b for permissions ["firebase.projects.get"]
+[debug] [2025-09-06T10:31:02.837Z] Checked if tokens are valid: true, expires at: 1757158134478
+[debug] [2025-09-06T10:31:02.838Z] Checked if tokens are valid: true, expires at: 1757158134478
+[debug] [2025-09-06T10:31:02.838Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/yuvaupdate-3762b:testIamPermissions [none]
+[debug] [2025-09-06T10:31:02.838Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/yuvaupdate-3762b:testIamPermissions x-goog-quota-user=projects/yuvaupdate-3762b
+[debug] [2025-09-06T10:31:02.839Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/yuvaupdate-3762b:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-09-06T10:31:04.228Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/yuvaupdate-3762b:testIamPermissions 200
+[debug] [2025-09-06T10:31:04.228Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/yuvaupdate-3762b:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-09-06T10:31:04.236Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-09-06T10:31:04.282Z] defaultcredentials: writing to file C:\Users\nares\AppData\Roaming\firebase\jogen1349_gmail_com_application_default_credentials.json
+[debug] [2025-09-06T10:31:04.285Z] DEBUG: Setting GAC to C:\Users\nares\AppData\Roaming\firebase\jogen1349_gmail_com_application_default_credentials.json
+[debug] [2025-09-06T10:31:04.285Z] Checked if tokens are valid: true, expires at: 1757158134478
+[debug] [2025-09-06T10:31:04.285Z] Checked if tokens are valid: true, expires at: 1757158134478
+[debug] [2025-09-06T10:31:04.285Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/yuvaupdate-3762b/adminSdkConfig [none]
+[debug] [2025-09-06T10:31:05.190Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/yuvaupdate-3762b/adminSdkConfig 200
+[debug] [2025-09-06T10:31:05.190Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/yuvaupdate-3762b/adminSdkConfig {"projectId":"yuvaupdate-3762b","databaseURL":"https://yuvaupdate-3762b-default-rtdb.firebaseio.com","storageBucket":"yuvaupdate-3762b.firebasestorage.app"}
+[debug] [2025-09-06T10:31:05.208Z] [functions] Watching "E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\functions" for Cloud Functions...
+[debug] [2025-09-06T10:31:05.214Z] Validating nodejs source
+[debug] [2025-09-06T10:31:06.444Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0"
+  },
+  "private": true
+}
+[debug] [2025-09-06T10:31:06.444Z] Building nodejs source
+[debug] [2025-09-06T10:31:06.445Z] Failed to find version of module node: reached end of search path E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\functions\node_modules
+[warn] !  functions: Your requested "node" version "22" doesn't match your global version "20". Using node@20 from host. 
+[debug] [2025-09-06T10:31:06.448Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-09-06T10:31:06.454Z] Found firebase-functions binary at 'E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8172
+
+[debug] [2025-09-06T10:31:06.901Z] Got response from /__/functions.yaml {"endpoints":{"sendNotificationToTopic":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"sendNotificationToTopic"},"sendNotificationToDevice":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"sendNotificationToDevice"},"sendDirectPushNotification":{"availableMemoryMb":null,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"sendDirectPushNotification"},"sendExpoArticlePush":{"availableMemoryMb":null,"timeoutSeconds":60,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"sendExpoArticlePush"},"healthCheck":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"healthCheck"},"createAdminUser":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"createAdminUser"},"updateUserRole":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"updateUserRole"},"fetchNews":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"fetchNews"},"searchNews":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"searchNews"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[debug] [2025-09-06T10:31:11.947Z] [functions] Loaded functions definitions from source: sendNotificationToTopic, sendNotificationToDevice, sendDirectPushNotification, sendExpoArticlePush, healthCheck, createAdminUser, updateUserRole, fetchNews, searchNews.
+[debug] [2025-09-06T10:31:11.948Z] [functions[us-central1-sendNotificationToTopic]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/sendNotificationToTopic).
+[debug] [2025-09-06T10:31:11.949Z] [functions[us-central1-sendNotificationToDevice]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/sendNotificationToDevice).
+[debug] [2025-09-06T10:31:11.949Z] [functions[us-central1-sendDirectPushNotification]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/sendDirectPushNotification).
+[debug] [2025-09-06T10:31:11.949Z] [functions[us-central1-sendExpoArticlePush]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/sendExpoArticlePush).
+[debug] [2025-09-06T10:31:11.950Z] [functions[us-central1-healthCheck]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/healthCheck).
+[debug] [2025-09-06T10:31:11.950Z] [functions[us-central1-createAdminUser]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/createAdminUser).
+[debug] [2025-09-06T10:31:11.950Z] [functions[us-central1-updateUserRole]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/updateUserRole).
+[debug] [2025-09-06T10:31:11.950Z] [functions[us-central1-fetchNews]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/fetchNews).
+[debug] [2025-09-06T10:31:11.950Z] [functions[us-central1-searchNews]] http function initialized (http://127.0.0.1:5000/yuvaupdate-3762b/us-central1/searchNews).
+[info] i  functions: Loaded functions: sendNotificationToTopic, sendNotificationToDevice, sendDirectPushNotification, sendExpoArticlePush, healthCheck, createAdminUser, updateUserRole, fetchNews, searchNews 
+[warn] !  functions: The following emulators are not running, calls to these services will affect production: firestore, database, pubsub, storage, eventarc, tasks 

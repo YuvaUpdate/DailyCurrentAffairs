@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "321937432406",
-    "project_id": "soullink-96d4b",
-    "storage_bucket": "soullink-96d4b.firebasestorage.app"
+    "project_number": "970590845048",
+    "project_id": "yuvaupdate-3762b",
+    "storage_bucket": "yuvaupdate-3762b.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:321937432406:android:fe8ec5604b2cc98e5380f7",
+        "mobilesdk_app_id": "1:970590845048:android:2d51c7c3fcae508edbd58d",
         "android_client_info": {
           "package_name": "com.nareshkumarbalamurugan.YuvaUpdate"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "321937432406-hume3dmvlpi72efjlb5bn6v2m5l6t8h1.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCO_QywjmS1Zt0SgjlXTQ0UNGnalBSo8NY"
+          "current_key": "AIzaSyAr0-reXFa5nLRAv2AdNbHMC9w-1LAtgsk"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "321937432406-hume3dmvlpi72efjlb5bn6v2m5l6t8h1.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

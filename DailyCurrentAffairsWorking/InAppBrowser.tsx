@@ -18,6 +18,19 @@ try {
 let opener: ((url: string) => void) | null = null;
 
 export function showInApp(url: string) {
+  // On web platform, open links externally instead of in-app
+  if (Platform.OS === 'web') {
+    // Open in new tab/window for web
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      // Fallback if window is not available
+      Linking.openURL(url).catch(err => console.warn('Failed to open URL:', err));
+    }
+    return;
+  }
+  
+  // For native platforms (Android/iOS), use the in-app browser
   if (opener) opener(url);
 }
 
@@ -33,12 +46,18 @@ export default function InAppBrowserHost() {
     mounted.current = true;
     opener = (u: string) => {
       if (!mounted.current) return;
-  // reset one-time fallback flag for each new open attempt
-  didFallback.current = false;
-  setLoading(true);
-  setError(null);
-  setUrl(u);
-      // start a fallback timeout: if WebView doesn't report load end within 8s, show error
+      // For web platform, links are handled externally in showInApp function
+      if (Platform.OS === 'web') {
+        return;
+      }
+      
+      // Reset state for new URL
+      didFallback.current = false;
+      setLoading(true);
+      setError(null);
+      setUrl(u);
+      
+      // Shorter timeout for faster UX - reduce to 1.5s for quick loading perception
       if (loadTimeout.current) {
         clearTimeout(loadTimeout.current);
         loadTimeout.current = null;
@@ -46,14 +65,11 @@ export default function InAppBrowserHost() {
       loadTimeout.current = setTimeout(() => {
         try {
           if (!mounted.current) return;
+          // Hide loading after short delay even if page still loading for better perceived performance
           setLoading(false);
-          const msg = 'Load timed out';
-          console.warn('InAppBrowser load timeout for', u);
-          // set an error but do not auto-open the external browser; allow the user
-          // to decide by tapping 'Open in Browser' in the header.
-          setError(msg);
+          console.log('InAppBrowser quick load timeout for faster UX:', u);
         } catch (e) {}
-      }, 8000);
+      }, 1500); // 1.5 seconds for faster perceived loading
     };
     return () => {
       mounted.current = false;
@@ -62,7 +78,7 @@ export default function InAppBrowserHost() {
     };
   }, []);
 
-  return (
+  return Platform.OS === 'web' ? null : (
     <Modal visible={!!url} animationType="slide" onRequestClose={() => setUrl(null)}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => {
@@ -73,68 +89,81 @@ export default function InAppBrowserHost() {
           <Text style={styles.headerText}>Close</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }} />
-        {/* Removed external 'Open in Browser' button to keep links inside the app only */}
+        {url && (
+          <TouchableOpacity onPress={() => {
+            // Refresh the current page
+            setLoading(true);
+            setError(null);
+            const currentUrl = url;
+            setUrl(null);
+            setTimeout(() => { if (mounted.current) setUrl(currentUrl); }, 50);
+          }} style={styles.headerBtn} accessibilityLabel="Refresh page">
+            <Text style={styles.headerText}>Refresh</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <SafeAreaView style={styles.container}>
         {loading && (
           <View style={styles.loadingOverlay} pointerEvents="none">
-            {/* Make the loading overlay opaque so underlying UI doesn't bleed through */}
-            <ActivityIndicator size="large" />
+            {/* Faster, smaller loading indicator for better UX */}
+            <ActivityIndicator size="small" color="#007AFF" />
           </View>
         )}
-        {error && (
-          <View style={styles.errorOverlay} pointerEvents="box-none">
-            <Text style={styles.errorText}>Failed to load page: {error}</Text>
-            <View style={styles.errorActions}>
-              <TouchableOpacity onPress={() => {
-                // retry by re-setting the url which re-initializes the WebView/iframe
-                setError(null);
-                setLoading(true);
-                // trigger a reload by toggling the url briefly
-                const tmp = url;
-                setUrl(null);
-                setTimeout(() => { if (mounted.current) setUrl(tmp); }, 50);
-              }} style={styles.errorBtn}>
-                <Text style={styles.headerText}>Retry</Text>
-              </TouchableOpacity>
-              {/* External open removed: keep interaction inside the app only */}
-            </View>
-          </View>
+        {url && NativeWebView && (
+          <NativeWebView
+            style={{ flex: 1 }}
+            source={{ uri: url }}
+            onLoadStart={() => { 
+              setLoading(true); 
+              setError(null); 
+            }}
+            onLoadProgress={(event: any) => {
+              // Hide loading when page is 30% loaded for faster perceived performance
+              if (event.nativeEvent.progress >= 0.3) {
+                setLoading(false);
+                // Clear timeout since we're showing content
+                if (loadTimeout.current) { 
+                  clearTimeout(loadTimeout.current); 
+                  loadTimeout.current = null; 
+                }
+              }
+            }}
+            onLoadEnd={() => {
+              setLoading(false);
+              // clear any pending timeout now that load finished
+              if (loadTimeout.current) { clearTimeout(loadTimeout.current); loadTimeout.current = null; }
+            }}
+            onError={(e: any) => { 
+              setLoading(false); 
+              // Just log errors, don't show them to user for better UX
+              console.warn('InAppBrowser WebView error', e?.nativeEvent?.description); 
+            }}
+            onHttpError={(e: any) => { 
+              setLoading(false); 
+              // Just log HTTP errors, don't show them to user
+              console.warn('InAppBrowser WebView httpError', e?.nativeEvent?.statusCode); 
+            }}
+            // Optimized settings for faster loading
+            startInLoadingState={false}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            thirdPartyCookiesEnabled={true}
+            cacheEnabled={true}
+            allowsBackForwardNavigationGestures={true}
+            mixedContentMode={"always"}
+            originWhitelist={["*"]}
+            // Performance optimizations
+            androidHardwareAccelerationDisabled={false}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            // Better rendering
+            useWebKit={true}
+            bounces={false}
+            scrollEnabled={true}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+          />
         )}
-  {url ? (
-          Platform.OS === 'web' ? (
-            // iframe fallback for web (Metro / npm start)
-            // add onLoad/onError and key so load events reliably fire and hide the spinner
-            <iframe
-              key={url}
-              src={url}
-              style={{ flex: 1, width: '100%', height: '100%', border: 'none' }}
-              title="In-App Browser"
-              onLoad={() => setLoading(false)}
-              onError={() => { setLoading(false); setError('iframe failed to load'); console.warn('InAppBrowser iframe onError', url); /* do not auto-open external browser */ }}
-            />
-          ) : (
-              (NativeWebView && (
-                <NativeWebView
-                  style={{ flex: 1 }}
-                  source={{ uri: url }}
-                onLoadStart={() => { setLoading(true); setError(null); }}
-                onLoadEnd={() => {
-                  setLoading(false);
-                  // clear any pending timeout now that load finished
-                  if (loadTimeout.current) { clearTimeout(loadTimeout.current); loadTimeout.current = null; }
-                }}
-                onError={(e: any) => { setLoading(false); const desc = e?.nativeEvent?.description || JSON.stringify(e?.nativeEvent); console.warn('InAppBrowser WebView error', desc); setError(desc); /* do not auto-open external browser */ }}
-                onHttpError={(e: any) => { setLoading(false); const desc = e?.nativeEvent?.statusCode ? `HTTP ${e.nativeEvent.statusCode}` : JSON.stringify(e?.nativeEvent); console.warn('InAppBrowser WebView httpError', desc); setError(desc); /* do not auto-open external browser */ }}
-                  startInLoadingState={true}
-                  javaScriptEnabled={true}
-                  domStorageEnabled={true}
-                  mixedContentMode={"always"}
-                  originWhitelist={["*"]}
-                />
-              ))
-          )
-        ) : null}
       </SafeAreaView>
     </Modal>
   );
@@ -145,18 +174,15 @@ const styles = StyleSheet.create({
   header: { height: 56, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderBottomWidth: Platform.OS === 'ios' ? StyleSheet.hairlineWidth : 1, borderColor: 'rgba(0,0,0,0.06)' },
   headerBtn: { paddingHorizontal: 8, paddingVertical: 6 },
   headerText: { fontWeight: '700', color: '#007AFF' },
-  loadingOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: 50 },
-  errorOverlay: { position: 'absolute', left: 12, right: 12, top: 12, padding: 12, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.9)', zIndex: 60 },
-  errorText: { color: '#b00020', fontWeight: '600' }
-  ,
-  errorActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    gap: 10,
+  loadingOverlay: { 
+    position: 'absolute', 
+    left: 0, 
+    right: 0, 
+    top: 0, 
+    bottom: 0, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(255,255,255,0.9)', // Semi-transparent background
+    zIndex: 50 
   },
-  errorBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  }
 });

@@ -81,8 +81,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   });
   const [isRefreshingAnalytics, setIsRefreshingAnalytics] = useState(false);
   
-  // Rate limiting for notifications to prevent duplicates
-  const [lastNotificationTime, setLastNotificationTime] = useState(0);
+  // Add notification lock to prevent duplicate submissions
+  const [isNotificationSending, setIsNotificationSending] = useState(false);
+  const [lastNotificationTime, setLastNotificationTime] = useState<number>(0);
 
   const isSmallScreen = width && width < 420;
 
@@ -169,6 +170,15 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
   };
 
   const handleSubmit = async () => {
+    const submitId = Math.random().toString(36).substr(2, 9);
+    console.log(`🚀 [Submit #${submitId}] Starting handleSubmit...`);
+    
+    // Prevent duplicate submissions
+    if (isLoading || isNotificationSending) {
+      console.log(`🚫 [Submit #${submitId}] Submission blocked - already in progress`);
+      return;
+    }
+
     if (!headline || !description || !category || !sourceUrl) {
       Alert.alert('Error', 'Please fill in all required fields (Headline, Description, Category, and External Link)');
       return;
@@ -243,9 +253,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
         const refreshed = await firebaseNewsService.getArticlesWithDocIds();
         setAllNews(refreshed);
       } else {
-        console.log('🔄 Adding new article:', articlePayload.headline);
+        console.log(`➕ Adding new article: ${articlePayload.headline}`);
         result = await onAddNews(articlePayload);
-        console.log('✅ Article added with result:', result);
+        console.log(`✅ Article added with result:`, result);
         Alert.alert('Success', 'News article added successfully!');
         // Send push notification (non-blocking with rate limiting)
         (async () => {
@@ -253,28 +263,34 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
             // Rate limiting: prevent sending notifications more than once per 10 seconds
             const now = Date.now();
             const timeSinceLastNotification = now - lastNotificationTime;
-            const MIN_NOTIFICATION_INTERVAL = 10000; // 10 seconds
+            const MIN_NOTIFICATION_INTERVAL = 5000; // 5 seconds for testing
             
             if (timeSinceLastNotification < MIN_NOTIFICATION_INTERVAL) {
-              console.log('⏭️ Rate limiting: Skipping notification (too soon after last one)');
+              return;
+            }
+
+            // Prevent duplicate notification sending
+            if (isNotificationSending) {
               return;
             }
             
+            setIsNotificationSending(true);
             setLastNotificationTime(now);
-            console.log('🔔 Starting notification process...');
-            await expoPushService.init(); // ensure Expo token stored (admin device)
             
-            // Send proper notification using NotificationSender
-            await NotificationSender.sendNewArticleNotification({
-              id: result || '',
-              headline: articlePayload.headline,
-              category: articlePayload.category,
-              docId: result
-            });
-            console.log('✅ Notification sent successfully');
+            try {
+              // Send proper notification using NotificationSender
+              await NotificationSender.sendNewArticleNotification({
+                id: result || '',
+                headline: articlePayload.headline,
+                category: articlePayload.category,
+                docId: result
+              });
+            } finally {
+              setIsNotificationSending(false);
+            }
             
           } catch (e) {
-            console.warn('Push notification send failed', e);
+            console.warn('Push notification failed:', e);
           }
         })();
         // Refresh article list
@@ -805,8 +821,8 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                 <Text style={styles.label}>External Link (Required)</Text>
                 <TextInput placeholder="https://example.com/article" value={sourceUrl} onChangeText={setSourceUrl} style={styles.input} keyboardType="url" autoCapitalize="none" maxLength={SOURCEURL_MAX} />
 
-                <FastTouchable style={[styles.submitButton, isLoading && { opacity: 0.7 }]} onPress={() => { if (!isLoading) handleSubmit(); }}>
-                  {isLoading ? (
+                <FastTouchable style={[styles.submitButton, (isLoading || isNotificationSending) && { opacity: 0.7 }]} onPress={() => { if (!isLoading && !isNotificationSending) handleSubmit(); }}>
+                  {(isLoading || isNotificationSending) ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text style={styles.submitButtonText}>{editingNews ? 'Update Article' : 'Add Article'}</Text>

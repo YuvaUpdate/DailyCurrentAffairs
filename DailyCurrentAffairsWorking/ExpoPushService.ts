@@ -16,31 +16,24 @@ class ExpoPushService {
   private listenersSet = false;
 
   async init(): Promise<string | null> {
-    console.log('🔔 ExpoPushService.init() called');
     if (this.token) {
-      console.log('🔔 ExpoPushService: already have token:', this.token.substring(0, 20) + '...');
       return this.token;
     }
     if (this.registering) {
-      console.log('🔔 ExpoPushService: already registering, skipping');
       return null;
     }
     this.registering = true;
     try {
       const stored = await AsyncStorage.getItem('expo_push_token');
       if (stored) {
-        console.log('🔔 ExpoPushService: found stored token:', stored.substring(0, 20) + '...');
         this.token = stored;
       }
 
       const permission = await Notifications.getPermissionsAsync();
       let finalStatus = permission.status;
-      console.log('🔔 ExpoPushService: current permission status:', finalStatus);
       if (finalStatus !== 'granted') {
-        console.log('🔔 ExpoPushService: requesting permissions...');
         const req = await Notifications.requestPermissionsAsync();
         finalStatus = req.status;
-        console.log('🔔 ExpoPushService: permission request result:', finalStatus);
       }
       if (finalStatus !== 'granted') {
         console.warn('ExpoPushService: permission not granted');
@@ -51,16 +44,13 @@ class ExpoPushService {
         console.warn('ExpoPushService: Missing EAS projectId (ensure app is built with EAS).');
       }
 
-      console.log('🔔 ExpoPushService: getting Expo push token...');
       const tokenData = await Notifications.getExpoPushTokenAsync();
       this.token = tokenData.data;
-      console.log('🔔 ExpoPushService: received token:', this.token?.substring(0, 20) + '...');
       await AsyncStorage.setItem('expo_push_token', this.token || '');
 
       // Persist in Firestore (id = token)
       try {
         if (this.token) {
-          console.log('🔔 ExpoPushService: storing token in Firestore...');
           const colRef = collection(db, 'expoPushTokens');
           const docRef = doc(colRef, this.token);
           await setDoc(docRef, {
@@ -68,7 +58,6 @@ class ExpoPushService {
           platform: Platform.OS,
           updatedAt: serverTimestamp(),
           }, { merge: true });
-          console.log('🔔 ExpoPushService: token stored in Firestore successfully');
         }
       } catch (e) {
         console.warn('Failed to store token in Firestore', e);

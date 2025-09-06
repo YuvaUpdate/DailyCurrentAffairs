@@ -413,7 +413,7 @@ export default function NewsFeed_Inshorts({
             onPress={() => openExternal(article)}
           >
             <OptimizedImage
-              source={{ uri: article.image || article.imageUrl || 'https://via.placeholder.com/600x900?text=No+Image' }}
+              source={{ uri: article.image || article.imageUrl || 'https://picsum.photos/600/900?random=3' }}
               style={[styles.image, {
                 height: dynH,
                 borderTopLeftRadius: 12,
@@ -778,7 +778,7 @@ export default function NewsFeed_Inshorts({
       <View style={[modalStyles.container, { backgroundColor: bg }]}> 
         <Animated.View style={{ opacity: modalAnim, transform: [{ translateY: modalAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>
           <ScrollView contentContainerStyle={modalStyles.scroll}>
-            <OptimizedImage source={{ uri: article.image || article.imageUrl || 'https://via.placeholder.com/400x300' }} style={modalStyles.image} resizeMode="cover" onLoad={() => { if (onReady) { try { onReady(); } catch (e) {} } }} />
+            <OptimizedImage source={{ uri: article.image || article.imageUrl || 'https://picsum.photos/400/300?random=4' }} style={modalStyles.image} resizeMode="cover" onLoad={() => { if (onReady) { try { onReady(); } catch (e) {} } }} />
             <Text style={[modalStyles.title, { color: text }]}>{article.headline}</Text>
             <Text style={[modalStyles.meta, { color: subText }]}>{(article.readTime ? article.readTime + ' • ' : '') + (article.category || '')}</Text>
             <View style={modalStyles.divider} />

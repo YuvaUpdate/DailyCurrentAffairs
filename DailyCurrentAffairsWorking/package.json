@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:web": "expo export --platform web",
+    "preview": "expo export --platform web && npx serve dist"
   },
   "dependencies": {
     "@expo/image-utils": "^0.7.6",
@@ -20,11 +22,14 @@
     "expo": "53.0.22",
     "expo-audio": "~0.4.9",
     "expo-av": "^15.1.7",
+    "expo-device": "~7.1.4",
     "expo-image-picker": "^16.1.4",
+    "expo-notifications": "~0.31.4",
     "expo-speech": "^13.1.7",
     "expo-status-bar": "~2.2.3",
     "expo-video": "^2.2.2",
     "firebase": "^12.1.0",
+    "firebase-admin": "^13.5.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
@@ -32,9 +37,7 @@
     "react-native-tts": "^4.1.1",
     "react-native-vector-icons": "^10.3.0",
     "react-native-web": "^0.20.0",
-    "react-native-webview": "13.13.5",
-    "expo-notifications": "~0.31.4",
-    "expo-device": "~7.1.4"
+    "react-native-webview": "13.13.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

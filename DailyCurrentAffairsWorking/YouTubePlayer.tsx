@@ -76,40 +76,31 @@ export default function YouTubePlayer({ youtubeUrl, style, thumbnailImage }: You
   const embedUrl = createEmbedUrl(videoId);
 
   const handlePlayPress = () => {
-    console.log('🎥 Playing YouTube video in iframe:', embedUrl);
     setIsPlaying(true);
   };
 
   const handleCloseVideo = () => {
-    console.log('🎬 Closing YouTube video');
     setIsPlaying(false);
   };
 
   const handleThumbnailError = () => {
-    console.warn('🖼️ YouTube thumbnail failed for quality:', currentThumbnailQuality);
-    
     // Try lower quality thumbnails as fallback
     if (currentThumbnailQuality === 'maxres') {
-      console.log('📸 Trying high quality thumbnail...');
       setCurrentThumbnailQuality('high');
       setThumbnailError(false);
     } else if (currentThumbnailQuality === 'high') {
-      console.log('📸 Trying medium quality thumbnail...');
       setCurrentThumbnailQuality('medium');
       setThumbnailError(false);
     } else if (currentThumbnailQuality === 'medium') {
-      console.log('📸 Trying default quality thumbnail...');
       setCurrentThumbnailQuality('default');
       setThumbnailError(false);
     } else {
       // All YouTube thumbnails failed, show error state
-      console.error('❌ All YouTube thumbnail qualities failed for video:', videoId);
       setThumbnailError(true);
     }
   };
 
   const handleThumbnailLoad = () => {
-    console.log('✅ YouTube thumbnail loaded successfully');
     setThumbnailLoaded(true);
     setThumbnailError(false);
   };

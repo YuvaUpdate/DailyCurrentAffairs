@@ -128,7 +128,7 @@ export class LocalNewsService {
         id: 1,
         headline: "Welcome to YuvaUpdate!",
         description: "Stay updated with the latest news and current affairs. This is your personalized news feed where you can read, save, and share articles that matter to you.",
-        image: "https://via.placeholder.com/400x300/667eea/ffffff?text=Welcome",
+        image: "https://picsum.photos/400/300?random=18",
         category: "General",
         readTime: "2 min read",
         timestamp: new Date().toLocaleDateString()
@@ -137,7 +137,7 @@ export class LocalNewsService {
         id: 2,
         headline: "How to Use YuvaUpdate",
         description: "Swipe up and down to browse articles. Use the menu (☰) to filter by categories or view your saved articles. Tap the floating buttons to save, share, or listen to articles.",
-        image: "https://via.placeholder.com/400x300/4ade80/ffffff?text=Tutorial",
+        image: "https://picsum.photos/400/300?random=19",
         category: "Tutorial",
         readTime: "3 min read",
         timestamp: new Date().toLocaleDateString()
@@ -146,7 +146,7 @@ export class LocalNewsService {
         id: 3,
         headline: "Admin Panel Available",
         description: "Content creators can access the admin panel by tapping the 🔒 Admin button. Use password 'admin123' to add new articles and manage content.",
-        image: "https://via.placeholder.com/400x300/f59e0b/ffffff?text=Admin",
+        image: "https://picsum.photos/400/300?random=20",
         category: "Info",
         readTime: "1 min read",
         timestamp: new Date().toLocaleDateString()

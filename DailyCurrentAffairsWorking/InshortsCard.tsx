@@ -110,7 +110,7 @@ export default function InshortsCard({ article, onPress, onBookmark, isBookmarke
     <FastTouchable activeOpacity={0.95} onPress={() => onPress?.(article)} style={styles.card}>
       <View style={styles.imageWrap}>
         <OptimizedImage
-          source={{ uri: article.image || article.imageUrl || 'https://via.placeholder.com/800x600' }}
+          source={{ uri: article.image || article.imageUrl || 'https://picsum.photos/800/600?random=2' }}
           style={[styles.image, { height: imageHeight }]}
           resizeMode="cover"
         />

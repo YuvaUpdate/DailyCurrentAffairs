@@ -3,10 +3,11 @@
  * Sends proper notifications that appear in notification tray
  */
 export class NotificationSender {
-  private static readonly FUNCTION_URL = 'https://us-central1-soullink-96d4b.cloudfunctions.net/sendNotificationToTopic';
+  private static readonly FUNCTION_URL = 'https://us-central1-yuvaupdate-3762b.cloudfunctions.net/sendNotificationToTopic';
   
   // Track sent notifications to prevent duplicates
   private static sentNotifications = new Set<string>();
+  private static callCounter = 0; // Add call counter
 
   /**
    * Send notification to all users via Firebase Cloud Function
@@ -18,7 +19,9 @@ export class NotificationSender {
     data?: any;
   }): Promise<boolean> {
     try {
-      console.log('📤 Sending notification to all users:', notification);
+      this.callCounter++;
+      const uniqueId = Math.random().toString(36).substr(2, 9);
+      console.log(`📤 [Call #${this.callCounter}] [${uniqueId}] Sending notification to all users:`, notification);
 
       const payload = {
         topic: 'news-updates',
@@ -26,10 +29,13 @@ export class NotificationSender {
           title: notification.title,
           body: notification.body,
         },
-        data: notification.data || {},
+        data: {
+          ...notification.data || {},
+          clientRequestId: uniqueId // Add unique ID to track duplicates
+        },
       };
 
-      console.log('📤 Notification payload:', payload);
+      console.log(`📤 [${uniqueId}] Notification payload:`, payload);
 
       const response = await fetch(this.FUNCTION_URL, {
         method: 'POST',
@@ -41,11 +47,11 @@ export class NotificationSender {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Notification sent successfully:', result.messageId);
+        console.log(`✅ [${uniqueId}] Notification sent successfully:`, result.messageId);
         return true;
       } else {
         const errorText = await response.text();
-        console.error('❌ Failed to send notification:', response.status, response.statusText, errorText);
+        console.error(`❌ [${uniqueId}] Failed to send notification:`, response.status, response.statusText, errorText);
         return false;
       }
     } catch (error) {
