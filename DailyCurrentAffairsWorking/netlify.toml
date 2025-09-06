@@ -1,9 +1,10 @@
 [build]
-  command = "npm run build:web"
+  command = "npm ci && npm run build:web"
   publish = "dist"
-
+  
 [build.environment]
   NODE_VERSION = "18"
+  NPM_FLAGS = "--prefix=."
 
 [[redirects]]
   from = "/*"
