@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import line clamp utilities */
+@import url('./components/ui/line-clamp.css');
+
+/* YuvaUpdate Professional Design System - Clean, modern, content-focused */
+
+@layer base {
+  :root {
+    /* Professional color palette */
+    --background: 0 0% 99%;
+    --foreground: 216 19% 16%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 216 19% 16%;
+    --card-border: 220 13% 91%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 19% 16%;
+
+    /* Professional blue primary */
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 221 83% 48%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 216 19% 16%;
+
+    --muted: 220 13% 95%;
+    --muted-foreground: 215 13% 65%;
+
+    --accent: 220 14% 96%;
+    --accent-foreground: 216 19% 16%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 221 83% 53%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Performance and UX tokens */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1);
+    
+    /* Animation tokens */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Layout tokens */
+    --header-height: 4rem;
+    --sidebar-width: 16rem;
+    --sidebar-collapsed: 4rem;
+    --content-max-width: 42rem;
+  }
+
+  .dark {
+    --background: 216 19% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 216 19% 12%;
+    --card-foreground: 0 0% 98%;
+    --card-border: 216 19% 20%;
+
+    --popover: 216 19% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 221 83% 48%;
+
+    --secondary: 216 19% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 216 19% 16%;
+    --muted-foreground: 215 13% 65%;
+
+    --accent: 216 19% 18%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 216 19% 20%;
+    --input: 216 19% 20%;
+    --ring: 221 83% 53%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Smooth scrolling for the app */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar for webkit browsers */
+  ::-webkit-scrollbar {
+    @apply w-1;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer components {
+  /* Article card animations */
+  .article-card {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+  
+  .article-card-skeleton {
+    @apply animate-pulse;
+  }
+  
+  /* Loading animations */
+  .loading-spinner {
+    @apply animate-spin;
+  }
+  
+  /* Smooth transitions for interactive elements */
+  .interactive {
+    @apply transition-colors duration-200;
+  }
+}
