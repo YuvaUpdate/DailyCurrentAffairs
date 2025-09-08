@@ -100,36 +100,35 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
           {article.title}
         </h2>
 
-        {/* Description - Optimized font size and spacing */}
-        <div className="bg-muted rounded-xl px-3 py-2 text-black dark:text-muted-foreground mb-3 break-words leading-relaxed text-sm overflow-hidden flex-1">
-          <div className="h-full flex items-start">
-            <div className="w-full">
+        {/* Description - Optimized font size and spacing with integrated button */}
+        <div className="bg-muted rounded-xl px-3 py-2 text-black dark:text-muted-foreground mb-3 break-words leading-relaxed text-sm overflow-hidden flex-shrink-0 max-h-96">
+          <div className="h-full flex flex-col">
+            <div className="w-full flex-1">
               {(() => {
                 const words = article.summary.split(' ');
-                // More generous word count to fill available space
+                // Minimum 100 words for better content display
                 const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
-                const maxWords = screenWidth < 640 ? 80 : screenWidth < 1024 ? 120 : 150;
-                if (words.length > maxWords) {
-                  return words.slice(0, maxWords).join(' ') + '...';
-                }
-                return article.summary;
+                const maxWords = screenWidth < 640 ? 100 : screenWidth < 1024 ? 120 : 150;
+                const text = words.length > maxWords ? words.slice(0, maxWords).join(' ') + '...' : article.summary;
+                
+                return (
+                  <span>
+                    {text}{' '}
+                    <a
+                      href={article.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center ml-2 px-2 py-1 text-xs font-semibold bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors duration-200 rounded-md"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      Read more <span className="ml-1">→</span>
+                    </a>
+                  </span>
+                );
               })()}
             </div>
           </div>
         </div>
-        </div>
-
-        {/* Bottom section - Button area with proper constraints */}
-        <div className="flex-shrink-0 mt-auto pt-6 pb-8 pl-4 pr-8">
-          <a
-            href={article.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full max-w-48 ml-0 rounded-xl font-semibold bg-primary/10 text-primary border border-primary hover:bg-primary/20 transition-colors duration-200 text-center py-3 px-4 text-sm"
-            onClick={e => e.stopPropagation()}
-          >
-            Tap to know more <span className="ml-2">→</span>
-          </a>
         </div>
       </div>
     </div>
