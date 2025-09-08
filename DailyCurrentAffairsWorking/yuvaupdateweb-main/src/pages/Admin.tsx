@@ -3,9 +3,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { firebaseNewsService } from "../services/FirebaseNewsService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, X, Play, Image as ImageIcon } from "lucide-react";
 import { NotificationSender } from "../services/NotificationSender";
 import { TestNotificationService } from "../services/TestNotificationService";
+import { webFileUploadService, UploadResult } from "../services/WebFileUploadService";
 
 const HEADLINE_MAX = 200;
 const DESCRIPTION_WORD_MAX = 80;
@@ -25,7 +26,9 @@ export default function AdminPanel() {
   const [imageUrl, setImageUrl] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [mediaSource, setMediaSource] = useState<'url' | 'upload'>("url");
-  const [uploadedMedia, setUploadedMedia] = useState<any>(null); // Stub for upload result
+  const [uploadedMedia, setUploadedMedia] = useState<UploadResult | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [readTime, setReadTime] = useState("");
   const [source, setSource] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -120,6 +123,7 @@ export default function AdminPanel() {
     setSourceUrl("");
     setEditingArticle(null);
     setUploadedMedia(null);
+    setSelectedFile(null);
     setMediaSource("url");
   }
 
@@ -253,7 +257,13 @@ export default function AdminPanel() {
       setUploadedMedia(null);
     } else if (article.mediaPath && article.image) {
       setMediaSource('upload');
-      setUploadedMedia({ url: article.image, path: article.mediaPath, type: article.mediaType });
+      setUploadedMedia({ 
+        url: article.image, 
+        path: article.mediaPath, 
+        type: article.mediaType || 'image',
+        name: 'Existing media',
+        size: 0
+      });
     } else {
       setMediaSource('url');
       setUploadedMedia(null);
@@ -273,6 +283,69 @@ export default function AdminPanel() {
     } catch {
       alert("Failed to delete article.");
     }
+  }
+
+  // File Upload Functions
+  async function handleFileSelect() {
+    try {
+      const file = await webFileUploadService.showFilePicker('both');
+      if (file) {
+        setSelectedFile(file);
+        setMediaSource('upload');
+        console.log('File selected:', file.name, file.type, webFileUploadService.formatFileSize(file.size));
+      }
+    } catch (error) {
+      console.error('File selection error:', error);
+      alert('Failed to select file');
+    }
+  }
+
+  async function handleFileUpload() {
+    if (!selectedFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const uploadResult = await webFileUploadService.uploadFile(selectedFile, category || 'general');
+      setUploadedMedia(uploadResult);
+      setImageUrl(uploadResult.url); // Set the image URL to the uploaded file URL
+      setSelectedFile(null);
+      alert(`${uploadResult.type} uploaded successfully!`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  function handleRemoveUploadedMedia() {
+    if (window.confirm('Are you sure you want to remove the uploaded media?')) {
+      setUploadedMedia(null);
+      setSelectedFile(null);
+      setImageUrl('');
+      setMediaSource('url');
+    }
+  }
+
+  function handleCancelFileSelection() {
+    setSelectedFile(null);
+    setMediaSource('url');
+  }
+
+  // YouTube Helper Functions
+  function getYouTubeVideoId(url: string): string | null {
+    return webFileUploadService.extractYouTubeVideoId(url);
+  }
+
+  function getYouTubeEmbedUrl(videoId: string): string {
+    return webFileUploadService.getYouTubeEmbedUrl(videoId);
+  }
+
+  function getYouTubeThumbnail(videoId: string): string {
+    return webFileUploadService.getYouTubeThumbnailUrl(videoId, 'high');
   }
 
   async function handleAddCategory(e: React.FormEvent) {
@@ -474,25 +547,165 @@ export default function AdminPanel() {
               </select>
             </div>
             <div>
-              <label className="block font-semibold mb-1">Image URL</label>
-              <Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://..." disabled={mediaSource === 'upload'} />
-              <div className="flex gap-2 mt-2">
+              <label className="block font-semibold mb-1">Media</label>
+              <div className="flex gap-2 mb-2">
                 <label className="inline-flex items-center">
                   <input type="radio" checked={mediaSource === 'url'} onChange={() => setMediaSource('url')} />
                   <span className="ml-1">Use URL</span>
                 </label>
                 <label className="inline-flex items-center">
                   <input type="radio" checked={mediaSource === 'upload'} onChange={() => setMediaSource('upload')} />
-                  <span className="ml-1">Upload (not implemented)</span>
+                  <span className="ml-1">Upload File</span>
                 </label>
               </div>
+              
+              {mediaSource === 'url' && (
+                <Input 
+                  value={imageUrl} 
+                  onChange={e => setImageUrl(e.target.value)} 
+                  placeholder="https://example.com/image.jpg" 
+                />
+              )}
+              
               {mediaSource === 'upload' && (
-                <div className="mt-2 text-xs text-muted-foreground">File upload is not implemented in the web version yet.</div>
+                <div className="space-y-3">
+                  {!selectedFile && !uploadedMedia && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleFileSelect}
+                      className="w-full"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Select Image or Video
+                    </Button>
+                  )}
+                  
+                  {selectedFile && !uploadedMedia && (
+                    <div className="border rounded p-3 bg-muted">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">Selected File:</span>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={handleCancelFileSelection}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <div>Name: {selectedFile.name}</div>
+                        <div>Size: {webFileUploadService.formatFileSize(selectedFile.size)}</div>
+                        <div>Type: {selectedFile.type}</div>
+                      </div>
+                      {selectedFile.type.startsWith('image/') && (
+                        <img 
+                          src={webFileUploadService.getFilePreviewURL(selectedFile)} 
+                          alt="Preview" 
+                          className="w-full max-h-32 object-cover rounded mt-2" 
+                        />
+                      )}
+                      <Button 
+                        type="button" 
+                        onClick={handleFileUpload} 
+                        disabled={isUploading}
+                        className="w-full mt-2"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload File
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {uploadedMedia && (
+                    <div className="border rounded p-3 bg-green-50 dark:bg-green-900/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                          {uploadedMedia.type === 'image' ? <ImageIcon className="w-4 h-4 inline mr-1" /> : <Play className="w-4 h-4 inline mr-1" />}
+                          Uploaded Successfully
+                        </span>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={handleRemoveUploadedMedia}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <div>Name: {uploadedMedia.name}</div>
+                        <div>Size: {webFileUploadService.formatFileSize(uploadedMedia.size)}</div>
+                        <div>Type: {uploadedMedia.type}</div>
+                      </div>
+                      {uploadedMedia.type === 'image' && (
+                        <img 
+                          src={uploadedMedia.url} 
+                          alt="Uploaded" 
+                          className="w-full max-h-32 object-cover rounded mt-2" 
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             <div>
-              <label className="block font-semibold mb-1">YouTube URL</label>
-              <Input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." />
+              <label className="block font-semibold mb-1">YouTube URL (Optional)</label>
+              <Input 
+                value={youtubeUrl} 
+                onChange={e => setYoutubeUrl(e.target.value)} 
+                placeholder="https://youtube.com/watch?v=..." 
+              />
+              {youtubeUrl && (
+                <div className="mt-2">
+                  {(() => {
+                    const videoId = getYouTubeVideoId(youtubeUrl);
+                    if (videoId) {
+                      return (
+                        <div className="border rounded p-3 bg-blue-50 dark:bg-blue-900/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Play className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                              YouTube Video Detected
+                            </span>
+                          </div>
+                          <div className="aspect-video max-w-xs">
+                            <iframe
+                              src={getYouTubeEmbedUrl(videoId)}
+                              className="w-full h-full rounded"
+                              allowFullScreen
+                              title="YouTube video preview"
+                            />
+                          </div>
+                          <div className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                            Video ID: {videoId}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            📺 YouTube video will be embedded. The image above will be used as a custom thumbnail instead of the auto-generated YouTube thumbnail.
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="text-sm text-red-600 dark:text-red-400">
+                          Invalid YouTube URL. Please use a valid YouTube link.
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              )}
             </div>
             <div>
               <label className="block font-semibold mb-1">Read Time</label>
@@ -532,19 +745,72 @@ export default function AdminPanel() {
           {/* Live Preview */}
           <div className="bg-card border rounded p-2 sm:p-4 flex flex-col gap-2 w-full max-w-full overflow-x-auto">
             <div className="font-bold text-lg mb-1">{headline || <span className="text-muted-foreground">Headline preview</span>}</div>
-            {imageUrl && mediaSource === 'url' && (
-              <img src={imageUrl} alt="Preview" className="w-full max-h-48 object-cover rounded mb-2" />
-            )}
-            {youtubeUrl && (
-              <div className="aspect-video mb-2">
-                <iframe
-                  src={youtubeUrl.replace('watch?v=', 'embed/')}
-                  title="YouTube preview"
-                  className="w-full h-full rounded"
-                  allowFullScreen
-                />
+            
+            {/* Media Preview */}
+            {youtubeUrl && (() => {
+              const videoId = getYouTubeVideoId(youtubeUrl);
+              if (videoId) {
+                // Show custom image as YouTube thumbnail if available
+                const thumbnailUrl = uploadedMedia?.url || imageUrl;
+                if (thumbnailUrl) {
+                  return (
+                    <div className="mb-2">
+                      <div className="relative aspect-video max-w-md">
+                        <img 
+                          src={thumbnailUrl} 
+                          alt="Custom YouTube Thumbnail" 
+                          className="w-full h-full object-cover rounded"
+                        />
+                        {/* Play button overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                          <div className="bg-red-600 rounded-full p-3">
+                            <Play className="w-6 h-6 text-white fill-white" />
+                          </div>
+                        </div>
+                        {/* Video indicator */}
+                        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                          <Play className="w-3 h-3 fill-white" />
+                          Video
+                        </div>
+                      </div>
+                      <div className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                        📺 Custom thumbnail for YouTube video (ID: {videoId})
+                      </div>
+                    </div>
+                  );
+                } else {
+                  // Show embedded player if no custom image
+                  return (
+                    <div className="aspect-video mb-2">
+                      <iframe
+                        src={getYouTubeEmbedUrl(videoId)}
+                        title="YouTube preview"
+                        className="w-full h-full rounded"
+                        allowFullScreen
+                      />
+                    </div>
+                  );
+                }
+              }
+              return null;
+            })()}
+            
+            {!youtubeUrl && uploadedMedia && (
+              <div className="mb-2">
+                {uploadedMedia.type === 'image' ? (
+                  <img src={uploadedMedia.url} alt="Preview" className="w-full max-h-48 object-cover rounded" />
+                ) : (
+                  <video src={uploadedMedia.url} controls className="w-full max-h-48 rounded">
+                    Your browser does not support the video tag.
+                  </video>
+                )}
               </div>
             )}
+            
+            {!youtubeUrl && !uploadedMedia && imageUrl && mediaSource === 'url' && (
+              <img src={imageUrl} alt="Preview" className="w-full max-h-48 object-cover rounded mb-2" />
+            )}
+            
             <div className="text-muted-foreground mb-1">{description || <span className="text-muted-foreground">Description preview</span>}</div>
             <div className="text-xs text-muted-foreground mb-1">{category || 'Category'} | {readTime || 'Read time'}</div>
             <div className="text-xs text-muted-foreground">{source || 'Source'} | {sourceUrl ? <a href={sourceUrl} className="underline" target="_blank" rel="noopener noreferrer">Link</a> : 'External Link'}</div>

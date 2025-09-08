@@ -8,6 +8,7 @@ import { WebViewModal } from "./WebViewModal";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { imagePreloadService } from "@/services/ImagePreloadService";
 
 
 const ARTICLES_PER_PAGE = 5;
@@ -42,16 +43,28 @@ export function NewsFeed() {
             title: data.headline || data.title || "",
             summary: data.description || data.summary || "",
             imageUrl: data.image || data.imageUrl || "",
+            youtubeUrl: data.youtubeUrl || "",
             source: data.source || "",
             sourceUrl: data.sourceUrl || data.source_url || data.link || "",
             publishedAt: data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date()),
             category: data.category,
             readTime: data.readTime || data.read_time || "",
             tags: data.tags || [],
+            mediaType: data.mediaType || 'image',
+            mediaPath: data.mediaPath || "",
           };
         });
         setArticles(fetchedArticles);
         setHasMore(snapshot.docs.length === ARTICLES_PER_PAGE);
+        
+        // Preload images for first few articles for faster loading
+        if (fetchedArticles.length > 0) {
+          imagePreloadService.preloadCriticalImages(
+            fetchedArticles.slice(0, 3).map(article => article.imageUrl).filter(Boolean)
+          );
+          imagePreloadService.preloadArticleImages(fetchedArticles, 0, 5);
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error("Error loading articles:", error);
@@ -86,16 +99,24 @@ export function NewsFeed() {
           title: data.headline || data.title || "",
           summary: data.description || data.summary || "",
           imageUrl: data.image || data.imageUrl || "",
+          youtubeUrl: data.youtubeUrl || "",
           source: data.source || "",
           sourceUrl: data.sourceUrl || data.source_url || data.link || "",
           publishedAt: data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date()),
           category: data.category,
           readTime: data.readTime || data.read_time || "",
           tags: data.tags || [],
+          mediaType: data.mediaType || 'image',
+          mediaPath: data.mediaPath || "",
         };
       });
       setArticles(prev => [...prev, ...newArticles]);
       setHasMore(snapshot.docs.length === ARTICLES_PER_PAGE);
+      
+      // Preload images for newly loaded articles
+      if (newArticles.length > 0) {
+        imagePreloadService.preloadArticleImages(newArticles, 0, 3);
+      }
     } catch (error) {
       console.error("Error loading more articles:", error);
       toast({
@@ -119,6 +140,11 @@ export function NewsFeed() {
       const newIndex = Math.round(scrollTop / windowHeight);
       
       setCurrentIndex(newIndex);
+      
+      // Preload images for upcoming articles as user scrolls
+      if (newIndex !== currentIndex) {
+        imagePreloadService.preloadArticleImages(articles, newIndex, 3);
+      }
       
       // Load more when approaching end
       if (newIndex >= articles.length - 3 && hasMore && !loadingMore) {
@@ -167,16 +193,24 @@ export function NewsFeed() {
           title: data.headline || data.title || "",
           summary: data.description || data.summary || "",
           imageUrl: data.image || data.imageUrl || "",
+          youtubeUrl: data.youtubeUrl || "",
           source: data.source || "",
           sourceUrl: data.sourceUrl || data.source_url || data.link || "",
           publishedAt: data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date()),
           category: data.category,
           readTime: data.readTime || data.read_time || "",
           tags: data.tags || [],
+          mediaType: data.mediaType || 'image',
+          mediaPath: data.mediaPath || "",
         };
       });
   setArticles(refreshedArticles);
   setHasMore(snapshot.docs.length === ARTICLES_PER_PAGE);
+  
+  // Preload images for refreshed articles while preserving user position
+  if (refreshedArticles.length > 0) {
+    imagePreloadService.preloadArticleImages(refreshedArticles, currentScrollIndex, 3);
+  }
   
   // Restore scroll position after refresh (auto-refresh should not change user's position)
   setTimeout(() => {

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Calendar, ExternalLink, Clock } from "lucide-react";
+import { Calendar, ExternalLink, Clock, Play, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArticleCard as ArticleType } from "@/types/article";
 import { formatDistanceToNow } from "date-fns";
 import { ArticleActions } from "@/components/ArticleActions";
+import { YouTubeEmbed, YouTubeThumbnail, extractYouTubeVideoId } from "@/components/ui/YouTubeEmbed";
 import "@/styles/article-layout.css";
 
 interface ArticleCardProps {
@@ -17,6 +18,7 @@ interface ArticleCardProps {
 export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false }: ArticleCardProps) {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
 
   const handleImageLoad = () => setImageLoading(false);
   const handleImageError = () => {
@@ -26,11 +28,27 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
 
   const timeAgo = formatDistanceToNow(article.publishedAt, { addSuffix: true });
 
+  // Extract YouTube video ID if article has YouTube URL
+  const youtubeVideoId = article.youtubeUrl ? extractYouTubeVideoId(article.youtubeUrl) : null;
+  const isYouTubeVideo = article.mediaType === 'youtube' && youtubeVideoId;
+
   // Handler for clicking anywhere on the card
   const handleCardClick = (e: React.MouseEvent) => {
     // Prevent link/button inside from triggering twice
-    if ((e.target as HTMLElement).closest('a,button')) return;
+    if ((e.target as HTMLElement).closest('a,button,iframe,.youtube-embed-container')) return;
     window.open(article.sourceUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleVideoThumbnailClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowVideoPlayer(true);
+  };
+
+  const handleCloseVideo = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowVideoPlayer(false);
   };
 
   return (
@@ -38,26 +56,79 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
       className="w-full h-screen flex flex-col snap-start snap-always bg-background border-b border-border cursor-pointer hover:bg-primary/5 transition-colors duration-200 overflow-hidden max-h-screen"
       onClick={handleCardClick}
     >
-      {/* Sticky Header with Image - Reduced height for more content space */}
+      {/* Sticky Header with Media - Reduced height for more content space */}
       <div className="relative w-full flex-shrink-0 overflow-hidden bg-muted sticky top-0 z-30" style={{ height: 'clamp(140px, 20vh, 180px)' }}>
-        {imageLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-muted">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        )}
-        {!imageError ? (
+        {/* YouTube Video Display */}
+        {isYouTubeVideo && youtubeVideoId ? (
+          showVideoPlayer ? (
+            <div 
+              className="youtube-embed-container w-full h-full relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <YouTubeEmbed 
+                videoId={youtubeVideoId}
+                title={article.title}
+                className="w-full h-full"
+                controls={true}
+                autoplay={false}
+                modestbranding={true}
+              />
+              {/* Close video button */}
+              <button
+                onClick={handleCloseVideo}
+                className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1 z-50 transition-colors"
+                title="Close video"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div 
+              className="relative w-full h-full cursor-pointer group"
+              onClick={handleVideoThumbnailClick}
+            >
+              {/* Use optimized article's image as YouTube thumbnail */}
+              <img
+                src={article.imageUrl}
+                alt={article.title}
+                className="w-full h-full object-cover"
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                loading={isActive ? "eager" : "lazy"}
+              />
+              
+              {/* Fallback to YouTube thumbnail if article image fails */}
+              {imageError && youtubeVideoId && (
+                <img
+                  src={`https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg`}
+                  alt={article.title}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              )}
+              
+              {/* Play button overlay for YouTube videos */}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-colors">
+                <div className="bg-red-600 rounded-full p-4 group-hover:scale-110 transition-transform shadow-lg">
+                  <Play className="w-8 h-8 text-white fill-white" />
+                </div>
+              </div>
+              {/* Video indicator */}
+              <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                <Play className="w-3 h-3 fill-white" />
+                Video
+              </div>
+            </div>
+          )
+        ) : (
+          /* Regular Image Display */
           <img
             src={article.imageUrl}
             alt={article.title}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoading ? "opacity-0" : "opacity-100"}`}
+            className="w-full h-full object-cover"
             onLoad={handleImageLoad}
             onError={handleImageError}
-            loading="lazy"
+            loading={isActive ? "eager" : "lazy"}
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-muted">
-            <span className="text-muted-foreground">Image unavailable</span>
-          </div>
         )}
         
         {/* Category badge */}
@@ -67,7 +138,15 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
           </span>
         )}
         
-        {/* Read Aloud and Share Actions - Moved higher up on the image */}
+        {/* YouTube indicator badge */}
+        {isYouTubeVideo && (
+          <span className="absolute top-3 right-3 bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 z-10">
+            <Play className="w-3 h-3 fill-white" />
+            Video
+          </span>
+        )}
+        
+        {/* Read Aloud and Share Actions - Moved higher up on the media */}
         <div className="absolute top-8 right-3 z-20" onClick={(e) => e.stopPropagation()}>
           <ArticleActions
             article={{
