@@ -278,7 +278,8 @@ export default function App(props: AppProps) {
         const articleId = resp.notification.request.content.data?.articleId as string | undefined;
         if (articleId) {
           console.log('🔔 Notification tapped (Expo) articleId=', articleId);
-          // TODO: integrate navigation to article (needs nav infra)
+          // Navigate to the specific article
+          navigateToArticle(articleId);
         }
       } catch(err) { console.warn('Notification response error', err); }
     });
@@ -701,6 +702,83 @@ export default function App(props: AppProps) {
     }
     setRefreshing(false);
   }, [applyFilter, selectedCategory]);
+
+  // Navigate to specific article by ID (used when notification is tapped)
+  const navigateToArticle = (articleId: string | number) => {
+    try {
+      console.log('📍 Attempting to navigate to article ID:', articleId);
+      
+      // Ensure we have articles loaded
+      if (!filteredNews || filteredNews.length === 0) {
+        console.warn('⚠️ No articles loaded yet, cannot navigate');
+        return;
+      }
+
+      // Find the article index in the current filtered news array
+      const articleIndex = filteredNews.findIndex(article => article.id.toString() === articleId.toString());
+      
+      if (articleIndex !== -1) {
+        console.log('📍 Found article at index:', articleIndex, 'in filtered list');
+        
+        // Update the current index
+        setCurrentIndex(articleIndex);
+        
+        // Scroll to the article with a small delay to ensure the state is updated
+        setTimeout(() => {
+          if (scrollViewRef.current && filteredNews.length > articleIndex) {
+            try {
+              scrollViewRef.current.scrollToIndex({ 
+                index: articleIndex, 
+                animated: true,
+                viewPosition: 0.5 // Center the article on screen
+              });
+              console.log('✅ Successfully scrolled to article');
+            } catch (scrollError) {
+              console.warn('⚠️ ScrollToIndex failed, using offset fallback:', scrollError);
+              // Fallback to offset-based scrolling
+              const offset = articleIndex * (screenData.height - headerHeight);
+              scrollViewRef.current.scrollToOffset({ offset, animated: true });
+            }
+          }
+        }, 150);
+        
+      } else {
+        console.warn('⚠️ Article not found in current filtered list, searching in all articles');
+        // If article is not in the current filtered list, reset filter and try again
+        setSelectedCategory(null); // Clear category filter
+        
+        // Wait for filter to reset and try again with all articles
+        setTimeout(() => {
+          const allArticlesIndex = newsData.findIndex(article => article.id.toString() === articleId.toString());
+          if (allArticlesIndex !== -1) {
+            console.log('📍 Found article at index:', allArticlesIndex, 'in all articles');
+            setCurrentIndex(allArticlesIndex);
+            
+            setTimeout(() => {
+              if (scrollViewRef.current && newsData.length > allArticlesIndex) {
+                try {
+                  scrollViewRef.current.scrollToIndex({ 
+                    index: allArticlesIndex, 
+                    animated: true,
+                    viewPosition: 0.5
+                  });
+                  console.log('✅ Successfully scrolled to article in all articles');
+                } catch (scrollError) {
+                  console.warn('⚠️ ScrollToIndex failed for all articles, using offset:', scrollError);
+                  const offset = allArticlesIndex * (screenData.height - headerHeight);
+                  scrollViewRef.current.scrollToOffset({ offset, animated: true });
+                }
+              }
+            }, 100);
+          } else {
+            console.error('❌ Article not found in any list:', articleId);
+          }
+        }, 400); // Give time for filter to reset
+      }
+    } catch (error) {
+      console.error('❌ Error navigating to article:', error);
+    }
+  };
 
   // Admin authentication - Check if current user is admin using Firebase profile
   const checkAdminAccess = (): boolean => {
@@ -1526,6 +1604,15 @@ export default function App(props: AppProps) {
         }
         onScroll={handleScroll}
         onMomentumScrollEnd={handleMomentumScrollEnd}
+        onScrollToIndexFailed={(info) => {
+          // Handle scroll to index failure gracefully
+          console.warn('📱 ScrollToIndex failed:', info);
+          // Fallback: scroll to offset instead
+          if (scrollViewRef.current) {
+            const offset = info.index * (screenData.height - headerHeight);
+            scrollViewRef.current.scrollToOffset({ offset, animated: true });
+          }
+        }}
         ListEmptyComponent={
           isLoadingArticles ? (
             <>

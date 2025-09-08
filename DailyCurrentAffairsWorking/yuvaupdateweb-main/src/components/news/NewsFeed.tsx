@@ -149,6 +149,11 @@ export function NewsFeed() {
   const handleRefresh = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Store current scroll position before refresh
+      const currentScrollTop = containerRef.current?.scrollTop || 0;
+      const currentScrollIndex = currentIndex;
+      
       const q = query(
         collection(db, COLLECTION_NAME),
         orderBy("timestamp", "desc"),
@@ -172,13 +177,21 @@ export function NewsFeed() {
       });
   setArticles(refreshedArticles);
   setHasMore(snapshot.docs.length === ARTICLES_PER_PAGE);
-  // Do not reset currentIndex or scroll position on auto-refresh
+  
+  // Restore scroll position after refresh (auto-refresh should not change user's position)
+  setTimeout(() => {
+    if (containerRef.current && currentScrollTop > 0) {
+      containerRef.current.scrollTop = currentScrollTop;
+      setCurrentIndex(currentScrollIndex);
+    }
+  }, 50); // Small delay to allow DOM to update
+  
     } catch (error) {
       console.error("Error refreshing:", error);
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, currentIndex]);
 
   // Auto-refresh every 5 seconds (fetch latest articles)
   useEffect(() => {
