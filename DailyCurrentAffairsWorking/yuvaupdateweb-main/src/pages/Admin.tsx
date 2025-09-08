@@ -214,7 +214,7 @@ export default function AdminPanel() {
               const stats = NotificationSender.getNotificationStats();
               setNotificationStats(stats);
               
-              console.log('✅ Notification sent for new article:', payload.headline);
+              console.log('Notification sent for new article:', payload.headline);
             } finally {
               setIsNotificationSending(false);
             }
@@ -318,16 +318,16 @@ export default function AdminPanel() {
       const success = await TestNotificationService.sendTestNotification();
       
       if (success) {
-        alert("✅ Test notification sent successfully! Check mobile devices for the notification.");
+        alert("Test notification sent successfully! Check mobile devices for the notification.");
         // Update notification stats
         const stats = NotificationSender.getNotificationStats();
         setNotificationStats(stats);
       } else {
-        alert("❌ Test notification failed. Check console for details.");
+        alert("Test notification failed. Check console for details.");
       }
     } catch (error) {
       console.error('Test notification error:', error);
-      alert("❌ Test notification failed with error. Check console for details.");
+      alert("Test notification failed with error. Check console for details.");
     } finally {
       setIsNotificationSending(false);
     }
@@ -348,18 +348,18 @@ export default function AdminPanel() {
       );
       
       if (success) {
-        alert("✅ Custom notification sent successfully!");
+        alert("Custom notification sent successfully!");
         setCustomNotificationTitle("");
         setCustomNotificationBody("");
         // Update notification stats
         const stats = NotificationSender.getNotificationStats();
         setNotificationStats(stats);
       } else {
-        alert("❌ Custom notification failed. Check console for details.");
+        alert("Custom notification failed. Check console for details.");
       }
     } catch (error) {
       console.error('Custom notification error:', error);
-      alert("❌ Custom notification failed with error. Check console for details.");
+      alert("Custom notification failed with error. Check console for details.");
     } finally {
       setIsNotificationSending(false);
     }
@@ -376,16 +376,16 @@ export default function AdminPanel() {
       const success = await TestNotificationService.sendBreakingNewsNotification(headline);
       
       if (success) {
-        alert("🚨 Breaking news notification sent successfully!");
+        alert("Breaking news notification sent successfully!");
         // Update notification stats
         const stats = NotificationSender.getNotificationStats();
         setNotificationStats(stats);
       } else {
-        alert("❌ Breaking news notification failed. Check console for details.");
+        alert("Breaking news notification failed. Check console for details.");
       }
     } catch (error) {
       console.error('Breaking news notification error:', error);
-      alert("❌ Breaking news notification failed with error. Check console for details.");
+      alert("Breaking news notification failed with error. Check console for details.");
     } finally {
       setIsNotificationSending(false);
     }
@@ -400,15 +400,15 @@ export default function AdminPanel() {
       setNotificationStats(status.stats);
       
       if (status.status === 'working') {
-        alert(`✅ Notification System Status: ${status.message}\n\nStats:\n- Total sent: ${status.stats.totalSent || 0}\n- Recent: ${status.stats.recentNotifications || 0}`);
+        alert(`Notification System Status: ${status.message}\n\nStats:\n- Total sent: ${status.stats.totalSent || 0}\n- Recent: ${status.stats.recentNotifications || 0}`);
       } else {
-        alert(`❌ Notification System Status: ${status.message}\n\nCheck console for detailed error information.`);
+        alert(`Notification System Status: ${status.message}\n\nCheck console for detailed error information.`);
       }
       
-      console.log('🔍 Notification system status:', status);
+      console.log('Notification system status:', status);
     } catch (error) {
       console.error('Status check error:', error);
-      alert("❌ Failed to check notification system status. Check console for details.");
+      alert("Failed to check notification system status. Check console for details.");
     } finally {
       setIsNotificationSending(false);
     }
@@ -418,10 +418,10 @@ export default function AdminPanel() {
     try {
       TestNotificationService.clearNotificationCache();
       setNotificationStats({ totalSent: 0, recentNotifications: 0 });
-      alert("🧹 Notification cache cleared successfully!");
+      alert("Notification cache cleared successfully!");
     } catch (error) {
       console.error('Cache clear error:', error);
-      alert("❌ Failed to clear notification cache.");
+      alert("Failed to clear notification cache.");
     }
   }
 
@@ -452,7 +452,7 @@ export default function AdminPanel() {
         <div><div className="font-bold text-lg">{analytics.comments}</div><div className="text-xs text-muted-foreground">Comments</div></div>
         <div><div className="font-bold text-lg">{analytics.uploads}</div><div className="text-xs text-muted-foreground">Uploads</div></div>
         <div><div className="font-bold text-lg">{notificationStats.totalSent}</div><div className="text-xs text-muted-foreground">Notifications</div></div>
-        <div><div className="font-bold text-lg">{isNotificationSending ? '⏳' : '✅'}</div><div className="text-xs text-muted-foreground">Status</div></div>
+        <div><div className="font-bold text-lg">{isNotificationSending ? 'Sending...' : 'Ready'}</div><div className="text-xs text-muted-foreground">Status</div></div>
       </div>
       {activeTab === 'manual' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
@@ -521,7 +521,7 @@ export default function AdminPanel() {
                 disabled={isLoading || isNotificationSending}
                 onClick={handleBreakingNewsNotification}
               >
-                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 inline-block mr-2" /> : "🚨"}
+                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 inline-block mr-2" /> : null}
                 Send as Breaking News
               </Button>
             )}
@@ -598,7 +598,7 @@ export default function AdminPanel() {
         <div className="space-y-6">
           {/* Notification Statistics */}
           <div className="bg-card border rounded p-4">
-            <h3 className="text-lg font-semibold mb-4">📊 Notification Statistics</h3>
+            <h3 className="text-lg font-semibold mb-4">Notification Statistics</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="text-center">
                 <div className="text-2xl font-bold">{notificationStats.totalSent}</div>
@@ -609,11 +609,11 @@ export default function AdminPanel() {
                 <div className="text-sm text-muted-foreground">Recent Cache</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold">{isNotificationSending ? '🔄' : '✅'}</div>
+                <div className="text-2xl font-bold">{isNotificationSending ? 'Processing' : 'Active'}</div>
                 <div className="text-sm text-muted-foreground">Status</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold">📱</div>
+                <div className="text-2xl font-bold">Mobile</div>
                 <div className="text-sm text-muted-foreground">Push Ready</div>
               </div>
             </div>
@@ -624,7 +624,7 @@ export default function AdminPanel() {
                 variant="outline"
                 className="flex-1 min-w-[150px]"
               >
-                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : "🔍"}
+                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
                 Check Status
               </Button>
               <Button 
@@ -633,21 +633,21 @@ export default function AdminPanel() {
                 variant="outline"
                 className="flex-1 min-w-[150px]"
               >
-                🧹 Clear Cache
+                Clear Cache
               </Button>
             </div>
           </div>
 
           {/* Quick Test Notification */}
           <div className="bg-card border rounded p-4">
-            <h3 className="text-lg font-semibold mb-4">🧪 Test Notifications</h3>
+            <h3 className="text-lg font-semibold mb-4">Test Notifications</h3>
             <div className="space-y-3">
               <Button 
                 onClick={handleTestNotification} 
                 disabled={isNotificationSending}
                 className="w-full"
               >
-                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : "📤"}
+                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
                 Send Test Notification
               </Button>
               <p className="text-sm text-muted-foreground">
@@ -658,7 +658,7 @@ export default function AdminPanel() {
 
           {/* Custom Notification */}
           <div className="bg-card border rounded p-4">
-            <h3 className="text-lg font-semibold mb-4">📝 Custom Notification</h3>
+            <h3 className="text-lg font-semibold mb-4">Custom Notification</h3>
             <form onSubmit={handleCustomNotification} className="space-y-4">
               <div>
                 <label className="block font-semibold mb-1">Title</label>
@@ -687,7 +687,7 @@ export default function AdminPanel() {
                 disabled={isNotificationSending || !customNotificationTitle.trim() || !customNotificationBody.trim()}
                 className="w-full"
               >
-                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : "📮"}
+                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
                 Send Custom Notification
               </Button>
             </form>
@@ -695,7 +695,7 @@ export default function AdminPanel() {
 
           {/* Important Notes */}
           <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded p-4">
-            <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">📋 Important Notes</h4>
+            <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">Important Notes</h4>
             <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
               <li>• Notifications are automatically sent when you add new articles</li>
               <li>• Rate limiting prevents spam (minimum 5 seconds between notifications)</li>
