@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArticleCard as ArticleType } from "@/types/article";
 import { formatDistanceToNow } from "date-fns";
+import { ArticleActions } from "@/components/ArticleActions";
+import "@/styles/article-layout.css";
 
 interface ArticleCardProps {
   article: ArticleType;
@@ -33,22 +35,11 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
 
   return (
     <div
-      className="w-screen min-h-screen flex flex-col snap-start snap-always bg-background border-b border-border items-stretch justify-start overflow-x-hidden cursor-pointer hover:bg-primary/5 transition"
-      style={{ boxSizing: 'border-box', minHeight: '100vh', margin: 0, padding: 0, width: '100vw', maxWidth: '100vw', overflowX: 'hidden' }}
+      className="w-full h-screen flex flex-col snap-start snap-always bg-background border-b border-border cursor-pointer hover:bg-primary/5 transition-colors duration-200 overflow-hidden max-h-screen"
       onClick={handleCardClick}
     >
-      {/* Image Section */}
-      <div
-        className="relative w-full mx-auto overflow-hidden"
-        style={{
-          height: 'clamp(160px, 36vw, 260px)',
-          minHeight: '140px',
-          maxHeight: '340px',
-          width: '100vw',
-          maxWidth: '100vw',
-          overflow: 'hidden',
-        }}
-      >
+      {/* Sticky Header with Image - Reduced height for more content space */}
+      <div className="relative w-full flex-shrink-0 overflow-hidden bg-muted sticky top-0 z-30" style={{ height: 'clamp(140px, 20vh, 180px)' }}>
         {imageLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-muted">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -59,26 +50,40 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
             src={article.imageUrl}
             alt={article.title}
             className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoading ? "opacity-0" : "opacity-100"}`}
-            style={{ height: '180px', objectFit: 'cover' }}
             onLoad={handleImageLoad}
             onError={handleImageError}
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-muted" style={{ height: '180px' }}>
+          <div className="w-full h-full flex items-center justify-center bg-muted">
             <span className="text-muted-foreground">Image unavailable</span>
           </div>
         )}
+        
         {/* Category badge */}
         {article.category && (
           <span className="absolute top-3 left-3 bg-black/80 text-white text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide z-10">
             {article.category}
           </span>
         )}
+        
+        {/* Read Aloud and Share Actions - Moved higher up on the image */}
+        <div className="absolute top-8 right-3 z-20" onClick={(e) => e.stopPropagation()}>
+          <ArticleActions
+            article={{
+              title: article.title,
+              summary: article.summary,
+              sourceUrl: article.sourceUrl,
+              category: article.category,
+            }}
+            className="flex-col gap-2"
+          />
+        </div>
+        
         {/* Post date and source on image */}
         <div className="absolute bottom-3 left-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 z-10">
           <span className="bg-black/70 text-white text-xs px-2 py-0.5 rounded font-medium">
-            {article.publishedAt instanceof Date ? article.publishedAt.toLocaleDateString('en-GB') : article.publishedAt}
+            {article.publishedAt instanceof Date ? article.publishedAt.toLocaleDateString('en-GB') : String(article.publishedAt)}
           </span>
           <span className="bg-black/70 text-white text-xs px-2 py-0.5 rounded font-medium">
             {article.source}
@@ -86,39 +91,46 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
         </div>
       </div>
 
-      {/* Title */}
-  <h2 className="font-bold text-foreground px-4 pt-4 pb-2 break-words leading-tight w-full text-lg sm:text-xl md:text-2xl" style={{ fontSize: 'clamp(1.1rem, 2.5vw, 1.7rem)', width: '100vw', maxWidth: '100vw', overflow: 'hidden' }}>
-        {article.title}
-      </h2>
+      {/* Content Area - Flexible without scrolling */}
+      <div className="flex-1 flex flex-col min-h-0 px-4 py-4 justify-between overflow-hidden">
+        {/* Content area */}
+        <div className="flex flex-col flex-1">
+        {/* Title - Balanced size for readability */}
+        <h2 className="font-bold text-foreground mb-2 break-words leading-tight text-sm sm:text-base lg:text-lg flex-shrink-0">
+          {article.title}
+        </h2>
 
-      {/* Description/Summary in rounded box */}
-  <div className="bg-muted rounded-xl px-4 py-3 text-muted-foreground mb-3 break-words leading-snug text-base sm:text-lg mx-auto" style={{ fontSize: 'clamp(1rem, 2vw, 1.15rem)', width: '100%', maxWidth: '600px', overflow: 'hidden' }}>
-        {(() => {
-          const words = article.summary.split(' ');
-          if (words.length > 100) {
-            return words.slice(0, 100).join(' ') + '...';
-          }
-          return article.summary;
-        })()}
-      </div>
+        {/* Description - Optimized font size and spacing */}
+        <div className="bg-muted rounded-xl px-3 py-2 text-black dark:text-muted-foreground mb-3 break-words leading-relaxed text-sm overflow-hidden flex-1">
+          <div className="h-full flex items-start">
+            <div className="w-full">
+              {(() => {
+                const words = article.summary.split(' ');
+                // More generous word count to fill available space
+                const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
+                const maxWords = screenWidth < 640 ? 80 : screenWidth < 1024 ? 120 : 150;
+                if (words.length > maxWords) {
+                  return words.slice(0, maxWords).join(' ') + '...';
+                }
+                return article.summary;
+              })()}
+            </div>
+          </div>
+        </div>
+        </div>
 
-      {/* Info row: time, date, source */}
-  <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 text-xs text-muted-foreground w-full min-w-0 w-screen" style={{ fontSize: 'clamp(0.9rem, 1vw, 1.05rem)', width: '100vw', maxWidth: '100vw', overflow: 'hidden' }}>
-        <span className="whitespace-nowrap min-w-0 truncate">{timeAgo}</span>
-      </div>
-
-      {/* Single large button */}
-      <div className="px-4 pb-6 w-full flex justify-center" style={{ width: '100vw', maxWidth: '100vw' }}>
-        <a
-          href={article.sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block rounded-xl font-semibold bg-primary/10 text-primary border border-primary hover:bg-primary/20 transition overflow-hidden text-center"
-          style={{ minWidth: '220px', maxWidth: '100%', fontSize: 'clamp(1rem, 2vw, 1.2rem)', padding: 'clamp(0.8rem, 2vw, 1.2rem) 2rem', overflow: 'hidden' }}
-          onClick={e => e.stopPropagation()}
-        >
-          Tap to know more <span className="ml-2">→</span>
-        </a>
+        {/* Bottom section - Button area with proper constraints */}
+        <div className="flex-shrink-0 mt-auto pt-6 pb-8 pl-4 pr-8">
+          <a
+            href={article.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full max-w-48 ml-0 rounded-xl font-semibold bg-primary/10 text-primary border border-primary hover:bg-primary/20 transition-colors duration-200 text-center py-3 px-4 text-sm"
+            onClick={e => e.stopPropagation()}
+          >
+            Tap to know more <span className="ml-2">→</span>
+          </a>
+        </div>
       </div>
     </div>
   );

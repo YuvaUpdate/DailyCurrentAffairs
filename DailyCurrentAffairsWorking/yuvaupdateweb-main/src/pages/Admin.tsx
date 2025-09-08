@@ -4,6 +4,8 @@ import { firebaseNewsService } from "../../../FirebaseNewsService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
+import { NotificationSender } from "../services/NotificationSender";
+import { TestNotificationService } from "../services/TestNotificationService";
 
 const HEADLINE_MAX = 200;
 const DESCRIPTION_WORD_MAX = 80;
@@ -14,7 +16,7 @@ const SOURCE_NAME_MAX = 100;
 export default function AdminPanel() {
   // Ref for scrolling to form on edit
   const formRef = useRef<HTMLFormElement | null>(null);
-  const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories' | 'notifications'>('manual');
   // Add/Edit News
   const [headline, setHeadline] = useState("");
   const [description, setDescription] = useState("");
@@ -36,12 +38,23 @@ export default function AdminPanel() {
   const [newCategory, setNewCategory] = useState("");
   // Analytics
   const [analytics, setAnalytics] = useState({ articles: 0, categories: 0, users: 0, comments: 0, uploads: 0 });
+  // Notification states
+  const [isNotificationSending, setIsNotificationSending] = useState(false);
+  const [lastNotificationTime, setLastNotificationTime] = useState<number>(0);
+  const [customNotificationTitle, setCustomNotificationTitle] = useState("");
+  const [customNotificationBody, setCustomNotificationBody] = useState("");
+  const [notificationStats, setNotificationStats] = useState({ totalSent: 0, recentNotifications: 0 });
 
   useEffect(() => {
   fetchCategories();
   if (activeTab === 'manage') fetchNews();
   // Only reset form if not editing
   if (activeTab === 'manual' && !editingArticle) resetForm();
+  // Load notification stats when switching to notifications tab
+  if (activeTab === 'notifications') {
+    const stats = NotificationSender.getNotificationStats();
+    setNotificationStats(stats);
+  }
     // eslint-disable-next-line
   }, [activeTab]);
 
@@ -122,6 +135,13 @@ export default function AdminPanel() {
       alert("Please enter a valid URL for the external link.");
       return;
     }
+    
+    // Prevent duplicate submissions
+    if (isLoading || isNotificationSending) {
+      console.log('Submission blocked - already in progress');
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Use uploaded media URL if available, otherwise use provided URL or placeholder
@@ -148,18 +168,68 @@ export default function AdminPanel() {
       Object.keys(payload).forEach((key) => {
         if (payload[key] === undefined) delete payload[key];
       });
+
+      let result: any = null;
       if (editingArticle && editingArticle.docId) {
         await firebaseNewsService.updateArticle(editingArticle.docId, payload);
+        result = editingArticle.docId;
         alert("Article updated!");
         setEditingArticle(null);
       } else {
-        await firebaseNewsService.addArticle(payload);
+        result = await firebaseNewsService.addArticle(payload);
         alert("News article added!");
+        
+        // Send push notification (non-blocking with rate limiting)
+        (async () => {
+          try {
+            // Rate limiting: prevent sending notifications more than once per 5 seconds
+            const now = Date.now();
+            const timeSinceLastNotification = now - lastNotificationTime;
+            const MIN_NOTIFICATION_INTERVAL = 5000; // 5 seconds
+            
+            if (timeSinceLastNotification < MIN_NOTIFICATION_INTERVAL) {
+              console.log('⏭️ Notification rate limited - too soon since last notification');
+              return;
+            }
+
+            // Prevent duplicate notification sending
+            if (isNotificationSending) {
+              console.log('⏭️ Notification already in progress');
+              return;
+            }
+            
+            setIsNotificationSending(true);
+            setLastNotificationTime(now);
+            
+            try {
+              // Send proper notification using NotificationSender
+              await NotificationSender.sendNewArticleNotification({
+                id: result || '',
+                headline: payload.headline,
+                category: payload.category,
+                docId: result
+              });
+
+              // Update notification stats
+              const stats = NotificationSender.getNotificationStats();
+              setNotificationStats(stats);
+              
+              console.log('✅ Notification sent for new article:', payload.headline);
+            } finally {
+              setIsNotificationSending(false);
+            }
+            
+          } catch (e) {
+            console.warn('Push notification failed:', e);
+          }
+        })();
       }
+
       resetForm();
       fetchNews();
     } catch (error) {
       alert("Failed to save article.");
+      console.error('Article save error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -241,10 +311,127 @@ export default function AdminPanel() {
     alert("API Import is not implemented in the web admin panel yet.");
   }
 
+  // Notification Testing Functions
+  async function handleTestNotification() {
+    try {
+      setIsNotificationSending(true);
+      const success = await TestNotificationService.sendTestNotification();
+      
+      if (success) {
+        alert("✅ Test notification sent successfully! Check mobile devices for the notification.");
+        // Update notification stats
+        const stats = NotificationSender.getNotificationStats();
+        setNotificationStats(stats);
+      } else {
+        alert("❌ Test notification failed. Check console for details.");
+      }
+    } catch (error) {
+      console.error('Test notification error:', error);
+      alert("❌ Test notification failed with error. Check console for details.");
+    } finally {
+      setIsNotificationSending(false);
+    }
+  }
+
+  async function handleCustomNotification(e: React.FormEvent) {
+    e.preventDefault();
+    if (!customNotificationTitle.trim() || !customNotificationBody.trim()) {
+      alert("Please enter both title and message for the custom notification.");
+      return;
+    }
+
+    try {
+      setIsNotificationSending(true);
+      const success = await TestNotificationService.sendCustomTestNotification(
+        customNotificationTitle.trim(),
+        customNotificationBody.trim()
+      );
+      
+      if (success) {
+        alert("✅ Custom notification sent successfully!");
+        setCustomNotificationTitle("");
+        setCustomNotificationBody("");
+        // Update notification stats
+        const stats = NotificationSender.getNotificationStats();
+        setNotificationStats(stats);
+      } else {
+        alert("❌ Custom notification failed. Check console for details.");
+      }
+    } catch (error) {
+      console.error('Custom notification error:', error);
+      alert("❌ Custom notification failed with error. Check console for details.");
+    } finally {
+      setIsNotificationSending(false);
+    }
+  }
+
+  async function handleBreakingNewsNotification() {
+    if (!headline.trim()) {
+      alert("Please enter a headline first, then use this button to send it as breaking news.");
+      return;
+    }
+
+    try {
+      setIsNotificationSending(true);
+      const success = await TestNotificationService.sendBreakingNewsNotification(headline);
+      
+      if (success) {
+        alert("🚨 Breaking news notification sent successfully!");
+        // Update notification stats
+        const stats = NotificationSender.getNotificationStats();
+        setNotificationStats(stats);
+      } else {
+        alert("❌ Breaking news notification failed. Check console for details.");
+      }
+    } catch (error) {
+      console.error('Breaking news notification error:', error);
+      alert("❌ Breaking news notification failed with error. Check console for details.");
+    } finally {
+      setIsNotificationSending(false);
+    }
+  }
+
+  async function handleCheckNotificationStatus() {
+    try {
+      setIsNotificationSending(true);
+      const status = await TestNotificationService.checkNotificationSystemStatus();
+      
+      // Update notification stats
+      setNotificationStats(status.stats);
+      
+      if (status.status === 'working') {
+        alert(`✅ Notification System Status: ${status.message}\n\nStats:\n- Total sent: ${status.stats.totalSent || 0}\n- Recent: ${status.stats.recentNotifications || 0}`);
+      } else {
+        alert(`❌ Notification System Status: ${status.message}\n\nCheck console for detailed error information.`);
+      }
+      
+      console.log('🔍 Notification system status:', status);
+    } catch (error) {
+      console.error('Status check error:', error);
+      alert("❌ Failed to check notification system status. Check console for details.");
+    } finally {
+      setIsNotificationSending(false);
+    }
+  }
+
+  async function handleClearNotificationCache() {
+    try {
+      TestNotificationService.clearNotificationCache();
+      setNotificationStats({ totalSent: 0, recentNotifications: 0 });
+      alert("🧹 Notification cache cleared successfully!");
+    } catch (error) {
+      console.error('Cache clear error:', error);
+      alert("❌ Failed to clear notification cache.");
+    }
+  }
+
   // Analytics (users/comments/uploads are stubbed)
   useEffect(() => {
     // TODO: implement real analytics for users/comments/uploads
     setAnalytics(a => ({ ...a, users: 0, comments: 0, uploads: 0 }));
+    // Load initial notification stats
+    const stats = NotificationSender.getNotificationStats();
+    setNotificationStats(stats);
   }, []);
 
   return (
@@ -254,15 +441,18 @@ export default function AdminPanel() {
         <Button variant={activeTab === 'manual' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manual')}>Add/Edit News</Button>
         <Button variant={activeTab === 'manage' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manage')}>Manage News</Button>
         <Button variant={activeTab === 'categories' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('categories')}>Categories</Button>
+        <Button variant={activeTab === 'notifications' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('notifications')}>Notifications</Button>
         <Button variant={activeTab === 'api' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('api')}>API Import</Button>
       </div>
       {/* Analytics Section */}
-  <div className="mb-4 sm:mb-6 grid grid-cols-2 xs:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 text-center">
+  <div className="mb-4 sm:mb-6 grid grid-cols-2 xs:grid-cols-3 md:grid-cols-7 gap-2 sm:gap-4 text-center">
         <div><div className="font-bold text-lg">{analytics.articles}</div><div className="text-xs text-muted-foreground">Articles</div></div>
         <div><div className="font-bold text-lg">{analytics.categories}</div><div className="text-xs text-muted-foreground">Categories</div></div>
         <div><div className="font-bold text-lg">{analytics.users}</div><div className="text-xs text-muted-foreground">Users</div></div>
         <div><div className="font-bold text-lg">{analytics.comments}</div><div className="text-xs text-muted-foreground">Comments</div></div>
         <div><div className="font-bold text-lg">{analytics.uploads}</div><div className="text-xs text-muted-foreground">Uploads</div></div>
+        <div><div className="font-bold text-lg">{notificationStats.totalSent}</div><div className="text-xs text-muted-foreground">Notifications</div></div>
+        <div><div className="font-bold text-lg">{isNotificationSending ? '⏳' : '✅'}</div><div className="text-xs text-muted-foreground">Status</div></div>
       </div>
       {activeTab === 'manual' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
@@ -316,7 +506,25 @@ export default function AdminPanel() {
               <label className="block font-semibold mb-1">External Link (Required)</label>
               <Input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://example.com/article" required maxLength={SOURCEURL_MAX} />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? <Loader2 className="animate-spin w-5 h-5 inline-block mr-2" /> : null}{editingArticle ? (isLoading ? "Updating..." : "Update Article") : (isLoading ? "Adding..." : "Add Article")}</Button>
+            <Button type="submit" className="w-full" disabled={isLoading || isNotificationSending}>
+              {(isLoading || isNotificationSending) ? <Loader2 className="animate-spin w-5 h-5 inline-block mr-2" /> : null}
+              {editingArticle 
+                ? (isLoading ? "Updating..." : "Update Article") 
+                : (isLoading ? "Adding..." : isNotificationSending ? "Sending Notification..." : "Add Article & Notify")
+              }
+            </Button>
+            {!editingArticle && headline && (
+              <Button 
+                type="button" 
+                variant="destructive" 
+                className="w-full mt-2" 
+                disabled={isLoading || isNotificationSending}
+                onClick={handleBreakingNewsNotification}
+              >
+                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 inline-block mr-2" /> : "🚨"}
+                Send as Breaking News
+              </Button>
+            )}
             {editingArticle && (
               <div className="text-blue-600 text-sm text-center">Editing existing article. Make changes and click Update Article.</div>
             )}
@@ -385,6 +593,118 @@ export default function AdminPanel() {
             ))}
           </div>
         </form>
+      )}
+      {activeTab === 'notifications' && (
+        <div className="space-y-6">
+          {/* Notification Statistics */}
+          <div className="bg-card border rounded p-4">
+            <h3 className="text-lg font-semibold mb-4">📊 Notification Statistics</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{notificationStats.totalSent}</div>
+                <div className="text-sm text-muted-foreground">Total Sent</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{notificationStats.recentNotifications}</div>
+                <div className="text-sm text-muted-foreground">Recent Cache</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{isNotificationSending ? '🔄' : '✅'}</div>
+                <div className="text-sm text-muted-foreground">Status</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">📱</div>
+                <div className="text-sm text-muted-foreground">Push Ready</div>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button 
+                onClick={handleCheckNotificationStatus} 
+                disabled={isNotificationSending}
+                variant="outline"
+                className="flex-1 min-w-[150px]"
+              >
+                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : "🔍"}
+                Check Status
+              </Button>
+              <Button 
+                onClick={handleClearNotificationCache} 
+                disabled={isNotificationSending}
+                variant="outline"
+                className="flex-1 min-w-[150px]"
+              >
+                🧹 Clear Cache
+              </Button>
+            </div>
+          </div>
+
+          {/* Quick Test Notification */}
+          <div className="bg-card border rounded p-4">
+            <h3 className="text-lg font-semibold mb-4">🧪 Test Notifications</h3>
+            <div className="space-y-3">
+              <Button 
+                onClick={handleTestNotification} 
+                disabled={isNotificationSending}
+                className="w-full"
+              >
+                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : "📤"}
+                Send Test Notification
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                Sends a test notification to all mobile app users to verify the system is working.
+              </p>
+            </div>
+          </div>
+
+          {/* Custom Notification */}
+          <div className="bg-card border rounded p-4">
+            <h3 className="text-lg font-semibold mb-4">📝 Custom Notification</h3>
+            <form onSubmit={handleCustomNotification} className="space-y-4">
+              <div>
+                <label className="block font-semibold mb-1">Title</label>
+                <Input 
+                  value={customNotificationTitle} 
+                  onChange={e => setCustomNotificationTitle(e.target.value)} 
+                  placeholder="e.g., Important Update"
+                  maxLength={100}
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Message</label>
+                <textarea 
+                  className="w-full rounded border border-muted bg-card p-2 text-foreground min-h-[80px]" 
+                  value={customNotificationBody} 
+                  onChange={e => setCustomNotificationBody(e.target.value)} 
+                  placeholder="Enter your custom notification message..."
+                  maxLength={200}
+                />
+                <div className="text-xs text-muted-foreground text-right mt-1">
+                  {customNotificationBody.length} / 200 characters
+                </div>
+              </div>
+              <Button 
+                type="submit" 
+                disabled={isNotificationSending || !customNotificationTitle.trim() || !customNotificationBody.trim()}
+                className="w-full"
+              >
+                {isNotificationSending ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : "📮"}
+                Send Custom Notification
+              </Button>
+            </form>
+          </div>
+
+          {/* Important Notes */}
+          <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded p-4">
+            <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">📋 Important Notes</h4>
+            <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+              <li>• Notifications are automatically sent when you add new articles</li>
+              <li>• Rate limiting prevents spam (minimum 5 seconds between notifications)</li>
+              <li>• Test notifications help verify the system without affecting real users</li>
+              <li>• Breaking news notifications have higher priority and visibility</li>
+              <li>• All notifications are sent to mobile app users who have enabled push notifications</li>
+            </ul>
+          </div>
+        </div>
       )}
       {activeTab === 'api' && (
         <form onSubmit={handleApiImport} className="space-y-4">

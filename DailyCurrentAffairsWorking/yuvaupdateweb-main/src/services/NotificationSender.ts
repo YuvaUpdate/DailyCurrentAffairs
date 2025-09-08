@@ -1,13 +1,13 @@
 /**
- * Firebase Cloud Functions notification sender
- * Sends proper notifications that appear in notification tray
+ * Firebase Cloud Functions notification sender for Web Admin
+ * Sends proper notifications that appear in notification tray for mobile app users
  */
 export class NotificationSender {
   private static readonly FUNCTION_URL = 'https://us-central1-yuvaupdate-3762b.cloudfunctions.net/sendNotificationToTopic';
   
   // Track sent notifications to prevent duplicates
   private static sentNotifications = new Set<string>();
-  private static callCounter = 0; // Add call counter
+  private static callCounter = 0;
 
   /**
    * Send notification to all users via Firebase Cloud Function
@@ -98,21 +98,65 @@ export class NotificationSender {
       }
 
       await this.sendNotificationToAllUsers({
-        title: article.headline || 'New Article',
+        title: article.headline,
         body: `${article.category}`,
         data: {
-          articleId: String(article.id || article.docId || Date.now()),
+          articleId: article.id || article.docId,
           category: article.category,
-          type: 'news',
-          timestamp: new Date().toISOString(),
-          uniqueKey: articleKey, // Add unique key for client-side deduplication
-        },
+          type: 'new_article',
+          headline: article.headline,
+          timestamp: new Date().toISOString()
+        }
       });
 
-      console.log('📰 New article notification sent:', article.headline);
+      console.log('✅ Notification sent for new article:', article.headline);
     } catch (error) {
-      console.error('❌ Error sending article notification:', error);
+      console.error('❌ Failed to send notification for new article:', error);
+      throw error;
     }
+  }
+
+  /**
+   * Send test notification
+   */
+  static async sendTestNotification(): Promise<boolean> {
+    const testArticle = {
+      headline: `Test Notification - ${new Date().toLocaleTimeString()}`,
+      category: 'test',
+      id: `test_${Date.now()}`
+    };
+
+    try {
+      await this.sendNewArticleNotification(testArticle);
+      return true;
+    } catch (error) {
+      console.error('❌ Test notification failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send custom notification with title and body
+   */
+  static async sendCustomNotification(title: string, body: string, data?: any): Promise<boolean> {
+    return await this.sendNotificationToAllUsers({
+      title,
+      body,
+      data
+    });
+  }
+
+  /**
+   * Get notification statistics
+   */
+  static getNotificationStats(): {
+    totalSent: number;
+    recentNotifications: number;
+  } {
+    return {
+      totalSent: this.callCounter,
+      recentNotifications: this.sentNotifications.size
+    };
   }
 
   /**
@@ -123,5 +167,3 @@ export class NotificationSender {
     console.log('🧹 Notification cache cleared');
   }
 }
-
-export const notificationSender = NotificationSender;

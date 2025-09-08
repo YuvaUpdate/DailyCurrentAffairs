@@ -1,0 +1,237 @@
+/* Responsive Article Card Utilities */
+
+/* Container utilities for article cards */
+.article-card-container {
+  /* Ensure the card takes full viewport dimensions */
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  max-width: 100vw;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Image section utilities */
+.article-image-container {
+  /* Responsive image height that adapts to different screen sizes */
+  height: clamp(200px, 35vh, 300px);
+  min-height: 200px;
+  max-height: 300px;
+  width: 100%;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Content area utilities */
+.article-content-container {
+  /* Flexible content area that takes remaining space */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Important for flex overflow */
+  overflow: hidden;
+}
+
+.article-text-area {
+  /* Scrollable text area */
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  min-height: 0;
+}
+
+.article-button-container {
+  /* Fixed button area at bottom */
+  flex-shrink: 0;
+  padding: 1rem;
+  padding-top: 0.5rem;
+}
+
+/* Text utilities */
+.article-title {
+  /* Responsive title sizing */
+  font-size: clamp(1.125rem, 4vw, 1.75rem);
+  line-height: 1.2;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+.article-description {
+  /* Responsive description with proper spacing */
+  font-size: clamp(0.875rem, 3vw, 1rem);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  word-wrap: break-word;
+  hyphens: auto;
+  /* Prevent very long content from breaking layout */
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.article-meta {
+  /* Small meta text */
+  font-size: clamp(0.75rem, 2.5vw, 0.875rem);
+  line-height: 1.4;
+}
+
+/* Button utilities */
+.article-action-button {
+  /* Responsive button styling */
+  width: 100%;
+  max-width: min(400px, 90vw);
+  margin: 0 auto;
+  padding: clamp(0.75rem, 3vw, 1rem) clamp(1rem, 4vw, 2rem);
+  font-size: clamp(0.875rem, 3vw, 1rem);
+  border-radius: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Action buttons overlay */
+.article-actions-overlay {
+  /* Position action buttons to avoid conflicts */
+  position: absolute;
+  top: 4rem; /* Below theme toggle */
+  right: 0.75rem;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Responsive breakpoint utilities */
+@media (max-width: 640px) {
+  /* Mobile optimizations */
+  .article-image-container {
+    height: clamp(180px, 30vh, 250px);
+  }
+  
+  .article-text-area {
+    padding: 0.75rem;
+  }
+  
+  .article-title {
+    font-size: clamp(1rem, 5vw, 1.25rem);
+    margin-bottom: 0.5rem;
+  }
+  
+  .article-description {
+    font-size: clamp(0.8rem, 3.5vw, 0.9rem);
+    max-height: 35vh;
+  }
+  
+  .article-action-button {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  /* Tablet optimizations */
+  .article-image-container {
+    height: clamp(220px, 32vh, 280px);
+  }
+  
+  .article-title {
+    font-size: clamp(1.25rem, 3.5vw, 1.5rem);
+  }
+  
+  .article-description {
+    font-size: clamp(0.9rem, 2.5vw, 1rem);
+    max-height: 38vh;
+  }
+}
+
+@media (min-width: 1025px) {
+  /* Desktop optimizations */
+  .article-image-container {
+    height: clamp(250px, 35vh, 300px);
+  }
+  
+  .article-title {
+    font-size: clamp(1.5rem, 2.5vw, 1.75rem);
+  }
+  
+  .article-description {
+    font-size: 1rem;
+    max-height: 40vh;
+  }
+}
+
+/* Landscape mobile optimizations */
+@media (max-height: 500px) and (orientation: landscape) {
+  .article-image-container {
+    height: clamp(120px, 25vh, 180px);
+  }
+  
+  .article-description {
+    max-height: 25vh;
+    font-size: 0.8rem;
+  }
+  
+  .article-text-area {
+    padding: 0.5rem;
+  }
+  
+  .article-title {
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .article-action-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* High-DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .article-title,
+  .article-description,
+  .article-meta {
+    /* Slightly better text rendering on high-DPI displays */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Ensure content is always accessible */
+.article-content-container {
+  /* Minimum content height to prevent button from being unreachable */
+  min-height: calc(100vh - clamp(200px, 35vh, 300px));
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .article-action-button {
+    transition: none;
+  }
+}
+
+/* Dark mode specific adjustments */
+@media (prefers-color-scheme: dark) {
+  .article-description {
+    /* Better contrast in dark mode */
+    color: rgb(156 163 175);
+  }
+}
+
+/* Print styles */
+@media print {
+  .article-actions-overlay,
+  .article-action-button {
+    display: none;
+  }
+  
+  .article-card-container {
+    height: auto;
+    page-break-inside: avoid;
+  }
+}
