@@ -7,12 +7,12 @@ import { getStorage } from 'firebase/storage';
 // Your web app's Firebase configuration
 // Uses environment variables in production, fallback to hardcoded values for development
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAr0-reXFa5nLRAv2AdNbHMC9w-1LAtgsk",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "yuvaupdate-3762b.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "yuvaupdate-3762b",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "yuvaupdate-3762b.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "970590845048",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:970590845048:android:2d51c7c3fcae508edbd58d"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyAr0-reXFa5nLRAv2AdNbHMC9w-1LAtgsk",
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "yuvaupdate-3762b.firebaseapp.com",
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "yuvaupdate-3762b",
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "yuvaupdate-3762b.firebasestorage.app",
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "970590845048",
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:970590845048:android:2d51c7c3fcae508edbd58d"
 };
 
 // Initialize Firebase

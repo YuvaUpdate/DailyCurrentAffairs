@@ -2,7 +2,7 @@
 // NOTE: Storing credentials in source is insecure; this file exists because you
 // explicitly requested the admin auto-login for the admin-included build.
 // Disable admin panel for public builds. Set to true only for private/admin debug builds.
-export const INCLUDE_ADMIN_PANEL = true;
+export const INCLUDE_ADMIN_PANEL = false;
 
 // Admin credentials for the admin-enabled build. These are required only for
 // private/admin builds. Do NOT commit these values to a public repository.
