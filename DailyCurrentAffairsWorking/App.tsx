@@ -387,9 +387,48 @@ export default function App(props: AppProps) {
   let unsubscribe: (() => void) | null = null;
     let refreshInterval: NodeJS.Timeout | null = null;
 
-    // Parallelize AsyncStorage reads to reduce startup blocking
+    // FORCE IMMEDIATE FRESH FETCH - Always get latest articles on app startup
     (async () => {
       try {
+        console.log('🚀 App startup: FORCING immediate fresh article fetch...');
+        
+        // First, try to get fresh articles immediately (priority)
+        try {
+          const svc = await getFirebaseNewsService();
+          const freshArticles = await svc.getArticles();
+          if (freshArticles && freshArticles.length > 0) {
+            console.log('✅ FORCED fresh articles loaded on startup:', freshArticles.length);
+            setNewsData(freshArticles);
+            setLastArticleCount(freshArticles.length);
+            setIsLoadingArticles(false);
+            
+            // Apply filter immediately
+            if (selectedCategory) {
+              const filtered = freshArticles.filter((article: NewsArticle) => article.category === selectedCategory);
+              setFilteredNews(filtered);
+            } else {
+              setFilteredNews(freshArticles);
+            }
+            
+            // Cache the fresh articles for next time
+            AsyncStorage.setItem('ya_cached_articles', JSON.stringify(freshArticles)).catch(() => {});
+            
+            // Notify parent that fresh articles are ready
+            try {
+              if (!articlesReadyCalled.current && typeof onArticlesReady === 'function') {
+                onArticlesReady();
+                articlesReadyCalled.current = true;
+              }
+            } catch (er) {
+              // ignore
+            }
+            return; // Success - skip cached loading
+          }
+        } catch (freshError) {
+          console.warn('Failed to fetch fresh articles immediately, falling back to cache:', freshError);
+        }
+
+        // Fallback: Load cached articles only if fresh fetch failed
         const [rawArticles, rawCats] = await Promise.all([
           AsyncStorage.getItem('ya_cached_articles'),
           AsyncStorage.getItem('ya_cached_categories')
@@ -399,27 +438,26 @@ export default function App(props: AppProps) {
           try {
             const cached = JSON.parse(rawArticles) as NewsArticle[];
             if (Array.isArray(cached) && cached.length > 0) {
+              console.log('📦 Using cached articles as fallback:', cached.length);
               setNewsData(cached);
               setLastArticleCount(cached.length);
-              // Update minimal state immediately so UI can render quickly,
-              // but defer heavier work (filtering and parent callback) until
-              // after the first interaction frame to avoid blocking the JS thread.
               setIsLoadingArticles(false);
-              InteractionManager.runAfterInteractions(() => {
-                try {
-                  applyFilter(cached, selectedCategory);
-                } catch (e) {
-                  console.warn('applyFilter failed in deferred run', e);
+              
+              if (selectedCategory) {
+                const filtered = cached.filter((article: NewsArticle) => article.category === selectedCategory);
+                setFilteredNews(filtered);
+              } else {
+                setFilteredNews(cached);
+              }
+              
+              try {
+                if (!articlesReadyCalled.current && typeof onArticlesReady === 'function') {
+                  onArticlesReady();
+                  articlesReadyCalled.current = true;
                 }
-                try {
-                  if (!articlesReadyCalled.current && typeof onArticlesReady === 'function') {
-                    onArticlesReady();
-                    articlesReadyCalled.current = true;
-                  }
-                } catch (er) {
-                  // ignore
-                }
-              });
+              } catch (er) {
+                // ignore
+              }
             }
           } catch (e) {
             console.warn('Failed to parse cached articles', e);
@@ -460,11 +498,14 @@ export default function App(props: AppProps) {
     })();
 
     const setupFirebaseSubscription = () => {
-      // Subscribe to backend and update cache when new articles arrive.
+      // Subscribe to backend for real-time updates (fresh fetch already done above)
     (async () => {
       try {
         const svc = await getFirebaseNewsService();
+        console.log('� Setting up real-time subscription for ongoing updates...');
+        
         unsubscribe = svc.subscribeToArticles((articles: NewsArticle[]) => {
+        console.log('🔄 Real-time subscription received articles:', articles.length);
         setIsLoadingArticles(false);
 
         // Note: Notifications are now handled by AdminPanel when articles are added
@@ -472,7 +513,16 @@ export default function App(props: AppProps) {
         
         setNewsData(articles);
         setLastArticleCount(articles.length);
-        applyFilter(articles, selectedCategory);
+        
+        // Apply current filter when new articles arrive
+        if (selectedCategory) {
+          const filtered = articles.filter(article => article.category === selectedCategory);
+          setFilteredNews(filtered);
+        } else {
+          setFilteredNews(articles);
+        }
+        console.log('✅ Articles updated in state via subscription, filtered applied');
+        
         // Notify parent that articles are available. Defer until after UI work completes
         try {
           if (!articlesReadyCalled.current && typeof onArticlesReady === 'function') {
@@ -591,7 +641,7 @@ export default function App(props: AppProps) {
         }
       }
     };
-  }, [lastArticleCount, selectedCategory]);
+  }, []); // Removed problematic dependencies that were causing subscription resets
 
   // Handle screen dimension changes for responsive design
   useEffect(() => {
@@ -691,17 +741,33 @@ export default function App(props: AppProps) {
   // Pull to refresh - memoized
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
+    console.log('🔄 Manual refresh: Fetching fresh articles...');
     try {
-  const svc = await getFirebaseNewsService();
-  const articles = await svc.getArticles();
+      const svc = await getFirebaseNewsService();
+      const articles = await svc.getArticles();
+      console.log('✅ Manual refresh: Fresh articles loaded:', articles.length);
+      
       setNewsData(articles);
-      applyFilter(articles, selectedCategory);
+      setLastArticleCount(articles.length);
+      
+      // Apply current filter when refreshing
+      if (selectedCategory) {
+        const filtered = articles.filter((article: NewsArticle) => article.category === selectedCategory);
+        setFilteredNews(filtered);
+      } else {
+        setFilteredNews(articles);
+      }
+      
+      // Cache the refreshed articles
+      AsyncStorage.setItem('ya_cached_articles', JSON.stringify(articles)).catch(() => {});
+      console.log('✅ Manual refresh: Articles updated in state, filter applied');
+      
     } catch (error) {
       console.error('Error refreshing articles:', error);
       Alert.alert('Error', 'Failed to refresh articles');
     }
     setRefreshing(false);
-  }, [applyFilter, selectedCategory]);
+  }, [selectedCategory]); // Removed applyFilter dependency to prevent stale closures
 
   // Navigate to specific article by ID (used when notification is tapped)
   const navigateToArticle = (articleId: string | number) => {
