@@ -3,10 +3,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { firebaseNewsService } from "../services/FirebaseNewsService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Upload, X, Play, Image as ImageIcon } from "lucide-react";
+import { Loader2, Upload, X, Play, Image as ImageIcon, LogOut } from "lucide-react";
 import { NotificationSender } from "../services/NotificationSender";
 import { TestNotificationService } from "../services/TestNotificationService";
 import { webFileUploadService, UploadResult } from "../services/WebFileUploadService";
+import { AuthProtected } from "@/components/AuthProtected";
+import { auth } from "@/services/firebase.config";
+import { signOut } from "firebase/auth";
 
 const HEADLINE_MAX = 200;
 const DESCRIPTION_WORD_MAX = 80;
@@ -507,9 +510,29 @@ export default function AdminPanel() {
     setNotificationStats(stats);
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   return (
-  <div className="max-w-4xl mx-auto p-2 sm:p-4 md:p-6 bg-background rounded shadow mt-4 md:mt-10 w-full min-h-screen">
-      <h2 className="text-2xl font-bold mb-6">Admin Panel</h2>
+    <AuthProtected>
+      <div className="max-w-4xl mx-auto p-2 sm:p-4 md:p-6 bg-background rounded shadow mt-4 md:mt-10 w-full min-h-screen">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Admin Panel</h2>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleLogout}
+            className="flex items-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       <div className="flex flex-wrap gap-2 mb-4 sm:mb-6 justify-center">
         <Button variant={activeTab === 'manual' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manual')}>Add/Edit News</Button>
         <Button variant={activeTab === 'manage' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manage')}>Manage News</Button>
@@ -981,6 +1004,7 @@ export default function AdminPanel() {
           <Button type="submit" disabled>Fetch (Not implemented)</Button>
         </form>
       )}
-    </div>
+      </div>
+    </AuthProtected>
   );
 }
