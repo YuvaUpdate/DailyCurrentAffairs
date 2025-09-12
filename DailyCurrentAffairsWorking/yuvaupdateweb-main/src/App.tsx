@@ -13,6 +13,7 @@ import About from "./pages/About";
 import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
 import { initImageOptimizations } from "@/services/ImagePreloadService";
+import { WebAnalyticsService } from "@/services/WebAnalyticsService";
 
 const queryClient = new QueryClient();
 const AdminPageLazy = lazy(() => import("./pages/Admin"));
@@ -21,6 +22,9 @@ const App = () => {
   useEffect(() => {
     // Initialize image optimizations when the app starts
     initImageOptimizations();
+    
+    // Initialize analytics tracking
+    WebAnalyticsService.initializeTracking();
   }, []);
   
   return (

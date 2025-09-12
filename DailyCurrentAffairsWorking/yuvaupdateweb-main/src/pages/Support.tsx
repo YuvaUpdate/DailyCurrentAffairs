@@ -1,7 +1,12 @@
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { Header } from "@/components/layout/Header";
+import { WebAnalyticsService } from "@/services/WebAnalyticsService";
+import { useEffect } from "react";
 
 export default function Support() {
+  useEffect(() => {
+    WebAnalyticsService.trackPageView('/support');
+  }, []);
   return (
     <div className="flex min-h-screen w-full bg-background">
       <AppSidebar />

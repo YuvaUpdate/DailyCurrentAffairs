@@ -10,6 +10,7 @@ import { webFileUploadService, UploadResult } from "../services/WebFileUploadSer
 import { AuthProtected } from "@/components/AuthProtected";
 import { auth } from "@/services/firebase.config";
 import { signOut } from "firebase/auth";
+import { WebAnalyticsService, AnalyticsData } from "../services/WebAnalyticsService";
 
 const HEADLINE_MAX = 200;
 const DESCRIPTION_WORD_MAX = 80;
@@ -20,7 +21,7 @@ const SOURCE_NAME_MAX = 100;
 export default function AdminPanel() {
   // Ref for scrolling to form on edit
   const formRef = useRef<HTMLFormElement | null>(null);
-  const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories' | 'notifications'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories' | 'notifications' | 'analytics'>('manual');
   // Add/Edit News
   const [headline, setHeadline] = useState("");
   const [description, setDescription] = useState("");
@@ -44,6 +45,7 @@ export default function AdminPanel() {
   const [newCategory, setNewCategory] = useState("");
   // Analytics
   const [analytics, setAnalytics] = useState({ articles: 0, categories: 0, users: 0, comments: 0, uploads: 0 });
+  const [webAnalytics, setWebAnalytics] = useState<AnalyticsData | null>(null);
   // Notification states
   const [isNotificationSending, setIsNotificationSending] = useState(false);
   const [lastNotificationTime, setLastNotificationTime] = useState<number>(0);
@@ -501,13 +503,45 @@ export default function AdminPanel() {
     }
   }
 
-  // Analytics (users/comments/uploads are stubbed)
+  // Track admin page view and load analytics data
   useEffect(() => {
-    // TODO: implement real analytics for users/comments/uploads
-    setAnalytics(a => ({ ...a, users: 0, comments: 0, uploads: 0 }));
+    // Track admin page view
+    WebAnalyticsService.trackPageView('/admin');
+    // Load web analytics
+    const loadAnalytics = async () => {
+      try {
+        const data = await WebAnalyticsService.getAnalyticsData();
+        setWebAnalytics(data);
+        setAnalytics(a => ({ 
+          ...a, 
+          users: data.totalUsers,
+          comments: 0, // Still not implemented
+          uploads: 0   // Still not implemented
+        }));
+      } catch (error) {
+        console.error('Failed to load analytics:', error);
+        setAnalytics(a => ({ ...a, users: 0, comments: 0, uploads: 0 }));
+      }
+    };
+
+    loadAnalytics();
+    
     // Load initial notification stats
     const stats = NotificationSender.getNotificationStats();
     setNotificationStats(stats);
+
+    // Set up real-time analytics updates
+    const unsubscribeAnalytics = WebAnalyticsService.subscribeToAnalytics((data) => {
+      setWebAnalytics(data);
+      setAnalytics(a => ({ 
+        ...a, 
+        users: data.totalUsers 
+      }));
+    });
+
+    return () => {
+      unsubscribeAnalytics();
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -538,17 +572,43 @@ export default function AdminPanel() {
         <Button variant={activeTab === 'manage' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manage')}>Manage News</Button>
         <Button variant={activeTab === 'categories' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('categories')}>Categories</Button>
         <Button variant={activeTab === 'notifications' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('notifications')}>Notifications</Button>
+        <Button variant={activeTab === 'analytics' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('analytics')}>Analytics</Button>
         <Button variant={activeTab === 'api' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('api')}>API Import</Button>
       </div>
-      {/* Analytics Section */}
-  <div className="mb-4 sm:mb-6 grid grid-cols-2 xs:grid-cols-3 md:grid-cols-7 gap-2 sm:gap-4 text-center">
-        <div><div className="font-bold text-lg">{analytics.articles}</div><div className="text-xs text-muted-foreground">Articles</div></div>
-        <div><div className="font-bold text-lg">{analytics.categories}</div><div className="text-xs text-muted-foreground">Categories</div></div>
-        <div><div className="font-bold text-lg">{analytics.users}</div><div className="text-xs text-muted-foreground">Users</div></div>
-        <div><div className="font-bold text-lg">{analytics.comments}</div><div className="text-xs text-muted-foreground">Comments</div></div>
-        <div><div className="font-bold text-lg">{analytics.uploads}</div><div className="text-xs text-muted-foreground">Uploads</div></div>
-        <div><div className="font-bold text-lg">{notificationStats.totalSent}</div><div className="text-xs text-muted-foreground">Notifications</div></div>
-        <div><div className="font-bold text-lg">{isNotificationSending ? 'Sending...' : 'Ready'}</div><div className="text-xs text-muted-foreground">Status</div></div>
+      {/* Quick Analytics Overview */}
+      <div className="mb-4 sm:mb-6 grid grid-cols-2 xs:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-4 text-center">
+        <div className="bg-card border rounded-lg p-3">
+          <div className="font-bold text-lg">{analytics.articles}</div>
+          <div className="text-xs text-muted-foreground">Articles</div>
+        </div>
+        <div className="bg-card border rounded-lg p-3">
+          <div className="font-bold text-lg">{analytics.categories}</div>
+          <div className="text-xs text-muted-foreground">Categories</div>
+        </div>
+        <div className="bg-card border rounded-lg p-3">
+          <div className="font-bold text-lg text-blue-600">{webAnalytics?.totalUsers || 0}</div>
+          <div className="text-xs text-muted-foreground">Total Users</div>
+        </div>
+        <div className="bg-card border rounded-lg p-3">
+          <div className="font-bold text-lg text-green-600">{webAnalytics?.activeUsers || 0}</div>
+          <div className="text-xs text-muted-foreground">Online Now</div>
+        </div>
+        <div className="bg-card border rounded-lg p-3">
+          <div className="font-bold text-lg text-purple-600">{webAnalytics?.totalPageViews || 0}</div>
+          <div className="text-xs text-muted-foreground">Page Views</div>
+        </div>
+        <div className="bg-card border rounded-lg p-3">
+          <div className="font-bold text-lg text-orange-600">{webAnalytics?.dailyUsers || 0}</div>
+          <div className="text-xs text-muted-foreground">Today</div>
+        </div>
+        <div className="bg-card border rounded-lg p-3">
+          <div className="font-bold text-lg">{notificationStats.totalSent}</div>
+          <div className="text-xs text-muted-foreground">Notifications</div>
+        </div>
+        <div className="bg-card border rounded-lg p-3">
+          <div className="font-bold text-lg text-sm">{isNotificationSending ? 'Sending...' : 'Ready'}</div>
+          <div className="text-xs text-muted-foreground">Status</div>
+        </div>
       </div>
       {activeTab === 'manual' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
@@ -1003,6 +1063,73 @@ export default function AdminPanel() {
           </div>
           <Button type="submit" disabled>Fetch (Not implemented)</Button>
         </form>
+      )}
+      
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          {/* Simplified Analytics Dashboard */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Real-time Online Visitors */}
+            <div className="bg-card border rounded-lg p-8 text-center">
+              <h3 className="text-lg font-semibold mb-2">Real-time Online Visitors</h3>
+              <div className="text-4xl font-bold text-green-600 mb-2">
+                {webAnalytics?.activeUsers || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Users active in last 5 minutes</p>
+              <div className="mt-4 flex items-center justify-center">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                <span className="text-xs text-muted-foreground">Live</span>
+              </div>
+            </div>
+
+            {/* Total Visitors */}
+            <div className="bg-card border rounded-lg p-8 text-center">
+              <h3 className="text-lg font-semibold mb-2">Total Visitors</h3>
+              <div className="text-4xl font-bold text-blue-600 mb-2">
+                {webAnalytics?.totalUsers || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">Unique visitors (last 30 days)</p>
+              <div className="mt-4">
+                <span className="text-xs text-muted-foreground">
+                  {webAnalytics?.totalPageViews || 0} total page views
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Simple Stats Row */}
+          <div className="bg-card border rounded-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">Quick Stats</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{webAnalytics?.dailyUsers || 0}</div>
+                <div className="text-xs text-muted-foreground">Today</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">{webAnalytics?.weeklyUsers || 0}</div>
+                <div className="text-xs text-muted-foreground">This Week</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{analytics.articles}</div>
+                <div className="text-xs text-muted-foreground">Articles</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{notificationStats.totalSent}</div>
+                <div className="text-xs text-muted-foreground">Notifications</div>
+              </div>
+            </div>
+          </div>
+
+          {/* App Installation Analytics (Future) */}
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+            <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">App Installation Tracking</h4>
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              App installation analytics will be available once you integrate Google Play Console API or Firebase Analytics for your mobile app. 
+              This will show app downloads, installations, and user retention metrics.
+            </p>
+          </div>
+        </div>
       )}
       </div>
     </AuthProtected>

@@ -6,6 +6,7 @@ import { ArticleCard as ArticleType } from "@/types/article";
 import { formatDistanceToNow } from "date-fns";
 import { ArticleActions } from "@/components/ArticleActions";
 import { YouTubeEmbed, YouTubeThumbnail, extractYouTubeVideoId } from "@/components/ui/YouTubeEmbed";
+import { WebAnalyticsService } from "@/services/WebAnalyticsService";
 import "@/styles/article-layout.css";
 
 interface ArticleCardProps {
@@ -36,12 +37,30 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
   const handleCardClick = (e: React.MouseEvent) => {
     // Prevent link/button inside from triggering twice
     if ((e.target as HTMLElement).closest('a,button,iframe,.youtube-embed-container')) return;
+    
+    // Track article click event
+    WebAnalyticsService.trackEvent('article_click', {
+      articleId: article.id,
+      articleTitle: article.title,
+      category: article.category,
+      source: article.source
+    });
+    
     window.open(article.sourceUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleVideoThumbnailClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Track video play click
+    WebAnalyticsService.trackEvent('video_play_click', {
+      articleId: article.id,
+      articleTitle: article.title,
+      category: article.category,
+      videoUrl: article.youtubeUrl
+    });
+    
     setShowVideoPlayer(true);
   };
 
@@ -198,7 +217,16 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center ml-2 px-2 py-1 text-xs font-semibold bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors duration-200 rounded-md"
-                      onClick={e => e.stopPropagation()}
+                      onClick={e => {
+                        e.stopPropagation();
+                        // Track read more click
+                        WebAnalyticsService.trackEvent('read_more_click', {
+                          articleId: article.id,
+                          articleTitle: article.title,
+                          category: article.category,
+                          source: article.source
+                        });
+                      }}
                     >
                       Read more <span className="ml-1">→</span>
                     </a>

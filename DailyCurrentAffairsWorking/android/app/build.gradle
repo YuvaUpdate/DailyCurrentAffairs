@@ -106,12 +106,10 @@ android {
             keyPassword 'android'
         }
         release {
-            // For now, use debug keystore for release builds to maintain Firebase compatibility
-            // In production, replace this with your actual release keystore
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+            storeFile file('release.keystore')
+            storePassword 'a8f616649a43fd9ebb8592e20b283079'
+            keyAlias '0b312ef8d1aacdba63b59a86301c012a'
+            keyPassword '788475ae28f11fa9378562ac1bc371ca'
         }
     }
     buildTypes {
