@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { firebaseNewsService } from "../services/FirebaseNewsService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Upload, X, Play, Image as ImageIcon, LogOut } from "lucide-react";
+import { Loader2, Upload, X, Play, Image as ImageIcon, LogOut, RefreshCw, TrendingUp, Users, Eye, Clock, Activity, Globe, Smartphone, Monitor, BarChart3 } from "lucide-react";
 import { NotificationSender } from "../services/NotificationSender";
 import { TestNotificationService } from "../services/TestNotificationService";
 import { webFileUploadService, UploadResult } from "../services/WebFileUploadService";
@@ -11,6 +11,7 @@ import { AuthProtected } from "@/components/AuthProtected";
 import { auth } from "@/services/firebase.config";
 import { signOut } from "firebase/auth";
 import { WebAnalyticsService, AnalyticsData } from "../services/WebAnalyticsService";
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 const HEADLINE_MAX = 200;
 const DESCRIPTION_WORD_MAX = 80;
@@ -46,6 +47,8 @@ export default function AdminPanel() {
   // Analytics
   const [analytics, setAnalytics] = useState({ articles: 0, categories: 0, users: 0, comments: 0, uploads: 0 });
   const [webAnalytics, setWebAnalytics] = useState<AnalyticsData | null>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   // Notification states
   const [isNotificationSending, setIsNotificationSending] = useState(false);
   const [lastNotificationTime, setLastNotificationTime] = useState<number>(0);
@@ -510,8 +513,10 @@ export default function AdminPanel() {
     // Load web analytics
     const loadAnalytics = async () => {
       try {
+        setIsLoadingAnalytics(true);
         const data = await WebAnalyticsService.getAnalyticsData();
         setWebAnalytics(data);
+        setLastUpdated(new Date());
         setAnalytics(a => ({ 
           ...a, 
           users: data.totalUsers,
@@ -521,6 +526,8 @@ export default function AdminPanel() {
       } catch (error) {
         console.error('Failed to load analytics:', error);
         setAnalytics(a => ({ ...a, users: 0, comments: 0, uploads: 0 }));
+      } finally {
+        setIsLoadingAnalytics(false);
       }
     };
 
@@ -1067,67 +1074,297 @@ export default function AdminPanel() {
       
       {activeTab === 'analytics' && (
         <div className="space-y-6">
-          {/* Simplified Analytics Dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Real-time Online Visitors */}
-            <div className="bg-card border rounded-lg p-8 text-center">
-              <h3 className="text-lg font-semibold mb-2">Real-time Online Visitors</h3>
-              <div className="text-4xl font-bold text-green-600 mb-2">
-                {webAnalytics?.activeUsers || 0}
+          {/* Analytics Header with Refresh */}
+          <div className="flex justify-between items-center bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <BarChart3 className="h-6 w-6 text-blue-600" />
+                Website Analytics Dashboard
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : 'Loading analytics data...'}
+              </p>
+            </div>
+            <Button 
+              onClick={async () => {
+                setIsLoadingAnalytics(true);
+                const data = await WebAnalyticsService.getAnalyticsData();
+                setWebAnalytics(data);
+                setLastUpdated(new Date());
+                setIsLoadingAnalytics(false);
+              }}
+              disabled={isLoadingAnalytics}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isLoadingAnalytics ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Refresh
+            </Button>
+          </div>
+
+          {/* Key Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Real-time Users */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/30 rounded-xl p-6 border border-green-200 dark:border-green-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-700 dark:text-green-300 text-sm font-medium">Live Users</p>
+                  <p className="text-3xl font-bold text-green-900 dark:text-green-100 mt-1">
+                    {webAnalytics?.activeUsers || 0}
+                  </p>
+                </div>
+                <div className="bg-green-500 rounded-full p-3">
+                  <Activity className="h-6 w-6 text-white" />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">Users active in last 5 minutes</p>
-              <div className="mt-4 flex items-center justify-center">
+              <div className="flex items-center mt-4">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
-                <span className="text-xs text-muted-foreground">Live</span>
+                <span className="text-xs text-green-700 dark:text-green-300">Real-time</span>
               </div>
             </div>
 
-            {/* Total Visitors */}
-            <div className="bg-card border rounded-lg p-8 text-center">
-              <h3 className="text-lg font-semibold mb-2">Total Visitors</h3>
-              <div className="text-4xl font-bold text-blue-600 mb-2">
-                {webAnalytics?.totalUsers || 0}
+            {/* Total Users */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/30 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-700 dark:text-blue-300 text-sm font-medium">Total Users</p>
+                  <p className="text-3xl font-bold text-blue-900 dark:text-blue-100 mt-1">
+                    {webAnalytics?.totalUsers || 0}
+                  </p>
+                </div>
+                <div className="bg-blue-500 rounded-full p-3">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">Unique visitors (last 30 days)</p>
-              <div className="mt-4">
-                <span className="text-xs text-muted-foreground">
-                  {webAnalytics?.totalPageViews || 0} total page views
-                </span>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-4">Last 30 days</p>
+            </div>
+
+            {/* Page Views */}
+            <div className="bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/30 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-700 dark:text-purple-300 text-sm font-medium">Page Views</p>
+                  <p className="text-3xl font-bold text-purple-900 dark:text-purple-100 mt-1">
+                    {webAnalytics?.totalPageViews || 0}
+                  </p>
+                </div>
+                <div className="bg-purple-500 rounded-full p-3">
+                  <Eye className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              <p className="text-xs text-purple-700 dark:text-purple-300 mt-4">Total views</p>
+            </div>
+
+            {/* Avg Session Duration */}
+            <div className="bg-gradient-to-br from-orange-50 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/30 rounded-xl p-6 border border-orange-200 dark:border-orange-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-700 dark:text-orange-300 text-sm font-medium">Avg Session</p>
+                  <p className="text-3xl font-bold text-orange-900 dark:text-orange-100 mt-1">
+                    {webAnalytics?.averageSessionDuration || 0}m
+                  </p>
+                </div>
+                <div className="bg-orange-500 rounded-full p-3">
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              <p className="text-xs text-orange-700 dark:text-orange-300 mt-4">Minutes per session</p>
+            </div>
+          </div>
+
+          {/* Charts Row 1: Traffic Trends */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Daily Traffic Chart */}
+            <div className="bg-card rounded-xl border p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+                Daily Traffic (Last 30 Days)
+              </h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={webAnalytics?.dailyStats || []}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip 
+                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                      formatter={(value: any) => [value, 'Users']}
+                      contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="users" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      fill="url(#colorUsers)" 
+                    />
+                    <defs>
+                      <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Hourly Activity */}
+            <div className="bg-card rounded-xl border p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-purple-600" />
+                Hourly Activity (Today)
+              </h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={webAnalytics?.hourlyStats || []}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis 
+                      dataKey="hour" 
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => `${value}:00`}
+                    />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip 
+                      labelFormatter={(value) => `${value}:00 - ${value + 1}:00`}
+                      formatter={(value: any) => [value, 'Users']}
+                      contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                    <Bar dataKey="users" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
 
-          {/* Simple Stats Row */}
-          <div className="bg-card border rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Quick Stats</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{webAnalytics?.dailyUsers || 0}</div>
-                <div className="text-xs text-muted-foreground">Today</div>
+          {/* Charts Row 2: Content & Devices */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Pages */}
+            <div className="bg-card rounded-xl border p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-green-600" />
+                Most Visited Pages
+              </h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={webAnalytics?.topPages || []} layout="horizontal">
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis type="number" tick={{ fontSize: 12 }} />
+                    <YAxis 
+                      type="category" 
+                      dataKey="page" 
+                      tick={{ fontSize: 11 }}
+                      width={100}
+                      tickFormatter={(value) => value.length > 15 ? `${value.substring(0, 15)}...` : value}
+                    />
+                    <Tooltip 
+                      formatter={(value: any) => [value, 'Views']}
+                      contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                    <Bar dataKey="views" fill="#10b981" />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{webAnalytics?.weeklyUsers || 0}</div>
-                <div className="text-xs text-muted-foreground">This Week</div>
+            </div>
+
+            {/* Device Breakdown */}
+            <div className="bg-card rounded-xl border p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Monitor className="h-5 w-5 text-indigo-600" />
+                Device Breakdown
+              </h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={webAnalytics?.deviceBreakdown || []}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="count"
+                    >
+                      {(webAnalytics?.deviceBreakdown || []).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b'][index % 3]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: any) => [value, 'Users']}
+                      contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{analytics.articles}</div>
-                <div className="text-xs text-muted-foreground">Articles</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{notificationStats.totalSent}</div>
-                <div className="text-xs text-muted-foreground">Notifications</div>
+              <div className="flex justify-center gap-4 mt-4">
+                {(webAnalytics?.deviceBreakdown || []).map((entry, index) => (
+                  <div key={entry.device} className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'][index % 3] }}
+                    ></div>
+                    <span className="text-sm text-muted-foreground">{entry.device}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* App Installation Analytics (Future) */}
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-            <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">App Installation Tracking</h4>
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              App installation analytics will be available once you integrate Google Play Console API or Firebase Analytics for your mobile app. 
-              This will show app downloads, installations, and user retention metrics.
-            </p>
+          {/* Bottom Stats Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Bounce Rate */}
+            <div className="bg-card rounded-xl border p-6 text-center">
+              <div className="text-3xl font-bold text-red-600 mb-2">
+                {webAnalytics?.bounceRate || 0}%
+              </div>
+              <p className="text-sm text-muted-foreground">Bounce Rate</p>
+              <p className="text-xs text-muted-foreground mt-1">Single page sessions</p>
+            </div>
+
+            {/* Content Stats */}
+            <div className="bg-card rounded-xl border p-6 text-center">
+              <div className="text-3xl font-bold text-blue-600 mb-2">
+                {analytics.articles}
+              </div>
+              <p className="text-sm text-muted-foreground">Published Articles</p>
+              <p className="text-xs text-muted-foreground mt-1">Total content pieces</p>
+            </div>
+
+            {/* Notifications Sent */}
+            <div className="bg-card rounded-xl border p-6 text-center">
+              <div className="text-3xl font-bold text-green-600 mb-2">
+                {notificationStats.totalSent}
+              </div>
+              <p className="text-sm text-muted-foreground">Notifications Sent</p>
+              <p className="text-xs text-muted-foreground mt-1">Push notifications</p>
+            </div>
+          </div>
+
+          {/* Export/Actions Section */}
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-6 border">
+            <div className="flex justify-between items-center">
+              <div>
+                <h4 className="font-semibold text-gray-900 dark:text-white">Analytics Data Export</h4>
+                <p className="text-sm text-muted-foreground mt-1">Download detailed analytics reports</p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm">
+                  <Globe className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button variant="outline" size="sm">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Generate Report
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

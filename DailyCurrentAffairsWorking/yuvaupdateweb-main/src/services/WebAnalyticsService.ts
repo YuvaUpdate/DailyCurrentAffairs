@@ -26,6 +26,19 @@ export interface UserSession {
   city?: string;
 }
 
+export interface DailyStats {
+  date: string;
+  users: number;
+  pageViews: number;
+  sessions: number;
+}
+
+export interface HourlyStats {
+  hour: number;
+  users: number;
+  pageViews: number;
+}
+
 export interface AnalyticsData {
   totalUsers: number;
   activeUsers: number;
@@ -33,8 +46,14 @@ export interface AnalyticsData {
   dailyUsers: number;
   weeklyUsers: number;
   monthlyUsers: number;
-  topPages: Array<{ page: string; views: number }>;
+  topPages: Array<{ page: string; views: number; title?: string }>;
   userSessions: UserSession[];
+  dailyStats: DailyStats[];
+  hourlyStats: HourlyStats[];
+  averageSessionDuration: number;
+  bounceRate: number;
+  topReferrers: Array<{ source: string; visitors: number }>;
+  deviceBreakdown: Array<{ device: string; count: number }>;
 }
 
 export class WebAnalyticsService {
@@ -230,6 +249,24 @@ export class WebAnalyticsService {
       // Get top pages
       const topPages = await this.getTopPages();
 
+      // Generate daily stats for the last 30 days
+      const dailyStats = await this.generateDailyStats(userSessions);
+
+      // Generate hourly stats for today
+      const hourlyStats = this.generateHourlyStats(userSessions);
+
+      // Calculate average session duration
+      const avgDuration = this.calculateAverageSessionDuration(userSessions);
+
+      // Calculate bounce rate (sessions with only 1 page view)
+      const bounceRate = this.calculateBounceRate(userSessions);
+
+      // Get top referrers
+      const topReferrers = this.getTopReferrers(userSessions);
+
+      // Get device breakdown
+      const deviceBreakdown = this.getDeviceBreakdown(userSessions);
+
       return {
         totalUsers,
         activeUsers,
@@ -238,7 +275,13 @@ export class WebAnalyticsService {
         weeklyUsers,
         monthlyUsers,
         topPages,
-        userSessions
+        userSessions,
+        dailyStats,
+        hourlyStats,
+        averageSessionDuration: avgDuration,
+        bounceRate,
+        topReferrers,
+        deviceBreakdown
       };
 
     } catch (error) {
@@ -251,7 +294,13 @@ export class WebAnalyticsService {
         weeklyUsers: 0,
         monthlyUsers: 0,
         topPages: [],
-        userSessions: []
+        userSessions: [],
+        dailyStats: [],
+        hourlyStats: [],
+        averageSessionDuration: 0,
+        bounceRate: 0,
+        topReferrers: [],
+        deviceBreakdown: []
       };
     }
   }
@@ -363,6 +412,154 @@ export class WebAnalyticsService {
     });
 
     return unsubscribe;
+  }
+
+  /**
+   * Generate daily statistics for the last 30 days
+   */
+  private static async generateDailyStats(userSessions: UserSession[]): Promise<DailyStats[]> {
+    const stats: DailyStats[] = [];
+    const now = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      const daySessions = userSessions.filter(session => 
+        session.firstVisit >= dayStart && session.firstVisit <= dayEnd
+      );
+      
+      const dayPageViews = daySessions.reduce((total, session) => total + session.pageViews, 0);
+      
+      stats.push({
+        date: dateStr,
+        users: daySessions.length,
+        pageViews: dayPageViews,
+        sessions: daySessions.length
+      });
+    }
+    
+    return stats;
+  }
+
+  /**
+   * Generate hourly statistics for today
+   */
+  private static generateHourlyStats(userSessions: UserSession[]): HourlyStats[] {
+    const stats: HourlyStats[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const todaySessions = userSessions.filter(session => 
+      session.firstVisit >= today && session.firstVisit < tomorrow
+    );
+    
+    for (let hour = 0; hour < 24; hour++) {
+      const hourStart = new Date(today);
+      hourStart.setHours(hour, 0, 0, 0);
+      const hourEnd = new Date(today);
+      hourEnd.setHours(hour, 59, 59, 999);
+      
+      const hourSessions = todaySessions.filter(session =>
+        session.firstVisit >= hourStart && session.firstVisit <= hourEnd
+      );
+      
+      const hourPageViews = hourSessions.reduce((total, session) => total + session.pageViews, 0);
+      
+      stats.push({
+        hour,
+        users: hourSessions.length,
+        pageViews: hourPageViews
+      });
+    }
+    
+    return stats;
+  }
+
+  /**
+   * Calculate average session duration in minutes
+   */
+  private static calculateAverageSessionDuration(userSessions: UserSession[]): number {
+    if (userSessions.length === 0) return 0;
+    
+    const totalDuration = userSessions.reduce((total, session) => {
+      const duration = (session.lastVisit.getTime() - session.firstVisit.getTime()) / 1000 / 60; // minutes
+      return total + duration;
+    }, 0);
+    
+    return Math.round(totalDuration / userSessions.length);
+  }
+
+  /**
+   * Calculate bounce rate (percentage of single-page sessions)
+   */
+  private static calculateBounceRate(userSessions: UserSession[]): number {
+    if (userSessions.length === 0) return 0;
+    
+    const bounces = userSessions.filter(session => session.pageViews <= 1).length;
+    return Math.round((bounces / userSessions.length) * 100);
+  }
+
+  /**
+   * Get top referrers
+   */
+  private static getTopReferrers(userSessions: UserSession[]): Array<{ source: string; visitors: number }> {
+    const referrers: { [key: string]: number } = {};
+    
+    userSessions.forEach(session => {
+      // Extract domain from user agent or use 'Direct' for direct visits
+      const source = this.extractReferrerSource(session.userAgent) || 'Direct';
+      referrers[source] = (referrers[source] || 0) + 1;
+    });
+    
+    return Object.entries(referrers)
+      .map(([source, visitors]) => ({ source, visitors }))
+      .sort((a, b) => b.visitors - a.visitors)
+      .slice(0, 10);
+  }
+
+  /**
+   * Get device breakdown from user agents
+   */
+  private static getDeviceBreakdown(userSessions: UserSession[]): Array<{ device: string; count: number }> {
+    const devices: { [key: string]: number } = {};
+    
+    userSessions.forEach(session => {
+      const device = this.extractDeviceType(session.userAgent);
+      devices[device] = (devices[device] || 0) + 1;
+    });
+    
+    return Object.entries(devices)
+      .map(([device, count]) => ({ device, count }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  /**
+   * Extract referrer source from user agent
+   */
+  private static extractReferrerSource(userAgent: string): string {
+    if (userAgent.includes('Google')) return 'Google';
+    if (userAgent.includes('Facebook')) return 'Facebook';
+    if (userAgent.includes('Twitter')) return 'Twitter';
+    if (userAgent.includes('LinkedIn')) return 'LinkedIn';
+    return 'Direct';
+  }
+
+  /**
+   * Extract device type from user agent
+   */
+  private static extractDeviceType(userAgent: string): string {
+    if (userAgent.includes('Mobile') || userAgent.includes('Android')) return 'Mobile';
+    if (userAgent.includes('Tablet') || userAgent.includes('iPad')) return 'Tablet';
+    return 'Desktop';
   }
 }
 
