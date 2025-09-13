@@ -31,6 +31,7 @@ const OptimizedImage = memo(({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [imageSource, setImageSource] = useState(source);
+  const [showImage, setShowImage] = useState(false);
   const prefetchService = ImagePrefetchService.getInstance();
 
   useEffect(() => {
@@ -45,10 +46,12 @@ const OptimizedImage = memo(({
     const isCached = prefetchService.isImageCached(imageUrl);
     if (isCached) {
       setIsLoading(false);
+      setShowImage(true); // Show immediately if cached
     } else {
       // Start prefetching if not cached
       prefetchService.prefetchImage(imageUrl).then(() => {
         setIsLoading(false);
+        setShowImage(true); // Show after prefetch completes
       }).catch(() => {
         setHasError(true);
         setIsLoading(false);
@@ -59,6 +62,7 @@ const OptimizedImage = memo(({
   const handleLoad = () => {
     setIsLoading(false);
     setHasError(false);
+    setShowImage(true);
     onLoad?.();
   };
 
@@ -90,20 +94,27 @@ const OptimizedImage = memo(({
 
   return (
     <View style={[getImageStyle(), ImageAlignmentHelper.getContainerAlignmentStyles()]}>
-      <Image
-        source={imageSource}
-        style={[getImageStyle(), hasError && styles.errorImage, ImageAlignmentHelper.getImageAlignmentStyles()]}
-        resizeMode={resizeMode}
-        onError={handleError}
-        onLoad={handleLoad}
-        fadeDuration={fadeDuration}
-        progressiveRenderingEnabled={progressiveRenderingEnabled}
-        loadingIndicatorSource={loadingIndicatorSource}
-      />
+      {showImage && (
+        <Image
+          source={imageSource}
+          style={[getImageStyle(), hasError && styles.errorImage, ImageAlignmentHelper.getImageAlignmentStyles()]}
+          resizeMode={resizeMode}
+          onError={handleError}
+          onLoad={handleLoad}
+          fadeDuration={hasError ? 0 : fadeDuration} // No fade for error images
+          progressiveRenderingEnabled={progressiveRenderingEnabled}
+          loadingIndicatorSource={loadingIndicatorSource}
+        />
+      )}
       
-      {isLoading && showLoadingIndicator && (
+      {isLoading && (
         <View style={[styles.loadingContainer, getImageStyle()]}>
-          <ActivityIndicator size="small" color="#999" />
+          <View style={styles.shimmerContainer}>
+            <View style={styles.shimmerPlaceholder} />
+            {showLoadingIndicator && (
+              <ActivityIndicator size="small" color="#666" style={styles.loadingSpinner} />
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -117,12 +128,29 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: '#f8f9fa',
+    overflow: 'hidden',
+  },
+  shimmerContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    position: 'relative',
+  },
+  shimmerPlaceholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#e9ecef',
+    borderRadius: 8,
+  },
+  loadingSpinner: {
+    position: 'absolute',
   },
   errorImage: {
-    opacity: 0.7,
+    opacity: 0.8,
   },
 });
 

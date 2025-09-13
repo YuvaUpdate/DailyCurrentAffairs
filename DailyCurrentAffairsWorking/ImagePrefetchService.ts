@@ -13,8 +13,9 @@ export class ImagePrefetchService {
   private prefetchQueue = new Set<string>();
   private readonly CACHE_KEY = 'image_prefetch_cache';
   private readonly CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
-  private readonly MAX_CACHE_SIZE = 300; // Increased cache size for faster image loading
-  private readonly MAX_CONCURRENT_PREFETCH = 8; // Increased concurrent prefetch for faster loading
+  private readonly MAX_CACHE_SIZE = 500; // Much larger cache for faster image loading
+  private readonly MAX_CONCURRENT_PREFETCH = 12; // More concurrent prefetch for faster loading
+  private readonly PREFETCH_AHEAD_COUNT = 8; // Prefetch images for next 8 articles
 
   static getInstance(): ImagePrefetchService {
     if (!ImagePrefetchService.instance) {
@@ -117,6 +118,38 @@ export class ImagePrefetchService {
     }
   }
 
+  // Aggressive prefetching for current and upcoming articles
+  async prefetchUpcomingArticles(articles: any[], currentIndex: number): Promise<void> {
+    if (!articles || articles.length === 0) return;
+
+    const imagesToPrefetch: string[] = [];
+    
+    // Prefetch current article and next few articles
+    const endIndex = Math.min(currentIndex + this.PREFETCH_AHEAD_COUNT, articles.length);
+    
+    for (let i = currentIndex; i < endIndex; i++) {
+      const article = articles[i];
+      if (article?.image && !this.cache.has(article.image)) {
+        imagesToPrefetch.push(article.image);
+      }
+    }
+
+    // Also prefetch a few previous articles (for swipe back)
+    const startIndex = Math.max(0, currentIndex - 2);
+    for (let i = startIndex; i < currentIndex; i++) {
+      const article = articles[i];
+      if (article?.image && !this.cache.has(article.image)) {
+        imagesToPrefetch.push(article.image);
+      }
+    }
+
+    if (imagesToPrefetch.length > 0) {
+      console.log(`🚀 Aggressively prefetching ${imagesToPrefetch.length} images for faster loading`);
+      // Start prefetching in background (don't wait)
+      this.prefetchImages(imagesToPrefetch).catch(console.warn);
+    }
+  }
+
   // Get image dimensions
   private getImageDimensions(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve) => {
@@ -177,6 +210,17 @@ export class ImagePrefetchService {
       size: this.cache.size,
       prefetching: this.prefetchQueue.size
     };
+  }
+
+  // Warm up cache with critical images (call when app starts)
+  async warmUpCache(criticalImages: string[]): Promise<void> {
+    console.log(`🔥 Warming up cache with ${criticalImages.length} critical images`);
+    const uncachedImages = criticalImages.filter(url => url && !this.cache.has(url));
+    
+    if (uncachedImages.length > 0) {
+      // Prefetch critical images with higher priority
+      await this.prefetchImages(uncachedImages.slice(0, 15)); // First 15 images
+    }
   }
 }
 

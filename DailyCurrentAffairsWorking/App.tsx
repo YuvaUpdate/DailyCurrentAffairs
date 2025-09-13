@@ -65,6 +65,8 @@ import InAppBrowserHost, { showInApp } from './InAppBrowser';
 import SkeletonCard from './SkeletonCard';
 import OptimizedImage from './OptimizedImage';
 import ImageAlignmentHelper from './ImageAlignmentHelper';
+import ImagePrefetchService from './ImagePrefetchService';
+import ImageCacheWarmer from './ImageCacheWarmer';
 import { expoPushService } from './ExpoPushService';
 import * as Notifications from 'expo-notifications';
 
@@ -402,6 +404,15 @@ export default function App(props: AppProps) {
             setLastArticleCount(freshArticles.length);
             setIsLoadingArticles(false);
             
+            // 🚀 ULTRA-FAST IMAGE LOADING - Multi-layer optimization
+            const cacheWarmer = ImageCacheWarmer.getInstance();
+            
+            // Phase 1: Immediate preload of visible images (first 5)
+            cacheWarmer.preloadVisibleImages(freshArticles);
+            
+            // Phase 2: Warm up cache with more images in background
+            cacheWarmer.warmUpCache(freshArticles);
+            
             // Apply filter immediately
             if (selectedCategory) {
               const filtered = freshArticles.filter((article: NewsArticle) => article.category === selectedCategory);
@@ -651,6 +662,15 @@ export default function App(props: AppProps) {
 
     return () => subscription?.remove();
   }, []);
+
+  // 🚀 Smart Image Prefetching - Prefetch upcoming articles when user scrolls
+  useEffect(() => {
+    if (filteredNews.length > 0 && currentIndex >= 0) {
+      const cacheWarmer = ImageCacheWarmer.getInstance();
+      // Smart prefetch based on current scroll position
+      cacheWarmer.smartPrefetch(filteredNews, currentIndex);
+    }
+  }, [currentIndex, filteredNews]);
 
   // Reset current index when filtered news changes
   useEffect(() => {
