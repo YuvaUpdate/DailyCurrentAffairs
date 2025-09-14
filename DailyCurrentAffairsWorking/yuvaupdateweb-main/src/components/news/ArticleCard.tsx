@@ -165,8 +165,8 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
           </span>
         )}
         
-        {/* Read Aloud and Share Actions - Moved higher up on the media */}
-        <div className="absolute top-8 right-3 z-20" onClick={(e) => e.stopPropagation()}>
+        {/* Read Aloud and Share Actions - Moved much lower to avoid theme button overlap */}
+        <div className="absolute top-24 right-3 z-20" onClick={(e) => e.stopPropagation()}>
           <ArticleActions
             article={{
               title: article.title,
@@ -174,7 +174,7 @@ export function ArticleCard({ article, onReadMore, onOpenLink, isActive = false 
               sourceUrl: article.sourceUrl,
               category: article.category,
             }}
-            className="flex-col gap-2"
+            className="flex-row gap-2"
           />
         </div>
         

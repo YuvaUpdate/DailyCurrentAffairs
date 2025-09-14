@@ -34,9 +34,15 @@ const AppContent = () => {
     <>
       <Toaster />
       <Sonner />
-      {/* Theme toggle button fixed at top right - hidden when video feed is open */}
+      {/* Theme toggle button fixed below header - hidden when video feed is open */}
       {!isVideoFeedOpen && (
-        <div className="fixed top-4 right-4 z-[9999] bg-card/80 rounded shadow-lg p-1">
+        <div className="fixed top-[calc(var(--header-height)+1rem)] right-4 z-[9999] bg-card/90 backdrop-blur-md rounded-lg shadow-lg border border-border/20 p-2 hover:bg-card transition-all duration-200 sm:block hidden">
+          <ThemeToggle />
+        </div>
+      )}
+      {/* Mobile theme toggle - positioned differently for mobile */}
+      {!isVideoFeedOpen && (
+        <div className="fixed top-[calc(var(--header-height)+0.5rem)] right-2 z-[9999] bg-card/90 backdrop-blur-md rounded-lg shadow-lg border border-border/20 p-1.5 hover:bg-card transition-all duration-200 sm:hidden block">
           <ThemeToggle />
         </div>
       )}
