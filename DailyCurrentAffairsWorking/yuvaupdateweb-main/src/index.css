@@ -1,5 +1,7 @@
 /* Import line clamp utilities */
 @import url('./components/ui/line-clamp.css');
+/* Import video feed styles */
+@import url('./styles/video-feed.css');
 
 @tailwind base;
 @tailwind components;

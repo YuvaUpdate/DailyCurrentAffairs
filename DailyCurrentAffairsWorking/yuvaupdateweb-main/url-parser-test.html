@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video URL Parser Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        .url-input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        .result { margin: 10px 0; padding: 10px; background-color: #f9f9f9; border-radius: 4px; }
+        .supported { color: green; font-weight: bold; }
+        .unsupported { color: orange; font-weight: bold; }
+        .platform-badge { display: inline-block; padding: 4px 8px; margin: 2px; border-radius: 12px; font-size: 12px; }
+        .youtube { background: #ff0000; color: white; }
+        .instagram { background: #e4405f; color: white; }
+        .tiktok { background: #000000; color: white; }
+        .direct { background: #28a745; color: white; }
+        .other { background: #6c757d; color: white; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; border: none; border-radius: 4px; background: #007bff; color: white; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🎥 Video URL Parser Test</h1>
+    <p>Test the video URL parsing functionality with various platforms</p>
+    
+    <div class="test-section">
+        <h2>URL Parser</h2>
+        <input type="text" class="url-input" id="urlInput" placeholder="Paste any video URL here (YouTube, Instagram, TikTok, etc.)">
+        <button onclick="parseUrl()">Parse URL</button>
+        <button onclick="clearTest()">Clear</button>
+        <div id="parseResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Quick Test URLs</h2>
+        <p>Click to test with sample URLs:</p>
+        <button onclick="testUrl('https://youtube.com/shorts/dQw4w9WgXcQ')">YouTube Shorts</button>
+        <button onclick="testUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')">YouTube Video</button>
+        <button onclick="testUrl('https://youtu.be/dQw4w9WgXcQ')">YouTube Short Link</button>
+        <button onclick="testUrl('https://www.instagram.com/reel/ABC123/')">Instagram Reel</button>
+        <button onclick="testUrl('https://www.tiktok.com/@user/video/1234567890')">TikTok Video</button>
+        <button onclick="testUrl('https://example.com/video.mp4')">Direct MP4</button>
+        <button onclick="testUrl('https://facebook.com/video/123')">Facebook Video</button>
+    </div>
+
+    <script>
+        // Video URL parsing utilities
+        class VideoUrlUtils {
+            static parseVideoUrl(url) {
+                try {
+                    const urlObj = new URL(url);
+                    const hostname = urlObj.hostname.toLowerCase();
+                    
+                    if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+                        return this.parseYouTubeUrl(url, urlObj);
+                    }
+                    
+                    if (hostname.includes('instagram.com')) {
+                        return this.parseInstagramUrl(url, urlObj);
+                    }
+                    
+                    if (hostname.includes('tiktok.com')) {
+                        return this.parseTikTokUrl(url, urlObj);
+                    }
+                    
+                    if (hostname.includes('facebook.com') || hostname.includes('fb.com')) {
+                        return this.parseFacebookUrl(url, urlObj);
+                    }
+                    
+                    if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
+                        return this.parseTwitterUrl(url, urlObj);
+                    }
+                    
+                    if (url.match(/\.(mp4|webm|ogg|avi|mov|wmv|flv|m4v)(\?.*)?$/i)) {
+                        return {
+                            originalUrl: url,
+                            embedUrl: url,
+                            platform: 'Direct',
+                            isSupported: true,
+                            playbackType: 'direct'
+                        };
+                    }
+                    
+                    return {
+                        originalUrl: url,
+                        platform: 'Other',
+                        isSupported: false,
+                        playbackType: 'external'
+                    };
+                    
+                } catch (error) {
+                    return {
+                        originalUrl: url,
+                        platform: 'Invalid',
+                        isSupported: false,
+                        playbackType: 'external',
+                        error: error.message
+                    };
+                }
+            }
+            
+            static parseYouTubeUrl(url, urlObj) {
+                let videoId = null;
+                
+                if (urlObj.hostname.includes('youtu.be')) {
+                    videoId = urlObj.pathname.slice(1);
+                } else if (urlObj.pathname.includes('/watch')) {
+                    videoId = urlObj.searchParams.get('v');
+                } else if (urlObj.pathname.includes('/shorts/')) {
+                    videoId = urlObj.pathname.split('/shorts/')[1];
+                } else if (urlObj.pathname.includes('/embed/')) {
+                    videoId = urlObj.pathname.split('/embed/')[1];
+                }
+                
+                if (videoId) {
+                    return {
+                        originalUrl: url,
+                        embedUrl: `https://www.youtube.com/embed/${videoId}`,
+                        thumbnailUrl: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                        platform: 'YouTube',
+                        videoId,
+                        isSupported: true,
+                        playbackType: 'embed'
+                    };
+                }
+                
+                return {
+                    originalUrl: url,
+                    platform: 'YouTube',
+                    isSupported: false,
+                    playbackType: 'external'
+                };
+            }
+            
+            static parseInstagramUrl(url, urlObj) {
+                const reelMatch = urlObj.pathname.match(/\/reel\/([^\/]+)/);
+                const postMatch = urlObj.pathname.match(/\/p\/([^\/]+)/);
+                
+                const videoId = reelMatch?.[1] || postMatch?.[1];
+                
+                if (videoId) {
+                    return {
+                        originalUrl: url,
+                        embedUrl: url.endsWith('/') ? `${url}embed/` : `${url}/embed/`,
+                        platform: 'Instagram',
+                        videoId,
+                        isSupported: true,
+                        playbackType: 'embed'
+                    };
+                }
+                
+                return {
+                    originalUrl: url,
+                    platform: 'Instagram',
+                    isSupported: false,
+                    playbackType: 'external'
+                };
+            }
+            
+            static parseTikTokUrl(url, urlObj) {
+                const videoMatch = urlObj.pathname.match(/\/video\/(\d+)/);
+                const videoId = videoMatch?.[1];
+                
+                if (videoId) {
+                    return {
+                        originalUrl: url,
+                        embedUrl: `https://www.tiktok.com/embed/v2/${videoId}`,
+                        platform: 'TikTok',
+                        videoId,
+                        isSupported: true,
+                        playbackType: 'embed'
+                    };
+                }
+                
+                return {
+                    originalUrl: url,
+                    platform: 'TikTok',
+                    isSupported: true,
+                    playbackType: 'embed'
+                };
+            }
+            
+            static parseFacebookUrl(url, urlObj) {
+                return {
+                    originalUrl: url,
+                    platform: 'Facebook',
+                    isSupported: true,
+                    playbackType: 'embed'
+                };
+            }
+            
+            static parseTwitterUrl(url, urlObj) {
+                return {
+                    originalUrl: url,
+                    platform: 'Twitter',
+                    isSupported: true,
+                    playbackType: 'embed'
+                };
+            }
+        }
+
+        function testUrl(url) {
+            document.getElementById('urlInput').value = url;
+            parseUrl();
+        }
+
+        function parseUrl() {
+            const url = document.getElementById('urlInput').value.trim();
+            const resultDiv = document.getElementById('parseResult');
+            
+            if (!url) {
+                resultDiv.style.display = 'none';
+                return;
+            }
+            
+            const result = VideoUrlUtils.parseVideoUrl(url);
+            
+            let html = `
+                <h3>📊 Parse Results</h3>
+                <div><strong>Original URL:</strong> ${result.originalUrl}</div>
+                <div><strong>Platform:</strong> <span class="platform-badge ${result.platform.toLowerCase()}">${result.platform}</span></div>
+                <div><strong>Supported:</strong> <span class="${result.isSupported ? 'supported' : 'unsupported'}">${result.isSupported ? '✅ Yes' : '⚠️ Limited'}</span></div>
+                <div><strong>Playback Type:</strong> ${result.playbackType}</div>
+            `;
+            
+            if (result.videoId) {
+                html += `<div><strong>Video ID:</strong> ${result.videoId}</div>`;
+            }
+            
+            if (result.embedUrl && result.embedUrl !== result.originalUrl) {
+                html += `<div><strong>Embed URL:</strong> <code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-size: 12px;">${result.embedUrl}</code></div>`;
+            }
+            
+            if (result.thumbnailUrl) {
+                html += `<div><strong>Thumbnail:</strong> <a href="${result.thumbnailUrl}" target="_blank">View Thumbnail</a></div>`;
+            }
+            
+            if (result.error) {
+                html += `<div style="color: red;"><strong>Error:</strong> ${result.error}</div>`;
+            }
+            
+            // Show recommendations
+            html += '<div style="margin-top: 15px; padding: 10px; background: #e9ecef; border-radius: 4px;">';
+            html += '<strong>💡 Admin Panel Integration:</strong><br>';
+            
+            if (result.isSupported) {
+                if (result.playbackType === 'embed') {
+                    html += '✅ This URL will work great in your video feed with embedded playback!';
+                } else if (result.playbackType === 'direct') {
+                    html += '✅ Direct video file - perfect for inline playback!';
+                }
+            } else {
+                html += '⚠️ This URL has limited support. Videos will be saved but users may need to open in external app.';
+            }
+            html += '</div>';
+            
+            resultDiv.innerHTML = html;
+            resultDiv.style.display = 'block';
+        }
+
+        function clearTest() {
+            document.getElementById('urlInput').value = '';
+            document.getElementById('parseResult').style.display = 'none';
+        }
+
+        // Auto-parse when typing
+        document.getElementById('urlInput').addEventListener('input', function() {
+            if (this.value.trim()) {
+                parseUrl();
+            } else {
+                document.getElementById('parseResult').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

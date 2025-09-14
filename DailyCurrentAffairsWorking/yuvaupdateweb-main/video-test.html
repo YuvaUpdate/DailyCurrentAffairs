@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Service Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        button { margin: 5px; padding: 10px; cursor: pointer; }
+        .result { margin: 10px 0; padding: 10px; background-color: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>Video Service Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Add Test Video</h2>
+        <button onclick="addTestVideo()">Add Test Video</button>
+        <div id="addResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Get All Videos</h2>
+        <button onclick="getVideos()">Refresh Videos</button>
+        <div id="videosResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>localStorage Contents</h2>
+        <button onclick="showLocalStorage()">Show localStorage</button>
+        <button onclick="clearLocalStorage()">Clear localStorage</button>
+        <div id="storageResult" class="result"></div>
+    </div>
+
+    <script>
+        // Mock VideoService class for testing
+        class VideoService {
+            static get VIDEOS_STORAGE_KEY() { return 'dailyCurrentAffairs_videos'; }
+
+            static initializeDefaultVideos() {
+                return [
+                    {
+                        id: '1',
+                        title: 'Sample Video 1',
+                        description: 'This is a sample video for testing the video feed',
+                        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                        thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg',
+                        category: 'Entertainment',
+                        tags: ['sample', 'test'],
+                        originalSource: {
+                            sourcePlatform: 'Instagram',
+                            sourceUrl: 'https://instagram.com/sample',
+                            creatorName: 'Sample Creator',
+                            creatorHandle: 'samplecreator'
+                        },
+                        timestamp: new Date().toISOString(),
+                        views: 1234,
+                        likes: 89,
+                        likedBy: [],
+                        shares: 12,
+                        comments: 34,
+                        duration: 30,
+                        resolution: '1080p',
+                        uploadedBy: 'admin',
+                        aspectRatio: '9:16',
+                        isFeatured: false,
+                        isActive: true,
+                        moderationStatus: 'approved'
+                    }
+                ];
+            }
+
+            static getStoredVideos() {
+                try {
+                    const stored = localStorage.getItem(this.VIDEOS_STORAGE_KEY);
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        return Array.isArray(parsed) ? parsed : this.initializeDefaultVideos();
+                    }
+                    return this.initializeDefaultVideos();
+                } catch (error) {
+                    console.error('Error loading stored videos:', error);
+                    return this.initializeDefaultVideos();
+                }
+            }
+
+            static saveVideos(videos) {
+                try {
+                    localStorage.setItem(this.VIDEOS_STORAGE_KEY, JSON.stringify(videos));
+                } catch (error) {
+                    console.error('Error saving videos to localStorage:', error);
+                }
+            }
+
+            static async getVideos() {
+                const storedVideos = this.getStoredVideos();
+                const sortedVideos = storedVideos.sort((a, b) => 
+                    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                );
+                return { 
+                    videos: sortedVideos, 
+                    lastDoc: null, 
+                    hasMore: false 
+                };
+            }
+
+            static async addVideo(videoData) {
+                const newVideoId = `video_${Date.now()}`;
+                const completeVideo = {
+                    ...videoData,
+                    id: newVideoId,
+                    timestamp: new Date().toISOString(),
+                    views: 0,
+                    likes: 0,
+                    likedBy: [],
+                    shares: 0,
+                    comments: 0
+                };
+
+                const existingVideos = this.getStoredVideos();
+                const updatedVideos = [completeVideo, ...existingVideos];
+                this.saveVideos(updatedVideos);
+                
+                return newVideoId;
+            }
+        }
+
+        async function addTestVideo() {
+            try {
+                const testVideo = {
+                    title: `Test YouTube Shorts ${new Date().toLocaleTimeString()}`,
+                    description: 'This is a test YouTube Shorts video added from the test page',
+                    videoUrl: 'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+                    embedUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=0&mute=0&controls=1&modestbranding=1&rel=0&showinfo=0&fs=1&cc_load_policy=0&iv_load_policy=3&autohide=0',
+                    thumbnailUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+                    category: 'Entertainment',
+                    tags: ['test', 'youtube', 'shorts'],
+                    originalSource: {
+                        sourcePlatform: 'YouTube',
+                        sourceUrl: 'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+                        creatorName: 'Test Creator',
+                        creatorHandle: 'testcreator'
+                    },
+                    platformInfo: {
+                        detectedPlatform: 'YouTube',
+                        isSupported: true,
+                        playbackType: 'embed',
+                        videoId: 'dQw4w9WgXcQ'
+                    },
+                    duration: 60,
+                    resolution: '1080p',
+                    uploadedBy: 'test',
+                    aspectRatio: '9:16',
+                    isFeatured: false,
+                    moderationStatus: 'approved',
+                    isActive: true
+                };
+
+                const videoId = await VideoService.addVideo(testVideo);
+                document.getElementById('addResult').innerHTML = `<strong>✅ Success!</strong> Video added with ID: ${videoId}`;
+            } catch (error) {
+                document.getElementById('addResult').innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        async function getVideos() {
+            try {
+                const result = await VideoService.getVideos();
+                const videosHtml = result.videos.map(video => `
+                    <div style="border: 1px solid #ccc; margin: 5px; padding: 10px;">
+                        <strong>${video.title}</strong> (ID: ${video.id})<br>
+                        <small>${video.description}</small><br>
+                        <small>Added: ${new Date(video.timestamp).toLocaleString()}</small>
+                    </div>
+                `).join('');
+                
+                document.getElementById('videosResult').innerHTML = `
+                    <strong>Found ${result.videos.length} videos:</strong><br>
+                    ${videosHtml}
+                `;
+            } catch (error) {
+                document.getElementById('videosResult').innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        }
+
+        function showLocalStorage() {
+            const videos = localStorage.getItem('dailyCurrentAffairs_videos');
+            if (videos) {
+                const parsed = JSON.parse(videos);
+                document.getElementById('storageResult').innerHTML = `
+                    <strong>localStorage contents (${parsed.length} videos):</strong><br>
+                    <pre style="background: #eee; padding: 10px; overflow: auto; max-height: 300px;">${JSON.stringify(parsed, null, 2)}</pre>
+                `;
+            } else {
+                document.getElementById('storageResult').innerHTML = '<strong>No videos found in localStorage</strong>';
+            }
+        }
+
+        function clearLocalStorage() {
+            localStorage.removeItem('dailyCurrentAffairs_videos');
+            document.getElementById('storageResult').innerHTML = '<strong>✅ localStorage cleared</strong>';
+        }
+
+        // Load videos on page load
+        window.onload = function() {
+            getVideos();
+            showLocalStorage();
+        };
+    </script>
+</body>
+</html>

@@ -22,12 +22,14 @@ import {
   Linking,
   Modal,
   FlatList,
+  Animated,
 } from 'react-native';
 import FastTouchable from './FastTouchable';
 import AdminPanel from './AdminPanel';
 import Sidebar from './Sidebar';
 import VideoPlayerComponent from './VideoPlayerComponent';
 import YouTubePlayer from './YouTubePlayer';
+import VideoFeed from './VideoFeed';
 import { NewsArticle } from './types';
 // Lazy-load FirebaseNewsService at runtime to reduce startup parsing/execution
 let _firebaseNewsService: any = null;
@@ -195,6 +197,8 @@ export default function App(props: AppProps) {
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
   const [articleModalVisible, setArticleModalVisible] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [videoFeedVisible, setVideoFeedVisible] = useState(false);
+  const pulseAnimation = useRef(new Animated.Value(1)).current;
   const [headerHeight, setHeaderHeight] = useState<number>(80); // measured header height (fallback 80)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoadingArticles, setIsLoadingArticles] = useState<boolean>(true);
@@ -237,6 +241,30 @@ export default function App(props: AppProps) {
     
     initializeOnboarding();
   }, []);
+
+  // Pulse animation for video button
+  useEffect(() => {
+    const startPulse = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnimation, {
+            toValue: 1.1,
+            duration: 1200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnimation, {
+            toValue: 1,
+            duration: 1200,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    const timeoutId = setTimeout(startPulse, 2000); // Start animation after 2 seconds
+    return () => clearTimeout(timeoutId);
+  }, [pulseAnimation]);
+
   const [filteredNews, setFilteredNews] = useState<NewsArticle[]>(newsData); // Initialize with newsData
   const [refreshing, setRefreshing] = useState(false);
   const [lastArticleCount, setLastArticleCount] = useState(0);
@@ -1752,6 +1780,38 @@ export default function App(props: AppProps) {
         />
       )}
 
+      {/* Floating Video Button */}
+      <Animated.View style={[
+        styles.floatingVideoButton, 
+        { 
+          backgroundColor: currentTheme.accent,
+          bottom: insets.bottom + 20,
+          right: 20,
+          transform: [{ scale: pulseAnimation }]
+        }
+      ]}>
+        <FastTouchable 
+          style={styles.floatingVideoButtonTouchable}
+          onPress={() => setVideoFeedVisible(true)}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <Text style={[styles.floatingVideoButtonText, { color: '#FFFFFF' }]}>VIDEO</Text>
+        </FastTouchable>
+      </Animated.View>
+
+      {/* Video Feed Modal */}
+      <Modal
+        visible={videoFeedVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setVideoFeedVisible(false)}
+      >
+        <VideoFeed
+          onClose={() => setVideoFeedVisible(false)}
+          isDarkMode={isDarkMode}
+        />
+      </Modal>
+
       {/* Auth Screen Modal for login/register when not authenticated */}
       <Modal
         visible={authVisible}
@@ -1833,6 +1893,31 @@ const styles = StyleSheet.create({
   gap: 6,
   flex: 0,
   justifyContent: 'flex-end',
+  },
+  floatingVideoButton: {
+    position: 'absolute',
+    width: 80,
+    height: 48,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  floatingVideoButtonTouchable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 24,
+  },
+  floatingVideoButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   themeButton: {
     paddingHorizontal: 12,

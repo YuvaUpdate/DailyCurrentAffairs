@@ -8,6 +8,7 @@ import { WebViewModal } from "./WebViewModal";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useVideoFeed } from "@/contexts/VideoFeedContext";
 import { imagePreloadService } from "@/services/ImagePreloadService";
 
 
@@ -15,6 +16,7 @@ const ARTICLES_PER_PAGE = 5;
 const COLLECTION_NAME = "news_articles";
 
 export function NewsFeed() {
+  const { isVideoFeedOpen } = useVideoFeed();
   const [articles, setArticles] = useState<ArticleType[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -255,15 +257,17 @@ export function NewsFeed() {
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-background">
-      {/* Floating Back to Top Button */}
-      <button
-        onClick={handleBackToTop}
-        className="fixed bottom-6 right-6 z-50 bg-primary text-white rounded-full shadow-lg p-3 hover:bg-primary/90 transition"
-        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-        aria-label="Back to Top"
-      >
-        ↑ Top
-      </button>
+      {/* Floating Back to Top Button - hidden when video feed is open */}
+      {!isVideoFeedOpen && (
+        <button
+          onClick={handleBackToTop}
+          className="fixed bottom-6 right-6 z-50 bg-primary text-white rounded-full shadow-lg p-3 hover:bg-primary/90 transition"
+          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+          aria-label="Back to Top"
+        >
+          ↑ Top
+        </button>
+      )}
       {/* Scrollable Container */}
       <div 
         ref={containerRef}

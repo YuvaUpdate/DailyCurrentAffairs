@@ -3,15 +3,21 @@ import React, { useState, useEffect, useRef } from "react";
 import { firebaseNewsService } from "../services/FirebaseNewsService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Upload, X, Play, Image as ImageIcon, LogOut, RefreshCw, TrendingUp, Users, Eye, Clock, Activity, Globe, Smartphone, Monitor, BarChart3 } from "lucide-react";
+import { Loader2, Upload, X, Play, Image as ImageIcon, LogOut, RefreshCw, TrendingUp, Users, Eye, Clock, Activity, Globe, Smartphone, Monitor, BarChart3, Edit, Trash2, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
 import { NotificationSender } from "../services/NotificationSender";
 import { TestNotificationService } from "../services/TestNotificationService";
 import { webFileUploadService, UploadResult } from "../services/WebFileUploadService";
 import { AuthProtected } from "@/components/AuthProtected";
+import { VideoUrlUtils, VideoUrlInfo } from "../utils/VideoUrlUtils";
 import { auth } from "@/services/firebase.config";
 import { signOut } from "firebase/auth";
 import { WebAnalyticsService, AnalyticsData } from "../services/WebAnalyticsService";
+import { VideoService } from "../services/VideoService";
+import { VideoReel } from "../types/types";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+
+// Make VideoService available in browser console for debugging
+(window as any).VideoService = VideoService;
 
 const HEADLINE_MAX = 200;
 const DESCRIPTION_WORD_MAX = 80;
@@ -22,7 +28,7 @@ const SOURCE_NAME_MAX = 100;
 export default function AdminPanel() {
   // Ref for scrolling to form on edit
   const formRef = useRef<HTMLFormElement | null>(null);
-  const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories' | 'notifications' | 'analytics'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories' | 'notifications' | 'analytics' | 'videos'>('manual');
   // Add/Edit News
   const [headline, setHeadline] = useState("");
   const [description, setDescription] = useState("");
@@ -49,6 +55,21 @@ export default function AdminPanel() {
   const [webAnalytics, setWebAnalytics] = useState<AnalyticsData | null>(null);
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  // Videos states
+  const [videos, setVideos] = useState<VideoReel[]>([]);
+  const [isLoadingVideos, setIsLoadingVideos] = useState(false);
+  const [videoTitle, setVideoTitle] = useState("");
+  const [videoDescription, setVideoDescription] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [originalSource, setOriginalSource] = useState("");
+  const [originalSourceUrl, setOriginalSourceUrl] = useState("");
+  const [originalCreator, setOriginalCreator] = useState("");
+  const [videoCategory, setVideoCategory] = useState("General");
+  const [videoTags, setVideoTags] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [isAddingVideo, setIsAddingVideo] = useState(false);
+  const [videoUrlInfo, setVideoUrlInfo] = useState<VideoUrlInfo | null>(null);
+  const [isFetchingThumbnail, setIsFetchingThumbnail] = useState(false);
   // Notification states
   const [isNotificationSending, setIsNotificationSending] = useState(false);
   const [lastNotificationTime, setLastNotificationTime] = useState<number>(0);
@@ -59,6 +80,7 @@ export default function AdminPanel() {
   useEffect(() => {
   fetchCategories();
   if (activeTab === 'manage') fetchNews();
+  if (activeTab === 'videos') fetchVideos();
   // Only reset form if not editing
   if (activeTab === 'manual' && !editingArticle) resetForm();
   // Load notification stats when switching to notifications tab
@@ -108,6 +130,19 @@ export default function AdminPanel() {
     }
   }
 
+  async function fetchVideos() {
+    setIsLoadingVideos(true);
+    try {
+      const { videos: videoList } = await VideoService.getVideos();
+      setVideos(videoList);
+    } catch (e) {
+      console.error('Error fetching videos:', e);
+      setVideos([]);
+    } finally {
+      setIsLoadingVideos(false);
+    }
+  }
+
   function limitWords(text: string, maxWords: number) {
     if (!text) return "";
     const words = text.trim().split(/\s+/).filter(Boolean);
@@ -133,6 +168,157 @@ export default function AdminPanel() {
     setUploadedMedia(null);
     setSelectedFile(null);
     setMediaSource("url");
+  }
+
+  function resetVideoForm() {
+    setVideoTitle("");
+    setVideoDescription("");
+    setVideoUrl("");
+    setOriginalSource("");
+    setOriginalSourceUrl("");
+    setOriginalCreator("");
+    setVideoCategory("General");
+    setVideoTags("");
+    setThumbnailUrl("");
+    setVideoUrlInfo(null);
+  }
+  
+  // Handle video URL changes and parse platform info
+  async function handleVideoUrlChange(url: string) {
+    setVideoUrl(url);
+    if (url.trim()) {
+      try {
+        const parsedInfo = VideoUrlUtils.parseVideoUrl(url);
+        setVideoUrlInfo(parsedInfo);
+        
+        // Auto-fill source platform if detected and not manually set
+        if (!originalSource && parsedInfo.platform !== 'Other' && parsedInfo.platform !== 'Direct') {
+          setOriginalSource(parsedInfo.platform);
+        }
+        
+        // Auto-fill thumbnail if available and not manually set
+        if (!thumbnailUrl && parsedInfo.thumbnailUrl) {
+          // Special handling for Instagram - fetch real thumbnail
+          if (parsedInfo.platform === 'Instagram') {
+            console.log('🔍 Detected Instagram URL, fetching thumbnail...');
+            setIsFetchingThumbnail(true);
+            try {
+              const instagramThumbnail = await VideoUrlUtils.fetchInstagramThumbnail(url);
+              if (instagramThumbnail) {
+                setThumbnailUrl(instagramThumbnail);
+                console.log('✅ Instagram thumbnail fetched:', instagramThumbnail);
+              } else {
+                // Use placeholder if fetch fails
+                setThumbnailUrl(parsedInfo.thumbnailUrl);
+              }
+            } catch (error) {
+              console.warn('⚠️ Failed to fetch Instagram thumbnail:', error);
+              setThumbnailUrl(parsedInfo.thumbnailUrl);
+            } finally {
+              setIsFetchingThumbnail(false);
+            }
+          } else {
+            // For other platforms (YouTube, etc.)
+            setThumbnailUrl(parsedInfo.thumbnailUrl);
+          }
+        }
+      } catch (error) {
+        setVideoUrlInfo(null);
+      }
+    } else {
+      setVideoUrlInfo(null);
+    }
+  }
+
+  async function handleAddVideo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!videoTitle || !videoDescription || !videoUrl || !originalSource) {
+      alert("Please fill in all required fields: Title, Description, Video URL, and Source Platform.");
+      return;
+    }
+
+    // Parse and validate video URL using VideoUrlUtils
+    let parsedVideoInfo: VideoUrlInfo;
+    try {
+      new URL(videoUrl); // Basic URL validation
+      parsedVideoInfo = VideoUrlUtils.parseVideoUrl(videoUrl);
+      
+      if (!parsedVideoInfo.isSupported) {
+        const confirmContinue = window.confirm(
+          `⚠️ Video platform "${parsedVideoInfo.platform}" may not be fully supported for embedded playback.\n\n` +
+          `The video will be saved but may require users to open it in a new tab to view.\n\n` +
+          `Supported platforms: YouTube, Instagram, TikTok, Direct MP4 files.\n\n` +
+          `Do you want to continue anyway?`
+        );
+        if (!confirmContinue) return;
+      }
+      
+      // Validate other URLs
+      if (originalSourceUrl) {
+        new URL(originalSourceUrl);
+      }
+      if (thumbnailUrl) {
+        new URL(thumbnailUrl);
+      }
+    } catch (error) {
+      alert("Please enter valid URLs. Video URL must be a complete URL (e.g., https://youtube.com/shorts/VIDEO_ID or https://example.com/video.mp4)");
+      return;
+    }
+
+    setIsAddingVideo(true);
+    try {
+      // Use parsed video info to enhance the data
+      const detectedPlatform = parsedVideoInfo.platform;
+      const finalThumbnailUrl = thumbnailUrl?.trim() || 
+        parsedVideoInfo.thumbnailUrl || 
+        'https://via.placeholder.com/720x1280.png?text=Video+Thumbnail';
+      
+      const videoData = {
+        title: videoTitle.trim(),
+        description: videoDescription.trim(),
+        videoUrl: videoUrl.trim(),
+        embedUrl: parsedVideoInfo.embedUrl, // Add embed URL for supported platforms
+        thumbnailUrl: finalThumbnailUrl,
+        category: videoCategory,
+        tags: videoTags.split(',').map(tag => tag.trim()).filter(Boolean),
+        originalSource: {
+          sourcePlatform: (originalSource || detectedPlatform) as 'Instagram' | 'TikTok' | 'YouTube' | 'Facebook' | 'Twitter' | 'Other',
+          sourceUrl: originalSourceUrl?.trim() || videoUrl,
+          creatorName: originalCreator?.trim() || 'Unknown',
+          ...(originalCreator?.trim() && { creatorHandle: originalCreator.trim() }),
+        },
+        // Add metadata about video platform support
+        platformInfo: {
+          detectedPlatform: parsedVideoInfo.platform,
+          isSupported: parsedVideoInfo.isSupported,
+          playbackType: parsedVideoInfo.playbackType,
+          ...(parsedVideoInfo.videoId && { videoId: parsedVideoInfo.videoId })
+        },
+        duration: 0, // Will be determined later
+        resolution: '1080p', // Default
+        uploadedBy: 'admin',
+        aspectRatio: '9:16' as const,
+        isFeatured: false,
+        moderationStatus: 'approved' as const,
+        isActive: true
+      };
+
+      console.log('Adding video with data:', videoData);
+      const result = await VideoService.addVideo(videoData);
+      console.log('Video added successfully:', result);
+      
+      alert("✅ Video added successfully! It will appear in the video feed.");
+      resetVideoForm();
+      
+      // Refresh the video list
+      await fetchVideos();
+      
+    } catch (error) {
+      console.error('Error adding video:', error);
+      alert(`❌ Failed to add video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsAddingVideo(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -290,6 +476,19 @@ export default function AdminPanel() {
       fetchNews();
     } catch {
       alert("Failed to delete article.");
+    }
+  }
+
+  async function handleDeleteVideo(videoId: string, videoTitle: string) {
+    if (!window.confirm(`Are you sure you want to delete "${videoTitle}"?`)) return;
+    try {
+      await VideoService.deleteVideo(videoId);
+      alert("✅ Video deleted successfully!");
+      // Refresh the video list
+      await fetchVideos();
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      alert(`❌ Failed to delete video: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -576,6 +775,7 @@ export default function AdminPanel() {
         </div>
       <div className="flex flex-wrap gap-2 mb-4 sm:mb-6 justify-center">
         <Button variant={activeTab === 'manual' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manual')}>Add/Edit News</Button>
+        <Button variant={activeTab === 'videos' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('videos')}>Videos</Button>
         <Button variant={activeTab === 'manage' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manage')}>Manage News</Button>
         <Button variant={activeTab === 'categories' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('categories')}>Categories</Button>
         <Button variant={activeTab === 'notifications' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('notifications')}>Notifications</Button>
@@ -1365,6 +1565,575 @@ export default function AdminPanel() {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Videos Management Section */}
+      {activeTab === 'videos' && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-6 border">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-purple-100 dark:bg-purple-800 p-2 rounded-lg">
+                <Play className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Video Management</h3>
+                <p className="text-sm text-muted-foreground">Upload and manage Instagram-style video content</p>
+              </div>
+            </div>
+            
+            {/* Debug Section */}
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  VideoService.debugLocalStorage();
+                }}
+              >
+                🔍 Debug localStorage
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  const foundVideos = VideoService.findAllVideosInStorage();
+                  console.log(`Found ${foundVideos.length} videos total:`, foundVideos);
+                }}
+              >
+                🔎 Search All Keys
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={async () => {
+                  console.log('🔄 Starting migration...');
+                  await VideoService.migrateToFirebase();
+                }}
+              >
+                🚀 Migrate to Firebase
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  console.log('🔥 Enabling Firebase mode...');
+                  console.log('⚠️ You need to manually change USE_FIREBASE to true in VideoService.ts');
+                  console.log('📁 File: src/services/VideoService.ts');
+                }}
+              >
+                🔥 Enable Firebase
+              </Button>
+            </div>
+          </div>
+
+          {/* Add Video Form */}
+          <div className="bg-card border rounded-xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-purple-100 dark:bg-purple-800 p-2 rounded-lg">
+                <Upload className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="text-lg font-semibold">Add New Video</h4>
+                <p className="text-sm text-muted-foreground">Upload Instagram-style video content for the mobile app</p>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+              <h5 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">📋 Platform Support:</h5>
+              <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+                <li>• <strong>✅ YouTube Shorts:</strong> Embedded playback with auto-play</li>
+                <li>• <strong>📸 Instagram Reels:</strong> Link only (Instagram blocks embedding)</li>
+                <li>• <strong>🎵 TikTok:</strong> Embedded playback supported</li>
+                <li>• <strong>📁 Direct MP4:</strong> Full playback control</li>
+                <li>• <strong>💡 Tip:</strong> Portrait videos (9:16 ratio) work best</li>
+                <li>• <strong>Tags:</strong> Use comma-separated keywords for discovery</li>
+                <li>• <strong>Best practices:</strong> Keep titles engaging, descriptions informative</li>
+              </ul>
+            </div>
+
+            <form onSubmit={handleAddVideo} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold mb-1">Video Title *</label>
+                  <Input
+                    value={videoTitle}
+                    onChange={e => setVideoTitle(e.target.value)}
+                    placeholder="Enter video title"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Category</label>
+                  <select
+                    value={videoCategory}
+                    onChange={e => setVideoCategory(e.target.value)}
+                    className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">Video Description *</label>
+                <textarea
+                  value={videoDescription}
+                  onChange={e => setVideoDescription(e.target.value)}
+                  placeholder="Enter video description"
+                  className="w-full p-2 border rounded-md h-24 dark:bg-gray-800 dark:border-gray-600"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold mb-1">Video URL *</label>
+                  <Input
+                    value={videoUrl}
+                    onChange={e => handleVideoUrlChange(e.target.value)}
+                    placeholder="YouTube Shorts, Instagram Reels, TikTok, or direct MP4 URL"
+                    required
+                  />
+                  {/* Show platform detection info */}
+                  {videoUrlInfo && (
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      {videoUrlInfo.isSupported ? (
+                        <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                          <CheckCircle className="h-4 w-4" />
+                          <span>
+                            {videoUrlInfo.platform === 'Instagram' ? '📸 Instagram Reel' : videoUrlInfo.platform} detected - Supported ✓
+                          </span>
+                          {videoUrlInfo.platform === 'Instagram' && (
+                            <span className="text-xs bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 px-2 py-1 rounded ml-2">
+                              External link (Instagram blocks embedding)
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{videoUrlInfo.platform} detected - Limited support</span>
+                        </div>
+                      )}
+                      {videoUrlInfo.playbackType === 'embed' && (
+                        <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                          Auto-play enabled
+                        </span>
+                      )}
+                      {isFetchingThumbnail && videoUrlInfo.platform === 'Instagram' && (
+                        <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-1 rounded flex items-center gap-1">
+                          <RefreshCw className="h-3 w-3 animate-spin" />
+                          Fetching thumbnail...
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Thumbnail URL</label>
+                  <Input
+                    value={thumbnailUrl}
+                    onChange={e => setThumbnailUrl(e.target.value)}
+                    placeholder="https://example.com/thumbnail.jpg"
+                  />
+                </div>
+              </div>
+
+              {/* Source Attribution Section */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-3">Source Attribution</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold mb-1">Original Source Platform *</label>
+                    <select
+                      value={originalSource}
+                      onChange={e => setOriginalSource(e.target.value)}
+                      className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600"
+                      required
+                    >
+                      <option value="">Select Platform</option>
+                      <option value="Instagram">📷 Instagram</option>
+                      <option value="TikTok">🎵 TikTok</option>
+                      <option value="YouTube">📺 YouTube</option>
+                      <option value="Facebook">📘 Facebook</option>
+                      <option value="Twitter">🐦 Twitter</option>
+                      <option value="Other">🌐 Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">Original Creator</label>
+                    <Input
+                      value={originalCreator}
+                      onChange={e => setOriginalCreator(e.target.value)}
+                      placeholder="Creator username or name"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block font-semibold mb-1">Original Source URL</label>
+                  <Input
+                    value={originalSourceUrl}
+                    onChange={e => setOriginalSourceUrl(e.target.value)}
+                    placeholder="Link to original video"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">Tags (comma-separated)</label>
+                <Input
+                  value={videoTags}
+                  onChange={e => setVideoTags(e.target.value)}
+                  placeholder="trending, viral, entertainment"
+                />
+              </div>
+
+              {/* Live Preview Section */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                <h5 className="font-semibold mb-3 flex items-center gap-2 text-purple-800 dark:text-purple-200">
+                  <Eye className="h-4 w-4" />
+                  Live Preview
+                </h5>
+                {(videoTitle || videoDescription || thumbnailUrl || videoUrl) ? (
+                  <div className="flex gap-4">
+                    {/* Thumbnail/Video Preview */}
+                    <div className="w-24 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0 relative">
+                      {(thumbnailUrl || videoUrlInfo?.thumbnailUrl) ? (
+                        <img 
+                          src={thumbnailUrl || videoUrlInfo?.thumbnailUrl} 
+                          alt="Video thumbnail" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://via.placeholder.com/720x1280.png?text=No+Image';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-800 dark:to-pink-800">
+                          {videoUrlInfo?.platform ? (
+                            <div className="text-center">
+                              <div className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-1">
+                                {videoUrlInfo.platform}
+                              </div>
+                              <Play className="h-6 w-6 text-purple-600 dark:text-purple-300 mx-auto" />
+                            </div>
+                          ) : (
+                            <Play className="h-8 w-8 text-purple-600 dark:text-purple-300" />
+                          )}
+                        </div>
+                      )}
+                      {/* Platform badge with special Instagram styling */}
+                      {videoUrlInfo?.platform && videoUrlInfo.platform !== 'Other' && (
+                        <div className={`absolute top-1 left-1 text-white text-xs px-1 py-0.5 rounded ${
+                          videoUrlInfo.platform === 'Instagram' 
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500' 
+                            : videoUrlInfo.platform === 'YouTube'
+                            ? 'bg-red-600'
+                            : 'bg-black bg-opacity-75'
+                        }`}>
+                          {videoUrlInfo.platform === 'Instagram' ? '📸 IG' : videoUrlInfo.platform}
+                        </div>
+                      )}
+                      {/* Play button overlay or loading indicator */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20">
+                        {isFetchingThumbnail && videoUrlInfo?.platform === 'Instagram' ? (
+                          <div className="bg-white bg-opacity-90 rounded-full p-2">
+                            <RefreshCw className="h-4 w-4 text-purple-600 animate-spin" />
+                          </div>
+                        ) : (
+                          <div className="bg-white bg-opacity-90 rounded-full p-2">
+                            <Play className="h-4 w-4 text-purple-600 fill-purple-600" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Video Info */}
+                    <div className="flex-1 min-w-0">
+                      <h6 className="font-semibold text-base text-gray-900 dark:text-white truncate">
+                        {videoTitle || "Enter video title above"}
+                      </h6>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-3">
+                        {videoDescription || "Enter video description above"}
+                      </p>
+                      
+                      {/* Source Info */}
+                      {originalSource && (
+                        <div className="flex items-center gap-1 mt-2 text-xs text-purple-700 dark:text-purple-300">
+                          <span>FROM:</span>
+                          <span className="font-medium">{originalSource}</span>
+                          {originalCreator && <span>• @{originalCreator}</span>}
+                        </div>
+                      )}
+                      
+                      {/* Tags and Category */}
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {videoCategory && (
+                          <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-1 rounded">
+                            {videoCategory}
+                          </span>
+                        )}
+                        {videoTags.split(',').filter(tag => tag.trim()).slice(0, 3).map((tag, index) => (
+                          <span key={index} className="bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200 text-xs px-2 py-1 rounded">
+                            #{tag.trim()}
+                          </span>
+                        ))}
+                      </div>
+                      
+                      {/* Enhanced Video URL Status */}
+                      {videoUrl && videoUrlInfo && (
+                        <div className="mt-2 text-xs space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-green-600 dark:text-green-400">✓ Video URL provided</span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              videoUrlInfo.isSupported 
+                                ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
+                                : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
+                            }`}>
+                              {videoUrlInfo.platform}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-1">
+                            {videoUrlInfo.isSupported ? (
+                              <>
+                                <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <span className="text-green-600 dark:text-green-400">
+                                  {videoUrlInfo.playbackType === 'embed' ? 'Embeddable video' : 
+                                   videoUrlInfo.playbackType === 'direct' ? 'Direct video file' : 
+                                   'External playback'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="h-3 w-3 text-orange-600 dark:text-orange-400" />
+                                <span className="text-orange-600 dark:text-orange-400">
+                                  Limited support - may require external playback
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          
+                          {videoUrlInfo.videoId && (
+                            <div className="text-gray-500 dark:text-gray-400">
+                              Video ID: {videoUrlInfo.videoId}
+                            </div>
+                          )}
+                          
+                          {videoUrlInfo.embedUrl && videoUrlInfo.embedUrl !== videoUrl && (
+                            <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                              <ExternalLink className="h-3 w-3" />
+                              <span>Embed URL generated</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                    <Play className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm">Fill in the form fields above to see a preview of your video</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={resetVideoForm}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Clear Form
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" 
+                  disabled={isAddingVideo}
+                >
+                  {isAddingVideo ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Adding Video...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Add Video to App
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          {/* Videos List */}
+          <div className="bg-card border rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="text-lg font-semibold">Uploaded Videos ({videos.length})</h4>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchVideos}
+                disabled={isLoadingVideos}
+              >
+                {isLoadingVideos ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Refresh
+              </Button>
+            </div>
+
+            {isLoadingVideos ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : videos.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Play className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No videos uploaded yet</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {videos.map(video => (
+                  <div key={video.id} className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full">
+                    {/* Video Thumbnail - Takes most space */}
+                    <div className="aspect-video bg-gray-100 dark:bg-gray-800 overflow-hidden relative group flex-shrink-0">
+                      {video.thumbnailUrl ? (
+                        <img
+                          src={video.thumbnailUrl}
+                          alt={video.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Play className="h-12 w-12 text-gray-400" />
+                        </div>
+                      )}
+                      {/* Play overlay */}
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                        <Play className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      {/* Video duration badge */}
+                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+                        {video.duration || 0}s
+                      </div>
+                    </div>
+
+                    {/* Minimal Bottom Actions */}
+                    <div className="p-2 mt-auto bg-white dark:bg-gray-900 border-t">
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1 hover:bg-blue-50 hover:border-blue-300">
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          className="flex-1"
+                          onClick={() => handleDeleteVideo(String(video.id), video.title)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Video Details Section - Bottom of Page */}
+            {videos.length > 0 && (
+              <div className="mt-8 border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Video Details & Analytics
+                </h3>
+                <div className="space-y-4">
+                  {videos.map(video => (
+                    <div key={`details-${video.id}`} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Basic Info */}
+                        <div>
+                          <h4 className="font-medium text-sm text-gray-600 dark:text-gray-400 mb-2">VIDEO INFO</h4>
+                          <p className="font-semibold">{video.title}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{video.description}</p>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs px-2 py-1 rounded">
+                              {video.category}
+                            </span>
+                            {video.tags?.map((tag, index) => (
+                              <span key={index} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs px-2 py-1 rounded">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Stats */}  
+                        <div>
+                          <h4 className="font-medium text-sm text-gray-600 dark:text-gray-400 mb-2">STATISTICS</h4>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1 text-sm">
+                                <Eye className="h-3 w-3" />
+                                Views
+                              </span>
+                              <span className="font-medium">{video.views || 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1 text-sm">
+                                <Activity className="h-3 w-3" />
+                                Likes
+                              </span>
+                              <span className="font-medium">{video.likes || 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1 text-sm">
+                                <TrendingUp className="h-3 w-3" />
+                                Shares
+                              </span>
+                              <span className="font-medium">{video.shares || 0}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Source */}
+                        <div>
+                          <h4 className="font-medium text-sm text-gray-600 dark:text-gray-400 mb-2">SOURCE</h4>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1 text-sm">
+                              <Smartphone className="h-3 w-3" />
+                              <span>{video.originalSource?.sourcePlatform || 'Unknown'}</span>
+                            </div>
+                            {video.originalSource?.creatorName && (
+                              <div className="flex items-center gap-1 text-sm">
+                                <Users className="h-3 w-3" />
+                                <span>{video.originalSource.creatorName}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1 text-sm">
+                              <Clock className="h-3 w-3" />
+                              <span>{new Date(video.timestamp).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

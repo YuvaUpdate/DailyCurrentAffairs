@@ -74,6 +74,7 @@ export interface VideoReel {
   title: string;
   description?: string;
   videoUrl: string; // Firebase Storage URL or external URL
+  embedUrl?: string; // Platform-specific embed URL (YouTube, Instagram, etc.)
   thumbnailUrl: string; // Video thumbnail/poster
   duration: number; // Video duration in seconds
   
@@ -108,6 +109,14 @@ export interface VideoReel {
   isActive: boolean;
   isFeatured: boolean;
   moderationStatus: 'approved' | 'pending' | 'rejected';
+  
+  // Platform-specific information
+  platformInfo?: {
+    detectedPlatform: string;
+    isSupported: boolean;
+    playbackType: 'embed' | 'direct' | 'external';
+    videoId?: string;
+  };
 }
 
 // Video engagement tracking
@@ -123,3 +132,5 @@ export interface VideoEngagement {
     deviceInfo?: string;
   };
 }
+
+

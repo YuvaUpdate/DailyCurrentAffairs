@@ -14,11 +14,14 @@ import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
 import { initImageOptimizations } from "@/services/ImagePreloadService";
 import { WebAnalyticsService } from "@/services/WebAnalyticsService";
+import { VideoFeedProvider, useVideoFeed } from "@/contexts/VideoFeedContext";
 
 const queryClient = new QueryClient();
 const AdminPageLazy = lazy(() => import("./pages/Admin"));
 
-const App = () => {
+const AppContent = () => {
+  const { isVideoFeedOpen } = useVideoFeed();
+  
   useEffect(() => {
     // Initialize image optimizations when the app starts
     initImageOptimizations();
@@ -28,32 +31,44 @@ const App = () => {
   }, []);
   
   return (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <SidebarProvider>
-        <Toaster />
-        <Sonner />
-        {/* Theme toggle button fixed at top right */}
+    <>
+      <Toaster />
+      <Sonner />
+      {/* Theme toggle button fixed at top right - hidden when video feed is open */}
+      {!isVideoFeedOpen && (
         <div className="fixed top-4 right-4 z-[9999] bg-card/80 rounded shadow-lg p-1">
           <ThemeToggle />
         </div>
-    <BrowserRouter>
-      {/* Removed Admin link from navigation */}
-      <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/support" element={<Support />} />
-                <Route path="/admin" element={<AdminPageLazy />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-        </BrowserRouter>
-      </SidebarProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+      )}
+      <BrowserRouter>
+        {/* Removed Admin link from navigation */}
+        <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/admin" element={<AdminPageLazy />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </>
+  );
+};
+
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <SidebarProvider>
+          <VideoFeedProvider>
+            <AppContent />
+          </VideoFeedProvider>
+        </SidebarProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 };
 
