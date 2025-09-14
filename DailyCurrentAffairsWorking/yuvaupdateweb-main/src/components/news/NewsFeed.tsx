@@ -260,9 +260,33 @@ export function NewsFeed() {
       {/* Floating Back to Top Button - hidden when video feed is open */}
       {!isVideoFeedOpen && (
         <button
-          onClick={handleBackToTop}
-          className="fixed bottom-6 right-6 z-50 bg-primary text-white rounded-full shadow-lg p-3 hover:bg-primary/90 transition"
-          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Immediate visual feedback
+            const button = e.currentTarget;
+            button.style.transform = 'scale(0.9)';
+            
+            // Execute immediately
+            handleBackToTop();
+            
+            // Reset visual feedback
+            setTimeout(() => {
+              button.style.transform = 'scale(1)';
+            }, 150);
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          className="fixed bottom-6 right-6 z-50 bg-primary text-white rounded-full shadow-lg p-3 hover:bg-primary/90 active:bg-primary/80 transition-all duration-100 hover:scale-105 active:scale-90 cursor-pointer select-none"
+          style={{ 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            pointerEvents: 'auto',
+            touchAction: 'manipulation',
+            userSelect: 'none'
+          }}
           aria-label="Back to Top"
         >
           ↑ Top
@@ -299,9 +323,40 @@ export function NewsFeed() {
           <div className="min-h-[60vh] flex items-center justify-center snap-start">
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">You've reached the end</p>
-              <Button onClick={handleRefresh} variant="outline">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  // Immediate visual feedback
+                  const button = e.currentTarget;
+                  button.style.transform = 'scale(0.95)';
+                  button.style.opacity = '0.8';
+                  
+                  console.log('REFRESH CLICKED!');
+                  
+                  // Execute immediately
+                  handleRefresh();
+                  
+                  // Reset visual feedback
+                  setTimeout(() => {
+                    button.style.transform = 'scale(1)';
+                    button.style.opacity = '1';
+                  }, 100);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                className="px-4 py-2 border border-border rounded-md text-foreground bg-background hover:bg-accent hover:text-accent-foreground active:bg-accent/80 transition-all duration-100 hover:scale-105 active:scale-95 cursor-pointer select-none"
+                style={{
+                  pointerEvents: 'auto',
+                  touchAction: 'manipulation',
+                  userSelect: 'none'
+                }}
+              >
                 Start Over
-              </Button>
+              </button>
             </div>
           </div>
         )}

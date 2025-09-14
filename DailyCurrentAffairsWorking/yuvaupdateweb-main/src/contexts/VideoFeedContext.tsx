@@ -23,8 +23,15 @@ interface VideoFeedProviderProps {
 export const VideoFeedProvider: React.FC<VideoFeedProviderProps> = ({ children }) => {
   const [isVideoFeedOpen, setIsVideoFeedOpen] = useState(false);
 
-  const openVideoFeed = () => setIsVideoFeedOpen(true);
-  const closeVideoFeed = () => setIsVideoFeedOpen(false);
+  const openVideoFeed = () => {
+    console.log('Opening video feed...');
+    setIsVideoFeedOpen(true);
+  };
+  
+  const closeVideoFeed = () => {
+    console.log('Closing video feed...');
+    setIsVideoFeedOpen(false);
+  };
 
   return (
     <VideoFeedContext.Provider value={{ isVideoFeedOpen, openVideoFeed, closeVideoFeed }}>

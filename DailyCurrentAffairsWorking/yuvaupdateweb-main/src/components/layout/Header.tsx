@@ -26,15 +26,22 @@ export function Header() {
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Video Button */}
-            <Button
-              onClick={openVideoFeed}
-              size="sm"
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold px-4 py-2 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+            {/* Simple Video Link - Alternative approach */}
+            <div
+              onClick={() => {
+                console.log('SIMPLE VIDEO CLICKED!');
+                openVideoFeed();
+              }}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold px-4 py-2 rounded-full shadow-lg cursor-pointer select-none transition-transform duration-100 hover:scale-105"
+              style={{
+                pointerEvents: 'auto',
+                zIndex: 1000,
+                position: 'relative'
+              }}
             >
-              <Play className="h-4 w-4 mr-2" />
+              <Play className="h-4 w-4 mr-2 inline-block" />
               VIDEOS
-            </Button>
+            </div>
             
             <div className="text-xs text-muted-foreground hidden sm:block">
               Professional News Platform
