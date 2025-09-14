@@ -7,17 +7,30 @@
   overflow: hidden;
 }
 
+/* Hide scrollbars */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 .video-feed-container {
   height: 100vh;
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
+  contain: layout style;
 }
 
 .video-item {
   height: 100vh;
   scroll-snap-align: start;
   position: relative;
+  overflow: hidden;
+  contain: layout style paint;
 }
 
 .video-player-container {
@@ -107,20 +120,85 @@
   }
 }
 
-/* Mobile responsiveness */
+/* Responsive design improvements */
 @media (max-width: 768px) {
   .video-controls {
-    right: 12px;
-    bottom: 100px;
-    gap: 12px;
+    right: 8px;
+    bottom: 80px;
+    gap: 8px;
   }
   
   .video-control-button {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
   
   .video-details {
-    padding: 16px;
+    padding: 12px;
+    right: 60px; /* Leave space for controls */
+    max-height: 35vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .video-controls {
+    right: 6px;
+    bottom: 70px;
+    gap: 6px;
+  }
+  
+  .video-control-button {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .video-details {
+    padding: 10px;
+    right: 50px;
+    max-height: 30vh;
+  }
+}
+
+/* Prevent text overflow and ensure proper clipping */
+.video-text-container {
+  max-width: 100%;
+  overflow: hidden;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+.video-tag {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Force video containers to respect boundaries */
+.video-player-container iframe,
+.video-player-container video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  overflow: hidden;
+}
+
+/* Ensure proper containment */
+.video-feed-container > * {
+  contain: layout style paint;
+}
+
+/* Additional responsive utilities */
+@media (max-width: 640px) {
+  .video-details {
+    right: 56px !important;
+    max-height: 30vh !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .video-details {
+    right: 48px !important;
+    max-height: 25vh !important;
   }
 }

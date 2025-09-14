@@ -1,0 +1,41 @@
+{
+  "sampleVideos": [
+    {
+      "id": "sample1",
+      "title": "Sample Video 1",
+      "description": "This is a sample video for testing",
+      "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      "thumbnailUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg",
+      "duration": 596,
+      "likes": 25,
+      "shares": 5,
+      "views": 150,
+      "timestamp": "2024-01-15T10:00:00Z",
+      "isActive": true,
+      "tags": ["sample", "test", "demo"],
+      "originalSource": {
+        "sourcePlatform": "Test",
+        "creatorName": "Sample Creator"
+      }
+    },
+    {
+      "id": "sample2", 
+      "title": "Sample Video 2",
+      "description": "Another sample video for testing",
+      "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+      "thumbnailUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg",
+      "duration": 653,
+      "likes": 42,
+      "shares": 8,
+      "views": 275,
+      "timestamp": "2024-01-15T11:00:00Z",
+      "isActive": true,
+      "tags": ["sample", "test", "demo2"],
+      "originalSource": {
+        "sourcePlatform": "Test",
+        "creatorName": "Another Creator"
+      }
+    }
+  ],
+  "note": "These are sample videos from Google's test video collection. Replace with your actual video file URLs."
+}

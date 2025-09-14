@@ -57,6 +57,8 @@ export class VideoService {
     hasMore: boolean;
   }> {
     try {
+      console.log('🚀 [VideoService] Fetching videos with optimized query...');
+      
       let videosQuery = query(
         collection(db, this.VIDEOS_COLLECTION),
         where('isActive', '==', true),
@@ -77,7 +79,7 @@ export class VideoService {
       const lastDocument = snapshot.docs[snapshot.docs.length - 1] || null;
       const hasMore = snapshot.docs.length === pageSize;
 
-      console.log(`📹 Loaded ${videos.length} videos`);
+      console.log(`📹 Loaded ${videos.length} videos in optimized mode`);
       return { videos, lastDoc: lastDocument, hasMore };
     } catch (error) {
       console.error('❌ Failed to get videos:', error);

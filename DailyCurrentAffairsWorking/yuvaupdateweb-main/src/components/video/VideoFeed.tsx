@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Play, Pause, Heart, Share2, Eye, X, Volume2, VolumeX, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VideoUrlUtils } from '@/utils/VideoUrlUtils';
+import '@/styles/video-feed.css';
 
 interface VideoFeedProps {
   onClose: () => void;
@@ -135,6 +136,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
       className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden"
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      style={{ contain: 'layout style' }}
     >
       {/* Video Element, Iframe, or Instagram Special Case */}
       {videoType === 'direct' ? (
@@ -184,7 +186,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
           ref={iframeRef}
           key={`${video.id}-${isActive}`}
           src={videoSrc}
-          className="w-full h-full"
+          className="w-full h-full absolute inset-0 border-0"
+          style={{ 
+            overflow: 'hidden',
+            objectFit: 'cover'
+          }}
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
@@ -223,77 +229,85 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
         </div>
       )}
 
-      {/* Controls - Right Side */}
-      <div className="absolute right-4 bottom-20 flex flex-col gap-4">
+      {/* Controls - Right Side with responsive positioning */}
+      <div className="absolute right-2 sm:right-4 bottom-16 sm:bottom-20 flex flex-col gap-2 sm:gap-4 z-20">
         {/* Like Button */}
         <Button
           size="sm"
           variant="ghost"
-          className="rounded-full w-12 h-12 bg-black/20 hover:bg-black/40 backdrop-blur-sm flex flex-col gap-1 p-0"
+          className="rounded-full w-10 h-10 sm:w-12 sm:h-12 bg-black/30 hover:bg-black/50 backdrop-blur-sm flex flex-col gap-0 sm:gap-1 p-0 transition-all"
           onClick={handleLike}
         >
-          <Heart className={cn("h-6 w-6", isLiked ? "fill-red-500 text-red-500" : "text-white")} />
-          <span className="text-xs text-white font-medium">{localLikes}</span>
+          <Heart className={cn("h-4 w-4 sm:h-6 sm:w-6", isLiked ? "fill-red-500 text-red-500" : "text-white")} />
+          <span className="text-[10px] sm:text-xs text-white font-medium leading-none">{localLikes}</span>
         </Button>
 
         {/* Share Button */}
         <Button
           size="sm"
           variant="ghost"
-          className="rounded-full w-12 h-12 bg-black/20 hover:bg-black/40 backdrop-blur-sm flex flex-col gap-1 p-0"
+          className="rounded-full w-10 h-10 sm:w-12 sm:h-12 bg-black/30 hover:bg-black/50 backdrop-blur-sm flex flex-col gap-0 sm:gap-1 p-0 transition-all"
           onClick={handleShare}
         >
-          <Share2 className="h-6 w-6 text-white" />
-          <span className="text-xs text-white font-medium">{video.shares || 0}</span>
+          <Share2 className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
+          <span className="text-[10px] sm:text-xs text-white font-medium leading-none">{video.shares || 0}</span>
         </Button>
 
         {/* Views */}
-        <div className="rounded-full w-12 h-12 bg-black/20 backdrop-blur-sm flex flex-col items-center justify-center gap-1">
-          <Eye className="h-6 w-6 text-white" />
-          <span className="text-xs text-white font-medium">{video.views || 0}</span>
+        <div className="rounded-full w-10 h-10 sm:w-12 sm:h-12 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center gap-0 sm:gap-1">
+          <Eye className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
+          <span className="text-[10px] sm:text-xs text-white font-medium leading-none">{video.views || 0}</span>
         </div>
 
         {/* Mute Button */}
         <Button
           size="sm"
           variant="ghost"
-          className="rounded-full w-12 h-12 bg-black/20 hover:bg-black/40 backdrop-blur-sm"
+          className="rounded-full w-10 h-10 sm:w-12 sm:h-12 bg-black/30 hover:bg-black/50 backdrop-blur-sm transition-all"
           onClick={toggleMute}
         >
           {isMuted ? (
-            <VolumeX className="h-6 w-6 text-white" />
+            <VolumeX className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
           ) : (
-            <Volume2 className="h-6 w-6 text-white" />
+            <Volume2 className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
           )}
         </Button>
       </div>
 
-      {/* Video Details - Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-6 py-4">
-        <h3 className="text-white font-semibold text-lg mb-2">{video.title}</h3>
-        <p className="text-white/80 text-sm mb-3 line-clamp-2">{video.description}</p>
-        
-        {/* Source */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="bg-blue-500/80 text-white text-xs font-medium px-3 py-1 rounded-full">
-            FROM: {video.originalSource?.sourcePlatform || 'Unknown'}
-            {video.originalSource?.creatorName && ` • @${video.originalSource.creatorName}`}
-          </span>
-        </div>
-
-        {/* Tags */}
-        {video.tags && video.tags.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            {video.tags.slice(0, 3).map((tag, index) => (
-              <span
-                key={index}
-                className="bg-cyan-500/20 text-cyan-300 text-xs font-medium px-2 py-1 rounded"
-              >
-                #{tag}
-              </span>
-            ))}
+      {/* Video Details - Top Left with gradient overlay */}
+      <div className="absolute top-16 sm:top-20 left-3 sm:left-4 right-16 sm:right-20 bg-gradient-to-b from-black/70 via-black/50 to-transparent px-3 sm:px-4 py-3 sm:py-4 max-h-[45vh] overflow-hidden rounded-b-lg">
+        <div className="space-y-1 sm:space-y-2">
+          <h3 className="text-white font-semibold text-sm sm:text-base mb-1 line-clamp-2 leading-tight drop-shadow-lg">{video.title}</h3>
+          <p className="text-white/90 text-xs sm:text-sm mb-2 line-clamp-3 leading-tight drop-shadow-md">{video.description}</p>
+          
+          {/* Source */}
+          <div className="flex items-center gap-1 sm:gap-2 mb-2">
+            <span className="bg-blue-500/90 text-white text-[10px] sm:text-xs font-medium px-2 py-1 rounded-full truncate max-w-[180px] sm:max-w-[220px] shadow-lg">
+              FROM: {video.originalSource?.sourcePlatform || 'Unknown'}
+              {video.originalSource?.creatorName && ` • @${video.originalSource.creatorName}`}
+            </span>
           </div>
-        )}
+
+          {/* Tags - Top positioned with better visibility */}
+          {video.tags && video.tags.length > 0 && (
+            <div className="flex gap-1 flex-wrap max-w-full overflow-hidden">
+              {video.tags.slice(0, 3).map((tag, index) => (
+                <span
+                  key={index}
+                  className="bg-cyan-500/30 text-cyan-200 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0 max-w-[70px] sm:max-w-[90px] truncate shadow-md"
+                >
+                  #{tag}
+                </span>
+              ))}
+              <span className="sm:hidden bg-cyan-500/30 text-cyan-200 text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 max-w-[50px] truncate shadow-md">
+                {video.tags.length > 2 && `+${video.tags.length - 2}`}
+              </span>
+              <span className="hidden sm:inline bg-gray-500/30 text-gray-200 text-xs font-medium px-2 py-1 rounded shrink-0 shadow-md">
+                {video.tags.length > 3 && `+${video.tags.length - 3}`}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -374,25 +388,26 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-50">
+    <div className="fixed inset-0 bg-black z-50 overflow-hidden">
       {/* Close Button with Label */}
-      <div className="absolute top-6 right-6 z-50">
+      <div className="absolute top-4 sm:top-6 right-4 sm:right-6 z-50">
         <Button
           onClick={onClose}
           size="lg"
           variant="ghost"
-          className="rounded-full w-14 h-14 bg-black/60 hover:bg-black/80 backdrop-blur-md border-2 border-white/20 hover:border-white/40 transition-all duration-300 hover:scale-110 group"
+          className="rounded-full w-12 h-12 sm:w-14 sm:h-14 bg-black/60 hover:bg-black/80 backdrop-blur-md border-2 border-white/20 hover:border-white/40 transition-all duration-300 hover:scale-110 group"
         >
-          <X className="h-8 w-8 text-white font-bold" />
+          <X className="h-6 w-6 sm:h-8 sm:w-8 text-white font-bold" />
         </Button>
-        <div className="absolute top-16 right-0 bg-black/80 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+        <div className="absolute top-14 sm:top-16 right-0 bg-black/80 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap hidden sm:block">
           Back to Home (ESC)
         </div>
       </div>
 
-      {/* Scrollable Video Feed */}
+      {/* Scrollable Video Feed with proper containment */}
       <div 
-        className="h-full overflow-y-auto snap-y snap-mandatory"
+        className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-hide"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         onScroll={(e) => {
           const container = e.currentTarget;
           const scrollTop = container.scrollTop;
@@ -404,7 +419,11 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
         }}
       >
         {videos.map((video, index) => (
-          <div key={video.id} className="h-screen snap-start">
+          <div 
+            key={`video-${video.id}-${index}`} 
+            className="h-screen snap-start relative overflow-hidden"
+            style={{ contain: 'layout style paint' }}
+          >
             <VideoPlayer
               video={video}
               isActive={index === currentIndex}
