@@ -7,6 +7,15 @@
   overflow: hidden;
 }
 
+/* Ensure buttons are always clickable */
+button {
+  pointer-events: auto !important;
+}
+
+.fixed {
+  pointer-events: auto !important;
+}
+
 /* Hide scrollbars */
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -201,4 +210,28 @@
     right: 48px !important;
     max-height: 25vh !important;
   }
+}
+
+/* Ensure buttons are always clickable */
+.video-control-button,
+button[data-video-control] {
+  pointer-events: auto !important;
+  z-index: 50 !important;
+  position: relative;
+}
+
+/* Prevent iframe from blocking interactions */
+iframe {
+  pointer-events: auto;
+  z-index: 1;
+}
+
+/* Video overlay controls should be above iframe */
+.video-overlay-controls {
+  pointer-events: none;
+  z-index: 30;
+}
+
+.video-overlay-controls > * {
+  pointer-events: auto;
 }
