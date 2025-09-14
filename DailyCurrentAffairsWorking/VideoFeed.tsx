@@ -151,9 +151,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
   const youtubeRef = useRef<YouTubeVideoPlayerRef>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [isLiked, setIsLiked] = useState(false);
   const [showControls, setShowControls] = useState(false);
-  const [localLikes, setLocalLikes] = useState(video.likes || 0);
   
   const isYouTube = useMemo(() => isYouTubeUrl(video.videoUrl), [video.videoUrl]);
   
@@ -227,20 +225,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
     }
   }, [isActive, video.id, fadeAnim, isYouTube]);
 
-  const handleLike = async () => {
-    try {
-      const newLikedState = !isLiked;
-      setIsLiked(newLikedState);
-      setLocalLikes(prev => newLikedState ? prev + 1 : prev - 1);
-      
-      await VideoService.toggleVideoLike(String(video.id), 'anonymous_user');
-    } catch (error) {
-      console.error('Error toggling like:', error);
-      // Revert optimistic update
-      setIsLiked(!isLiked);
-      setLocalLikes(prev => isLiked ? prev + 1 : prev - 1);
-    }
-  };
+
 
   const handleShare = async () => {
     try {
@@ -363,16 +348,8 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
 
       {/* Video overlay content - YouTube gets minimal overlay, others get full overlay */}
       <View key={`overlay-${video.id}`} style={[styles.overlay, isYouTube && styles.youtubeOverlay]}>
-        {/* Right side controls - always show */}
+        {/* Right side controls - only share and views */}
         <View key={`controls-${video.id}`} style={styles.rightControls}>
-          {/* Like button */}
-          <TouchableOpacity style={styles.controlButton} onPress={handleLike}>
-            <Text style={[styles.controlIcon, { color: isLiked ? "#ff3040" : "#ffffff" }]}>
-              {isLiked ? "LIKED" : "LIKE"}
-            </Text>
-            <Text style={styles.controlText}>{localLikes}</Text>
-          </TouchableOpacity>
-
           {/* Share button */}
           <TouchableOpacity style={styles.controlButton} onPress={handleShare}>
             <Text style={[styles.controlIcon, { color: "#ffffff" }]}>SHARE</Text>
@@ -386,31 +363,40 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
           </TouchableOpacity>
         </View>
 
-        {/* Video Details - Positioned on Left Side */}
-        <View key={`details-${video.id}`} style={styles.leftDetailsContainer}>
-          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
-            {video.title}
-          </Text>
-          <Text style={[styles.description, { color: theme.subText }]} numberOfLines={2}>
-            {video.description}
-          </Text>
-          
-          {/* Source attribution */}
+        {/* Video Details - Professional Bottom Layout */}
+        <View key={`details-${video.id}`} style={styles.videoDetailsContainer}>
+          {/* Source badge - Top priority */}
           <View style={styles.sourceContainer}>
             <Text style={styles.sourceText}>
-              FROM: {video.originalSource?.sourcePlatform || 'Unknown'}
-              {video.originalSource?.creatorName && ` • @${video.originalSource.creatorName}`}
+              {video.originalSource?.sourcePlatform || 'News'}
+              {video.originalSource?.creatorName && ` • ${video.originalSource.creatorName}`}
             </Text>
           </View>
+          
+          {/* Main content */}
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={3}>
+            {video.title}
+          </Text>
+          
+          {video.description && (
+            <Text style={[styles.description, { color: theme.subText }]} numberOfLines={2}>
+              {video.description}
+            </Text>
+          )}
 
           {/* Tags */}
           {video.tags && video.tags.length > 0 && (
             <View key={`tags-${video.id}`} style={styles.tagsContainer}>
-              {video.tags.slice(0, 3).map((tag, index) => (
+              {video.tags.slice(0, 2).map((tag, index) => (
                 <Text key={`tag-${video.id}-${index}-${tag}`} style={styles.tag}>
                   #{tag}
                 </Text>
               ))}
+              {video.tags.length > 2 && (
+                <Text style={[styles.tag, styles.moreTag]}>
+                  +{video.tags.length - 2}
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -748,17 +734,15 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    alignSelf: 'center',
-    left: '50%',
-    marginLeft: -22, // Half of width to center perfectly
+    left: 16, // Positioned on the left side
     zIndex: 1000,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.3)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -829,7 +813,7 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   emptyContainer: {
@@ -866,70 +850,76 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingBottom: 20,
   },
-  leftDetailsContainer: {
+  videoDetailsContainer: {
     position: 'absolute',
-    left: 16,
-    bottom: 120, // Position above the bottom area to avoid overflow
-    maxWidth: '65%', // Don't take up too much width, leave space for controls
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    left: 0,
+    right: 0, // Complete full width
+    bottom: 0, // Align to bottom edge
+    backgroundColor: '#000000', // Solid black, non-transparent
+    paddingHorizontal: 16,
+    paddingRight: 80, // Leave space for right controls
+    paddingVertical: 12,
+    borderRadius: 0,
   },
   title: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 3,
+    marginTop: 4,
     color: '#ffffff',
     textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    lineHeight: 20,
+    letterSpacing: -0.2,
+  },
+  description: {
+    fontSize: 12,
+    marginBottom: 4,
+    color: 'rgba(255, 255, 255, 0.85)',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
     lineHeight: 16,
-  },
-  description: {
-    fontSize: 11,
-    marginBottom: 4,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-    lineHeight: 14,
+    letterSpacing: 0,
+    fontWeight: '400',
   },
   sourceContainer: {
-    backgroundColor: 'rgba(74, 144, 226, 0.8)',
+    backgroundColor: 'rgba(220, 53, 69, 0.9)',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginBottom: 4,
+    paddingVertical: 4,
+    borderRadius: 4,
     alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 2,
   },
   sourceText: {
     color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 0.1,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 1,
+    marginTop: 3,
   },
   tag: {
-    backgroundColor: 'rgba(0, 212, 255, 0.2)',
-    color: '#00d4ff',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 9,
-    fontWeight: '600',
-    marginRight: 3,
+    fontWeight: '500',
+    marginRight: 4,
     marginBottom: 2,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 255, 0.4)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
     overflow: 'hidden',
+    letterSpacing: 0.1,
+  },
+  moreTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '600',
   },
 });
