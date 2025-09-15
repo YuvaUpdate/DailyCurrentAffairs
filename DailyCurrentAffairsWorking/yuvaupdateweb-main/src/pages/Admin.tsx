@@ -64,10 +64,12 @@ export default function AdminPanel() {
   const [originalSource, setOriginalSource] = useState("");
   const [originalSourceUrl, setOriginalSourceUrl] = useState("");
   const [originalCreator, setOriginalCreator] = useState("");
+  const [creatorProfilePic, setCreatorProfilePic] = useState("");
   const [videoCategory, setVideoCategory] = useState("General");
   const [videoTags, setVideoTags] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [isAddingVideo, setIsAddingVideo] = useState(false);
+  const [editingVideo, setEditingVideo] = useState<VideoReel | null>(null);
   const [videoUrlInfo, setVideoUrlInfo] = useState<VideoUrlInfo | null>(null);
   const [isFetchingThumbnail, setIsFetchingThumbnail] = useState(false);
   // Notification states
@@ -177,10 +179,12 @@ export default function AdminPanel() {
     setOriginalSource("");
     setOriginalSourceUrl("");
     setOriginalCreator("");
+    setCreatorProfilePic("");
     setVideoCategory("General");
     setVideoTags("");
     setThumbnailUrl("");
     setVideoUrlInfo(null);
+    setEditingVideo(null);
   }
   
   // Handle video URL changes and parse platform info
@@ -237,6 +241,8 @@ export default function AdminPanel() {
       return;
     }
 
+    const isEditing = editingVideo !== null;
+
     // Parse and validate video URL using VideoUrlUtils
     let parsedVideoInfo: VideoUrlInfo;
     try {
@@ -285,6 +291,7 @@ export default function AdminPanel() {
           sourcePlatform: (originalSource || detectedPlatform) as 'Instagram' | 'TikTok' | 'YouTube' | 'Facebook' | 'Twitter' | 'Other',
           sourceUrl: originalSourceUrl?.trim() || videoUrl,
           creatorName: originalCreator?.trim() || 'Unknown',
+          creatorProfilePic: creatorProfilePic?.trim() || '',
           ...(originalCreator?.trim() && { creatorHandle: originalCreator.trim() }),
         },
         // Add metadata about video platform support
@@ -303,11 +310,20 @@ export default function AdminPanel() {
         isActive: true
       };
 
-      console.log('Adding video with data:', videoData);
-      const result = await VideoService.addVideo(videoData);
-      console.log('Video added successfully:', result);
+      if (isEditing && editingVideo) {
+        console.log('Updating video with data:', videoData);
+        const result = await VideoService.updateVideo(String(editingVideo.id), videoData);
+        console.log('Video updated successfully:', result);
+        
+        alert("✅ Video updated successfully! Changes will appear in the video feed.");
+      } else {
+        console.log('Adding video with data:', videoData);
+        const result = await VideoService.addVideo(videoData);
+        console.log('Video added successfully:', result);
+        
+        alert("✅ Video added successfully! It will appear in the video feed.");
+      }
       
-      alert("✅ Video added successfully! It will appear in the video feed.");
       resetVideoForm();
       
       // Refresh the video list
@@ -490,6 +506,30 @@ export default function AdminPanel() {
       console.error('Error deleting video:', error);
       alert(`❌ Failed to delete video: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  function handleEditVideo(video: VideoReel) {
+    // Populate the form with existing video data
+    setEditingVideo(video);
+    setVideoTitle(video.title);
+    setVideoDescription(video.description || '');
+    setVideoUrl(video.videoUrl);
+    setOriginalSource(video.originalSource?.sourcePlatform || '');
+    setOriginalSourceUrl(video.originalSource?.sourceUrl || '');
+    setOriginalCreator(video.originalSource?.creatorName || '');
+    setCreatorProfilePic(video.originalSource?.creatorProfilePic || '');
+    setVideoCategory(video.category);
+    setVideoTags(video.tags?.join(', ') || '');
+    setThumbnailUrl(video.thumbnailUrl);
+    
+    // Switch to videos tab and scroll to form
+    setActiveTab('videos');
+    setTimeout(() => {
+      const form = document.getElementById('video-form');
+      if (form) {
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   }
 
   // File Upload Functions
@@ -1629,15 +1669,26 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* Add Video Form */}
-          <div className="bg-card border rounded-xl p-6">
+          {/* Add/Edit Video Form */}
+          <div id="video-form" className="bg-card border rounded-xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-purple-100 dark:bg-purple-800 p-2 rounded-lg">
-                <Upload className="h-5 w-5 text-purple-600" />
+                {editingVideo ? (
+                  <Edit className="h-5 w-5 text-purple-600" />
+                ) : (
+                  <Upload className="h-5 w-5 text-purple-600" />
+                )}
               </div>
               <div>
-                <h4 className="text-lg font-semibold">Add New Video</h4>
-                <p className="text-sm text-muted-foreground">Upload Instagram-style video content for the mobile app</p>
+                <h4 className="text-lg font-semibold">
+                  {editingVideo ? 'Edit Video' : 'Add New Video'}
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {editingVideo 
+                    ? 'Update video details and metadata' 
+                    : 'Upload Instagram-style video content for the mobile app'
+                  }
+                </p>
               </div>
             </div>
 
@@ -1773,6 +1824,26 @@ export default function AdminPanel() {
                       onChange={e => setOriginalCreator(e.target.value)}
                       placeholder="Creator username or name"
                     />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">Creator Profile Picture</label>
+                    <Input
+                      value={creatorProfilePic}
+                      onChange={e => setCreatorProfilePic(e.target.value)}
+                      placeholder="URL to creator's profile picture"
+                    />
+                    {creatorProfilePic && (
+                      <div className="mt-2">
+                        <img 
+                          src={creatorProfilePic} 
+                          alt="Creator profile preview" 
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="mt-3">
@@ -1951,7 +2022,7 @@ export default function AdminPanel() {
                   onClick={resetVideoForm}
                 >
                   <X className="mr-2 h-4 w-4" />
-                  Clear Form
+                  {editingVideo ? 'Cancel Edit' : 'Clear Form'}
                 </Button>
                 <Button 
                   type="submit" 
@@ -1961,12 +2032,16 @@ export default function AdminPanel() {
                   {isAddingVideo ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Adding Video...
+                      {editingVideo ? 'Updating Video...' : 'Adding Video...'}
                     </>
                   ) : (
                     <>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Add Video to App
+                      {editingVideo ? (
+                        <Edit className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Upload className="mr-2 h-4 w-4" />
+                      )}
+                      {editingVideo ? 'Update Video' : 'Add Video to App'}
                     </>
                   )}
                 </Button>
@@ -2032,7 +2107,12 @@ export default function AdminPanel() {
                     {/* Minimal Bottom Actions */}
                     <div className="p-2 mt-auto bg-white dark:bg-gray-900 border-t">
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="flex-1 hover:bg-blue-50 hover:border-blue-300">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="flex-1 hover:bg-blue-50 hover:border-blue-300"
+                          onClick={() => handleEditVideo(video)}
+                        >
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Button>

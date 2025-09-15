@@ -81,8 +81,8 @@ const WebYouTubeVideoPlayer: React.FC<Omit<YouTubeVideoPlayerProps, 'videoUrl'> 
     onError?.(error);
   };
 
-  // Optimized embed URL for instant autoplay and fastest loading - no black screen
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&cc_load_policy=0&iv_load_policy=3&autohide=1&disablekb=0&enablejsapi=1&html5=1&vq=hd720&start=0&preload=none&poster=0&thumbnail=0&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`;
+  // Ad-blocker friendly embed URL without tracking APIs
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&cc_load_policy=0&iv_load_policy=3&disablekb=1&enablejsapi=0&html5=1&start=0&preload=none`;
 
   return (
     <View style={[styles.container, style]}>
@@ -228,7 +228,7 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
 
   // Fallback to WebView if YoutubePlayer is not available
   if (!YoutubePlayer) {
-    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=1&widgetid=1&iv_load_policy=3&cc_load_policy=0&start=0&preload=none&poster=0`;
+    const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=0&iv_load_policy=3&cc_load_policy=0&start=0&preload=none`;
     
     return (
       <View style={[styles.fullScreenContainer, style]}>
@@ -257,7 +257,7 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
 
   // Force WebView approach for better full-screen control on mobile
   console.log('📱 [MobileYouTube] Forcing WebView approach for full-screen control');
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=1&widgetid=1&iv_load_policy=3&cc_load_policy=0&start=0&preload=none&poster=0`;
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=0&iv_load_policy=3&cc_load_policy=0&start=0&preload=none`;
   
   return (
     <View style={[styles.fullScreenContainer, style]}>
@@ -281,6 +281,7 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
         cacheEnabled={false} // Disable caching to prevent black frames
         cacheMode={'LOAD_NO_CACHE'}
         incognito={true} // Fresh load each time
+        userAgent={'Mozilla/5.0 (Linux; Android 10; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Mobile Safari/537.36'} // Mobile user agent
         // Performance optimizations
         androidHardwareAccelerationDisabled={false}
         androidLayerType={'hardware'}
@@ -368,35 +369,30 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
           showsVerticalScrollIndicator: false,
           injectedJavaScript: `
             (function() {
-              // Remove black screens and force immediate autoplay
-              const optimizeAndPlay = () => {
-                // Remove any black screens or loading overlays
+              // Simple video optimization without API calls
+              const optimizeVideo = () => {
+                // Remove any loading overlays
                 const loadingElements = document.querySelectorAll('[class*="loading"], [class*="spinner"], [class*="placeholder"]');
                 loadingElements.forEach(el => el.style.display = 'none');
                 
-                const iframe = document.querySelector('iframe');
-                if (iframe && iframe.contentWindow) {
-                  try {
-                    iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-                    iframe.contentWindow.postMessage('{"event":"command","func":"setPlaybackRate","args":[1]}', '*');
-                  } catch(e) {}
-                }
-                
+                // Focus on direct video element manipulation only
                 const video = document.querySelector('video');
                 if (video) {
                   video.muted = ${muted};
                   video.currentTime = 0;
                   video.poster = ''; // Remove poster to prevent black frame
                   video.style.backgroundColor = 'transparent';
-                  video.play();
+                  video.play().catch(() => {
+                    video.muted = true;
+                    video.play();
+                  });
                 }
               };
               
-              // Execute immediately and multiple times
-              optimizeAndPlay();
-              setTimeout(optimizeAndPlay, 10);
-              setTimeout(optimizeAndPlay, 50);
-              setTimeout(optimizeAndPlay, 150);
+              // Execute multiple times for reliability
+              optimizeVideo();
+              setTimeout(optimizeVideo, 100);
+              setTimeout(optimizeVideo, 300);
             })();
           `,
         }}

@@ -12,7 +12,9 @@ import {
   Share,
   Alert,
   Animated,
+  Image,
 } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoReel } from './types';
 import YouTubeVideoPlayer, { YouTubeVideoPlayerRef } from './YouTubeVideoPlayer';
@@ -25,38 +27,73 @@ interface WebVideoProps {
   onLoadStart?: () => void;
   onLoad?: () => void;
   onError?: (error: any) => void;
+  onReady?: () => void;
   shouldPlay?: boolean;
   isLooping?: boolean;
   [key: string]: any;
 }
 
-// Web-compatible video player
+// Web-compatible video player with CORS fallback
 const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, onError, shouldPlay, isLooping, ...props }: WebVideoProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [hasCORSError, setHasCORSError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  // Check if URL is likely to have CORS issues
+  const isExternalVideo = useMemo(() => {
+    const url = source?.uri || '';
+    return url.includes('googlevideo.com') || 
+           url.includes('dmate4.online') || 
+           url.includes('tomp3.cc') ||
+           url.includes('dl188') ||
+           url.includes('yt-dlp') ||
+           url.includes('ytdl');
+  }, [source?.uri]);
   
   useEffect(() => {
-    if (videoRef.current && source?.uri) {
+    if (videoRef.current && source?.uri && !hasCORSError) {
       const video = videoRef.current;
       
-      // Set up video for better web compatibility
-      video.preload = 'metadata';
-      video.crossOrigin = 'anonymous';
+      // Aggressive preloading for faster video start
+      video.preload = 'auto'; // Load entire video for instant playback
+      
+      // Remove crossOrigin for external videos to avoid CORS preflight
+      if (!isExternalVideo) {
+        video.crossOrigin = 'anonymous';
+      }
+      
+      // Optimize video element for performance
+      video.playsInline = true;
+      video.muted = true; // Ensure autoplay works
+      video.loop = isLooping || false;
+      
+      // Force immediate loading
+      video.load();
       
       if (shouldPlay) {
-        // Try to play with proper error handling
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise.catch((error) => {
-            console.warn('Video autoplay failed:', error);
-            // Fallback: just load the video without playing
-            video.load();
-          });
-        }
+        // Immediate play attempt without waiting
+        const playVideo = async () => {
+          try {
+            await video.play();
+          } catch (error) {
+            console.warn('Video autoplay failed, retrying muted:', error);
+            video.muted = true;
+            try {
+              await video.play();
+            } catch (retryError) {
+              console.warn('Muted autoplay also failed:', retryError);
+              video.load(); // Final fallback
+            }
+          }
+        };
+        
+        // Try to play immediately
+        playVideo();
       } else {
         video.pause();
       }
     }
-  }, [shouldPlay, source?.uri]);
+  }, [shouldPlay, source?.uri, hasCORSError, isExternalVideo, isLooping]);
 
   const handleLoadStart = () => {
     onLoadStart && onLoadStart();
@@ -70,6 +107,23 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
     console.error('Web video error:', e);
     console.error('Video URL that failed:', source?.uri);
     console.error('Video source type:', typeof source?.uri);
+    
+    // Check if this is likely a CORS error
+    const url = source?.uri || '';
+    const isCORSError = url.includes('googlevideo.com') || 
+                       url.includes('dmate4.online') || 
+                       url.includes('tomp3.cc') ||
+                       url.includes('dl188') ||
+                       e.target?.error?.code === 4; // MEDIA_ELEMENT_ERROR: MEDIA_ERR_SRC_NOT_SUPPORTED
+    
+    if (isCORSError && retryCount < 2) {
+      console.warn('🚫 CORS error detected for video URL:', url);
+      setHasCORSError(true);
+      setRetryCount(prev => prev + 1);
+      // Try iframe fallback
+      return;
+    }
+    
     onError && onError(e);
   };
 
@@ -77,6 +131,51 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
     // Video is ready to play
     onLoad && onLoad();
   };
+
+  // If CORS error detected, show a placeholder with message
+  if (hasCORSError && isExternalVideo) {
+    return React.createElement('div', {
+      style: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#000',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        padding: '20px',
+        textAlign: 'center',
+        ...style,
+      }
+    }, [
+      React.createElement('div', {
+        key: 'icon',
+        style: { fontSize: '48px', marginBottom: '16px' }
+      }, '📹'),
+      React.createElement('div', {
+        key: 'message',
+        style: { fontSize: '16px', marginBottom: '8px' }
+      }, 'Video Unavailable'),
+      React.createElement('div', {
+        key: 'reason',
+        style: { fontSize: '12px', opacity: 0.7, maxWidth: '300px' }
+      }, 'This video cannot be played due to browser security restrictions. Try opening in a new tab.'),
+      React.createElement('button', {
+        key: 'button',
+        onClick: () => window.open(source?.uri, '_blank'),
+        style: {
+          marginTop: '16px',
+          padding: '8px 16px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }
+      }, 'Open Video')
+    ]);
+  }
 
   return React.createElement('video', {
     ref: videoRef,
@@ -92,8 +191,12 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
     muted: true, // Start muted for autoplay compatibility
     playsInline: true,
     controls: false,
-    preload: 'metadata',
-    crossOrigin: 'anonymous',
+    preload: 'auto', // Aggressive preloading for instant start
+    crossOrigin: isExternalVideo ? undefined : 'anonymous', // No CORS for external videos
+    // Performance optimizations
+    'webkit-playsinline': true,
+    'x5-video-player-type': 'h5',
+    'x5-video-player-fullscreen': false,
     onLoadStart: handleLoadStart,
     onCanPlay: handleCanPlay,
     onLoadedData: handleLoadedData,
@@ -165,6 +268,167 @@ const extractYouTubeVideoId = (url: string): string | null => {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+// Super Professional Custom Icon Components
+const ShareIcon = ({ size = 16, color = "#ffffff" }) => (
+  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    {/* Top Node - with gradient effect */}
+    <View style={{
+      width: size * 0.28,
+      height: size * 0.28,
+      borderRadius: size * 0.14,
+      backgroundColor: color,
+      position: 'absolute',
+      top: size * 0.02,
+      right: size * 0.12,
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 3,
+      elevation: 5,
+    }} />
+    
+    {/* Left Node - main hub */}
+    <View style={{
+      width: size * 0.32,
+      height: size * 0.32,
+      borderRadius: size * 0.16,
+      backgroundColor: color,
+      position: 'absolute',
+      left: size * 0.02,
+      top: size * 0.34,
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 4,
+      elevation: 6,
+    }} />
+    
+    {/* Bottom Node */}
+    <View style={{
+      width: size * 0.28,
+      height: size * 0.28,
+      borderRadius: size * 0.14,
+      backgroundColor: color,
+      position: 'absolute',
+      bottom: size * 0.02,
+      right: size * 0.12,
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 3,
+      elevation: 5,
+    }} />
+    
+    {/* Connection Lines with gradient effect */}
+    <View style={{
+      width: size * 0.45,
+      height: 3,
+      backgroundColor: color,
+      position: 'absolute',
+      top: size * 0.22,
+      left: size * 0.18,
+      transform: [{ rotate: '25deg' }],
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.6,
+      shadowRadius: 2,
+      elevation: 3,
+    }} />
+    <View style={{
+      width: size * 0.45,
+      height: 3,
+      backgroundColor: color,
+      position: 'absolute',
+      bottom: size * 0.22,
+      left: size * 0.18,
+      transform: [{ rotate: '-25deg' }],
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.6,
+      shadowRadius: 2,
+      elevation: 3,
+    }} />
+  </View>
+);
+
+const EyeIcon = ({ size = 16, color = "#ffffff" }) => (
+  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    {/* Outer Eye Shape with gradient */}
+    <View style={{
+      width: size * 0.95,
+      height: size * 0.65,
+      borderRadius: size * 0.475,
+      backgroundColor: 'transparent',
+      borderWidth: 2.5,
+      borderColor: color,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 4,
+      elevation: 6,
+    }}>
+      {/* Iris */}
+      <View style={{
+        width: size * 0.42,
+        height: size * 0.42,
+        borderRadius: size * 0.21,
+        backgroundColor: color,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 2,
+        elevation: 3,
+      }}>
+        {/* Pupil */}
+        <View style={{
+          width: size * 0.18,
+          height: size * 0.18,
+          borderRadius: size * 0.09,
+          backgroundColor: '#000',
+        }} />
+        
+        {/* Light reflection */}
+        <View style={{
+          width: size * 0.08,
+          height: size * 0.08,
+          borderRadius: size * 0.04,
+          backgroundColor: color,
+          position: 'absolute',
+          top: size * 0.06,
+          left: size * 0.12,
+          opacity: 0.8,
+        }} />
+      </View>
+    </View>
+    
+    {/* Eye lashes effect */}
+    <View style={{
+      width: size * 0.15,
+      height: 2,
+      backgroundColor: color,
+      position: 'absolute',
+      top: size * 0.12,
+      left: size * 0.25,
+      transform: [{ rotate: '-15deg' }],
+      opacity: 0.7,
+    }} />
+    <View style={{
+      width: size * 0.15,
+      height: 2,
+      backgroundColor: color,
+      position: 'absolute',
+      top: size * 0.12,
+      right: size * 0.25,
+      transform: [{ rotate: '15deg' }],
+      opacity: 0.7,
+    }} />
+  </View>
+);
+
 interface VideoFeedProps {
   onClose: () => void;
   isDarkMode: boolean;
@@ -188,8 +452,8 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
   const isYouTube = useMemo(() => isYouTubeUrl(video.videoUrl), [video.videoUrl]);
   
   // Instant loading state management for smooth scrolling
-  const [isLoading, setIsLoading] = useState(!isYouTube); // YouTube videos never show loading
-  const [isVideoReady, setIsVideoReady] = useState(isYouTube); // YouTube videos are always ready
+  const [isLoading, setIsLoading] = useState(!isYouTube && !isPreloaded); // Preloaded videos skip loading
+  const [isVideoReady, setIsVideoReady] = useState(isYouTube || isPreloaded); // YouTube and preloaded videos are always ready
   const [hasError, setHasError] = useState(false);
   
   // Debug logging for video type and state
@@ -210,14 +474,14 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
     }
   }, [isYouTube, video.id]);
 
-  // Minimal timeout for worst-case scenarios only
+  // Ultra-minimal timeout for instant experience
   useEffect(() => {
     if (isLoading) {
       loadingTimeoutRef.current = setTimeout(() => {
         console.log('⏰ Force hiding loading animation after timeout for video:', video.title);
         setIsLoading(false);
         setIsVideoReady(true);
-      }, 1000); // Reduced timeout for faster experience
+      }, 300); // Ultra-fast 300ms timeout for instant experience
     }
 
     return () => {
@@ -229,20 +493,23 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
 
   useEffect(() => {
     if (isActive) {
-      // Aggressive YouTube autoplay with retry logic
+      // Ultra-aggressive YouTube autoplay with rapid retry logic
       if (isYouTube && youtubeRef.current) {
         const attemptPlay = (attempt = 0) => {
-          if (attempt > 5) return; // Max 5 attempts
+          if (attempt > 10) return; // Max 10 attempts for reliability
           
           youtubeRef.current?.play().catch((error: any) => {
             console.log(`YouTube play attempt ${attempt + 1} failed:`, error);
-            // Retry after short delay
-            setTimeout(() => attemptPlay(attempt + 1), 100);
+            // Ultra-fast retry with 25ms delay
+            setTimeout(() => attemptPlay(attempt + 1), 25);
           });
         };
         
-        // Try to play immediately, then with retries
+        // Try to play immediately, then with rapid retries
         attemptPlay();
+        
+        // Also try a second immediate attempt
+        setTimeout(() => attemptPlay(0), 10);
       } 
       // Handle regular videos with minimal delay
       else if (!isYouTube && videoRef.current) {
@@ -419,18 +686,42 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
             ref={videoRef}
             source={{ uri: video.videoUrl }}
             style={styles.video}
-            onLoadStart={() => setIsLoading(true)}
+            onLoadStart={() => {
+              // Only show loading for non-preloaded videos
+              if (!isPreloaded) {
+                setIsLoading(true);
+              }
+            }}
             onLoad={() => {
               if (loadingTimeoutRef.current) {
                 clearTimeout(loadingTimeoutRef.current);
               }
               setIsLoading(false);
+              setIsVideoReady(true);
+              
+              // For preloaded videos, ensure instant playback
+              if (isPreloaded && Platform.OS === 'web') {
+                const videoElement = videoRef.current;
+                if (videoElement && isActive) {
+                  videoElement.play().catch(() => {
+                    console.log('Instant play failed, retrying...');
+                    videoElement.muted = true;
+                    videoElement.play();
+                  });
+                }
+              }
             }}
             onError={(error: any) => {
               console.error('Video error:', error);
               if (loadingTimeoutRef.current) {
                 clearTimeout(loadingTimeoutRef.current);
               }
+              setIsLoading(false);
+              setHasError(true);
+            }}
+            onReady={() => {
+              // Immediate ready state for faster responsiveness
+              setIsVideoReady(true);
               setIsLoading(false);
             }}
             {...(Platform.OS === 'web' ? {
@@ -462,53 +753,53 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
         <View key={`controls-${video.id}`} style={styles.rightControls}>
           {/* Share button */}
           <TouchableOpacity style={styles.controlButton} onPress={handleShare}>
-            <Text style={[styles.controlIcon, { color: "#ffffff" }]}>↗</Text>
+            <ShareIcon size={18} color="#ffffff" />
             <Text style={styles.controlText}>{video.shares || 0}</Text>
           </TouchableOpacity>
 
           {/* Views */}
           <TouchableOpacity style={styles.controlButton}>
-            <Text style={[styles.controlIcon, { color: "#ffffff" }]}>👁</Text>
+            <EyeIcon size={18} color="#ffffff" />
             <Text style={styles.controlText}>{video.views || 0}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Video Details - Professional Bottom Layout */}
-        <View key={`details-${video.id}`} style={styles.videoDetailsContainer}>
-          {/* Source badge - Top priority */}
-          <View style={styles.sourceContainer}>
-            <Text style={styles.sourceText}>
-              {video.originalSource?.sourcePlatform || 'News'}
-              {video.originalSource?.creatorName && ` • ${video.originalSource.creatorName}`}
-            </Text>
+        {/* Professional Creator Profile Section */}
+        <View key={`creator-${video.id}`} style={styles.creatorProfileContainer}>
+          <View style={styles.creatorInfo}>
+            {/* Creator Profile Picture */}
+            <View style={styles.profilePictureContainer}>
+              <Image
+                source={{
+                  uri: video.originalSource?.creatorProfilePic || 
+                       'https://via.placeholder.com/40x40/4F46E5/FFFFFF?text=' + 
+                       (video.originalSource?.creatorName?.charAt(0) || 'N')
+                }}
+                style={styles.profilePicture}
+                defaultSource={{
+                  uri: 'https://via.placeholder.com/40x40/4F46E5/FFFFFF?text=' + 
+                       (video.originalSource?.creatorName?.charAt(0) || 'N')
+                }}
+              />
+            </View>
+            
+            {/* Creator Name and Platform */}
+            <View style={styles.creatorDetails}>
+              <Text style={[styles.creatorName, { color: theme.text }]} numberOfLines={1}>
+                {video.originalSource?.creatorName || 'Daily Current Affairs'}
+              </Text>
+              <Text style={[styles.sourcePlatform, { color: theme.subText }]} numberOfLines={1}>
+                {video.originalSource?.sourcePlatform || 'News'} • Few hours ago
+              </Text>
+            </View>
           </View>
-          
-          {/* Main content */}
-          <Text style={[styles.title, { color: theme.text }]} numberOfLines={3}>
+        </View>
+
+        {/* Video Details - Simplified Title Only */}
+        <View key={`details-${video.id}`} style={styles.videoDetailsContainer}>
+          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
             {video.title}
           </Text>
-          
-          {video.description && (
-            <Text style={[styles.description, { color: theme.subText }]} numberOfLines={2}>
-              {video.description}
-            </Text>
-          )}
-
-          {/* Tags */}
-          {video.tags && video.tags.length > 0 && (
-            <View key={`tags-${video.id}`} style={styles.tagsContainer}>
-              {video.tags.slice(0, 2).map((tag, index) => (
-                <Text key={`tag-${video.id}-${index}-${tag}`} style={styles.tag}>
-                  #{tag}
-                </Text>
-              ))}
-              {video.tags.length > 2 && (
-                <Text style={[styles.tag, styles.moreTag]}>
-                  +{video.tags.length - 2}
-                </Text>
-              )}
-            </View>
-          )}
         </View>
 
       </View>
@@ -546,27 +837,51 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
     }
   }, [loading, hasAttemptedLoad, videos.length, error]);
 
-  // Aggressive preloading for instant access
+  // Ultra-aggressive preloading for instant access
   const preloadVideo = useCallback((video: VideoReel) => {
     const videoIdStr = String(video.id);
     if (preloadedVideos.has(videoIdStr)) return;
     
     console.log('🚀 [VideoFeed] Preloading video:', video.title?.substring(0, 30));
     
-    // For regular videos, preload metadata
+    // For regular videos, preload entire video for instant playback
     if (Platform.OS === 'web' && !isYouTubeUrl(video.videoUrl)) {
       const videoElement = document.createElement('video');
-      videoElement.preload = 'metadata';
+      videoElement.preload = 'auto'; // Load entire video, not just metadata
+      videoElement.muted = true; // Enable autoplay compatibility
+      videoElement.playsInline = true;
       videoElement.src = video.videoUrl;
+      
+      // Force immediate loading
       videoElement.load();
+      
+      // Try to buffer video data immediately
+      videoElement.addEventListener('canplaythrough', () => {
+        console.log('✅ [VideoPreload] Video ready for instant playback:', video.title?.substring(0, 20));
+      });
+      
+      // Store video element for instant access
+      (window as any).preloadedVideoElements = (window as any).preloadedVideoElements || new Map();
+      (window as any).preloadedVideoElements.set(videoIdStr, videoElement);
     }
     
-    // For YouTube videos, extract video ID for faster loading
+    // For YouTube videos, prefetch embed and extract video ID for faster loading
     if (isYouTubeUrl(video.videoUrl)) {
       const videoId = extractYouTubeVideoId(video.videoUrl);
       if (videoId) {
         console.log('🎬 [VideoFeed] YouTube video ID extracted for instant loading:', videoId);
-        // YouTube videos are considered preloaded immediately for smooth scrolling
+        
+        // Prefetch YouTube embed page
+        const link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = `https://www.youtube-nocookie.com/embed/${videoId}`;
+        document.head.appendChild(link);
+        
+        // Also prefetch thumbnail for immediate display
+        const thumbLink = document.createElement('link');
+        thumbLink.rel = 'prefetch';
+        thumbLink.href = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        document.head.appendChild(thumbLink);
       }
     }
     
@@ -626,7 +941,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
         
         // Aggressively preload first 5 videos for instant playback
         currentVideos.slice(0, 5).forEach((video: VideoReel, index: number) => {
-          setTimeout(() => preloadVideo(video), index * 10); // Stagger by 10ms for optimal loading
+          setTimeout(() => preloadVideo(video), index * 2); // Stagger by 2ms for ultra-fast loading
         });
       } else {
         // Don't immediately set error - videos may still be loading
@@ -674,7 +989,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
         
         // Preload with minimal staggering
         videosToPreload.forEach((video, index) => {
-          setTimeout(() => preloadVideo(video), index * 5);
+          setTimeout(() => preloadVideo(video), index * 1); // Ultra-fast 1ms stagger
         });
       }
     }
@@ -996,6 +1311,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingBottom: 20,
+  },
+  // Creator Profile Styles
+  creatorProfileContainer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 120, // Position above video details
+    backgroundColor: 'transparent',
+    paddingVertical: 8,
+  },
+  creatorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 25,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    flex: 1, // Take full available width
+  },
+  profilePictureContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  profilePicture: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
+  creatorDetails: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  creatorName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  sourcePlatform: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   videoDetailsContainer: {
     position: 'absolute',

@@ -272,38 +272,43 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
 
 
 
-      {/* Video Details - Bottom Left positioned slightly above bottom */}
-      <div className="absolute bottom-16 sm:bottom-20 left-3 sm:left-4 max-w-[60%] sm:max-w-[65%] bg-gradient-to-t from-black/80 via-black/60 to-transparent px-3 sm:px-4 py-3 sm:py-4 max-h-[35vh] overflow-hidden rounded-t-lg z-10" style={{ pointerEvents: 'none' }}>
-        <div className="space-y-1 sm:space-y-2">
-          <h3 className="text-white font-semibold text-sm sm:text-base mb-1 line-clamp-2 leading-tight drop-shadow-lg">{video.title}</h3>
-          <p className="text-white/90 text-xs sm:text-sm mb-2 line-clamp-2 leading-tight drop-shadow-md">{video.description}</p>
-          
-          {/* Source */}
-          <div className="flex items-center gap-1 sm:gap-2 mb-2">
-            <span className="bg-blue-500/90 text-white text-[10px] sm:text-xs font-medium px-2 py-1 rounded-full truncate max-w-[180px] sm:max-w-[200px] shadow-lg">
-              FROM: {video.originalSource?.sourcePlatform || 'Unknown'}
-              {video.originalSource?.creatorName && ` • @${video.originalSource.creatorName}`}
-            </span>
-          </div>
-
-          {/* Tags - Bottom left positioned with contained width */}
-          {video.tags && video.tags.length > 0 && (
-            <div className="flex gap-1 flex-wrap max-w-full overflow-hidden">
-              {video.tags.slice(0, 2).map((tag, index) => (
-                <span
-                  key={index}
-                  className="bg-cyan-500/30 text-cyan-200 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0 max-w-[65px] sm:max-w-[80px] truncate shadow-md"
-                >
-                  #{tag}
-                </span>
-              ))}
-              {video.tags.length > 2 && (
-                <span className="bg-gray-500/30 text-gray-200 text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0 shadow-md">
-                  +{video.tags.length - 2}
-                </span>
-              )}
+      {/* Creator Profile Section - App-like rounded bar */}
+      <div className="absolute bottom-28 sm:bottom-32 left-3 sm:left-4 right-16 sm:right-20 z-10" style={{ pointerEvents: 'none' }}>
+        <div className="flex items-center gap-3 bg-black/60 backdrop-blur-sm border border-white/20 rounded-full px-3 py-2 max-w-fit shadow-xl">
+          {/* Creator Profile Picture */}
+          {video.originalSource?.creatorProfilePic ? (
+            <img 
+              src={video.originalSource.creatorProfilePic} 
+              alt={`${video.originalSource.creatorName || 'Creator'} profile`}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border-2 border-white/30 shadow-lg"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-600 border-2 border-white/30 flex items-center justify-center shadow-lg">
+              <span className="text-white text-xs sm:text-sm font-bold">
+                {video.originalSource?.creatorName?.charAt(0) || 'N'}
+              </span>
             </div>
           )}
+          
+          {/* Creator Details */}
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-semibold text-xs sm:text-sm leading-tight drop-shadow-lg">
+              {video.originalSource?.creatorName || 'Daily Current Affairs'}
+            </div>
+            <div className="text-white/80 text-[10px] sm:text-xs leading-tight drop-shadow-md">
+              {video.originalSource?.sourcePlatform || 'News'} • Few hours ago
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Video Details - Simplified Title Only */}
+      <div className="absolute bottom-16 sm:bottom-20 left-3 sm:left-4 max-w-[70%] sm:max-w-[75%] bg-gradient-to-t from-black/80 via-black/60 to-transparent px-3 sm:px-4 py-2 sm:py-3 rounded-t-lg z-10" style={{ pointerEvents: 'none' }}>
+        <div>
+          <h3 className="text-white font-semibold text-sm sm:text-base line-clamp-2 leading-tight drop-shadow-lg">{video.title}</h3>
         </div>
       </div>
     </div>
@@ -525,12 +530,22 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
           touchAction: 'manipulation'
         }}
       >
-        <Share2 className="h-5 w-5 sm:h-6 sm:w-6 text-white font-bold" />
+        <svg className="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 512 512" fill="white">
+          <circle cx="389" cy="154" r="85" />
+          <circle cx="123" cy="277" r="85" />
+          <circle cx="389" cy="431" r="85" />
+          <path d="M208 277L348 154" stroke="white" strokeWidth="20" strokeLinecap="round" />
+          <path d="M208 277L348 431" stroke="white" strokeWidth="20" strokeLinecap="round" />
+        </svg>
       </button>
 
       {/* VIEWS COUNTER - Middle Right - Simple Display */}
       <div className="fixed right-4 sm:right-6 top-1/2 transform -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/80 border-2 border-white/30 shadow-xl flex flex-col items-center justify-center z-[50000]">
-        <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+        <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 512 512" fill="white">
+          <path d="M256 144c79.4 0 144 64.6 144 144s-64.6 144-144 144S112 367.4 112 256S176.6 144 256 144z" />
+          <circle cx="256" cy="256" r="64" fill="#000" />
+          <path d="M256 96C123.9 96 14.4 186.1 2.3 255.5c-0.8 4.5-0.8 9.1 0 13.6C14.4 325.9 123.9 416 256 416s241.6-90.1 253.7-146.9c0.8-4.5 0.8-9.1 0-13.6C497.6 186.1 388.1 96 256 96zM256 352c-53 0-96-43-96-96s43-96 96-96s96 43 96 96S309 352 256 352z" />
+        </svg>
         <span className="text-[8px] sm:text-[10px] text-white font-bold leading-none">{videos[currentIndex]?.views || 0}</span>
       </div>
 

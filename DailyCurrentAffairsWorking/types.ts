@@ -81,6 +81,7 @@ export interface VideoReel {
   originalSource: {
     creatorName: string; // Original creator name
     creatorHandle?: string; // @username if available
+    creatorProfilePic?: string; // Creator's profile picture URL
     sourceUrl: string; // Link to original video/channel
     sourcePlatform: 'YouTube' | 'Instagram' | 'TikTok' | 'Twitter' | 'Facebook' | 'Other';
     originalVideoId?: string; // Original video ID if available

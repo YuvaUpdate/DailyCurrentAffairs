@@ -242,6 +242,35 @@ export class VideoService {
     this.saveVideos(updatedVideos);
   }
 
+  static async updateVideo(videoId: string, updates: Partial<VideoReel>): Promise<void> {
+    if (this.USE_FIREBASE) {
+      try {
+        const { VideoService: FirebaseVideoService } = await import('./VideoServiceFirebase');
+        await FirebaseVideoService.updateVideo(videoId, updates);
+        return;
+      } catch (error) {
+        console.warn('Firebase not available, falling back to localStorage');
+      }
+    }
+
+    const videos = this.getStoredVideos();
+    const videoIndex = videos.findIndex(video => video.id === videoId);
+    
+    if (videoIndex === -1) {
+      throw new Error(`Video with ID ${videoId} not found`);
+    }
+
+    // Update the video with new data, preserving existing fields
+    videos[videoIndex] = {
+      ...videos[videoIndex],
+      ...updates,
+      id: videoId, // Ensure ID doesn't change
+      timestamp: videos[videoIndex].timestamp, // Preserve original timestamp
+    };
+
+    this.saveVideos(videos);
+  }
+
   private static getStoredVideos(): VideoReel[] {
     try {
       const stored = localStorage.getItem(this.VIDEOS_STORAGE_KEY);
