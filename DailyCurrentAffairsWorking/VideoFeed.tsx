@@ -120,15 +120,47 @@ const VideoService = Platform.OS === 'web'
   ? require('./VideoServiceFirebase').VideoService
   : require('./VideoServiceMobile').VideoService;
 
-// Helper function to detect YouTube URLs
+// Helper function to detect YouTube URLs with better validation
 const isYouTubeUrl = (url: string): boolean => {
+  if (!url || typeof url !== 'string') {
+    console.log('🔍 [VideoFeed] Invalid URL:', url);
+    return false;
+  }
+  
   const youtubePatterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)/,
     /youtube\.com\/.*[?&]v=/,
   ];
+  
   const isYT = youtubePatterns.some(pattern => pattern.test(url));
+  
+  // Additional validation - check if video ID can be extracted
+  if (isYT) {
+    const videoId = extractYouTubeVideoId(url);
+    if (!videoId) {
+      console.log('🔍 [VideoFeed] YouTube URL but no video ID:', url);
+      return false;
+    }
+  }
+  
   console.log('🔍 [VideoFeed] URL check:', url, '-> YouTube:', isYT);
   return isYT;
+};
+
+// Helper function to extract YouTube video ID
+const extractYouTubeVideoId = (url: string): string | null => {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([^&\n?#]+)/,
+    /youtube\.com\/.*[?&]v=([^&\n?#]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
 };
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -155,21 +187,37 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
   
   const isYouTube = useMemo(() => isYouTubeUrl(video.videoUrl), [video.videoUrl]);
   
-  // Only show loading for non-YouTube videos
-  const [isLoading, setIsLoading] = useState(!isYouTube);
+  // Instant loading state management for smooth scrolling
+  const [isLoading, setIsLoading] = useState(!isYouTube); // YouTube videos never show loading
+  const [isVideoReady, setIsVideoReady] = useState(isYouTube); // YouTube videos are always ready
+  const [hasError, setHasError] = useState(false);
   
   // Debug logging for video type and state
   useEffect(() => {
-    console.log(`� [VideoItem] "${video.title?.substring(0, 30)}..." - YouTube: ${isYouTube}, Active: ${isActive}, Loading: ${isLoading}, Platform: ${Platform.OS}`);
-  }, [isYouTube, isActive, isLoading, video.title]);
+    console.log(`� [VideoItem] "${video.title?.substring(0, 30)}..." - YouTube: ${isYouTube}, Active: ${isActive}, Loading: ${isLoading}, Ready: ${isVideoReady}, Platform: ${Platform.OS}`);
+  }, [isYouTube, isActive, isLoading, isVideoReady, video.title]);
 
-  // Force hide loading animation after 3 seconds for non-YouTube videos only
+  // Instant initialization for YouTube videos
   useEffect(() => {
-    if (isLoading && !isYouTube) {
+    if (isYouTube) {
+      // YouTube videos are instantly ready - no delays
+      setIsLoading(false);
+      setIsVideoReady(true);
+      setHasError(false);
+    } else {
+      // Regular videos start ready but can show loading if needed
+      setIsVideoReady(true);
+    }
+  }, [isYouTube, video.id]);
+
+  // Minimal timeout for worst-case scenarios only
+  useEffect(() => {
+    if (isLoading) {
       loadingTimeoutRef.current = setTimeout(() => {
-        console.log('⏰ Force hiding loading animation after 3 seconds for video:', video.title);
+        console.log('⏰ Force hiding loading animation after timeout for video:', video.title);
         setIsLoading(false);
-      }, 3000);
+        setIsVideoReady(true);
+      }, 1000); // Reduced timeout for faster experience
     }
 
     return () => {
@@ -177,34 +225,45 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
         clearTimeout(loadingTimeoutRef.current);
       }
     };
-  }, [isLoading, isYouTube, video.title]);
+  }, [isLoading, video.title]);
 
   useEffect(() => {
     if (isActive) {
-      // Handle YouTube videos
+      // Aggressive YouTube autoplay with retry logic
       if (isYouTube && youtubeRef.current) {
-        youtubeRef.current.play().catch((error: any) => {
-          console.log('YouTube play failed:', error);
-        });
-      } 
-      // Handle regular videos
-      else if (!isYouTube && videoRef.current) {
-        if (Platform.OS === 'web') {
-          videoRef.current.play().catch((error: any) => {
-            console.log('Video play failed:', error);
+        const attemptPlay = (attempt = 0) => {
+          if (attempt > 5) return; // Max 5 attempts
+          
+          youtubeRef.current?.play().catch((error: any) => {
+            console.log(`YouTube play attempt ${attempt + 1} failed:`, error);
+            // Retry after short delay
+            setTimeout(() => attemptPlay(attempt + 1), 100);
           });
-        } else {
-          videoRef.current.playAsync();
-        }
+        };
+        
+        // Try to play immediately, then with retries
+        attemptPlay();
+      } 
+      // Handle regular videos with minimal delay
+      else if (!isYouTube && videoRef.current) {
+        setTimeout(() => {
+          if (Platform.OS === 'web') {
+            videoRef.current.play().catch((error: any) => {
+              console.log('Video play failed:', error);
+            });
+          } else {
+            videoRef.current.playAsync();
+          }
+        }, 30); // Minimal delay only for regular videos
       }
       
       // Track view
       VideoService.trackVideoView(String(video.id), 'anonymous_user');
       
-      // Fade in animation
+      // Faster fade in animation
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 500,
+        duration: 200, // Faster animation
         useNativeDriver: true,
       }).start();
     } else {
@@ -255,47 +314,98 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
     overlay: 'rgba(0, 0, 0, 0.3)',
   };
 
-  // Memoize callbacks to prevent re-renders
+  // Improved YouTube callbacks with proper error handling
   const handleYouTubeLoadStart = useCallback(() => {
-    // No loading state needed for YouTube videos
-  }, []);
+    console.log('🎬 [YouTube] Load started for:', video.title);
+    // YouTube videos never show loading - always ready for smooth scrolling
+    setHasError(false);
+  }, [video.title]);
 
   const handleYouTubeReady = useCallback(() => {
-    // YouTube videos are ready immediately
-  }, []);
+    console.log('✅ [YouTube] Video ready:', video.title);
+    // YouTube is always ready - no state changes needed
+    setHasError(false);
+  }, [video.title]);
 
   const handleYouTubeError = useCallback((error: any) => {
-    console.error('YouTube video error:', error);
-    // No loading state management needed for YouTube
-  }, []);
+    console.error('❌ [YouTube] Video error for', video.title, ':', error);
+    setIsLoading(false);
+    setHasError(true);
+    setIsVideoReady(false);
+    
+    // Extract YouTube video ID for debugging
+    const videoId = extractYouTubeVideoId(video.videoUrl);
+    
+    // Try to provide helpful error message
+    const errorMessage = error?.message || error || 'YouTube video configuration error';
+    console.log('🔧 [YouTube] Error details:', {
+      url: video.videoUrl,
+      videoId: videoId,
+      error: errorMessage,
+      platform: Platform.OS,
+      userAgent: Platform.OS === 'web' ? (typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown') : `${Platform.OS} app`,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Log common YouTube issues
+    if (errorMessage.includes('configuration')) {
+      console.log('💡 [YouTube] Tip: Video may be restricted, age-gated, or unavailable in this region');
+    }
+    if (errorMessage.includes('network')) {
+      console.log('💡 [YouTube] Tip: Check network connection and try again');
+    }
+  }, [video.title, video.videoUrl]);
 
   return (
     <Animated.View key={`video-container-${video.id}`} style={[styles.videoContainer, { opacity: fadeAnim }]}>
       <View key={`strict-clip-${video.id}`} style={styles.strictClipContainer}>
         {isYouTube ? (
-          // YouTube videos - no TouchableOpacity wrapper to allow native controls
+          // YouTube videos - with error handling
           <View key={`youtube-container-${video.id}`} style={styles.videoTouchable}>
-            <YouTubeVideoPlayer
-            key={`youtube-${video.id}`} // Stable key to prevent recreation
-            ref={youtubeRef}
-            videoUrl={video.videoUrl}
-            isActive={isActive}
-            style={styles.video}
-            onLoadStart={() => {
-              console.log('📱 [VideoItem] YouTube onLoadStart for:', video.title?.substring(0, 30));
-              handleYouTubeLoadStart();
-            }}
-            onReady={() => {
-              console.log('📱 [VideoItem] YouTube onReady for:', video.title?.substring(0, 30));
-              handleYouTubeReady();
-            }}
-            onError={(error) => {
-              console.error('📱 [VideoItem] YouTube onError for:', video.title?.substring(0, 30), error);
-              handleYouTubeError(error);
-            }}
-            muted={false}
-          />
-        </View>
+            {hasError ? (
+              // YouTube error fallback
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>📺</Text>
+                <Text style={[styles.errorText, { color: theme.text }]}>
+                  YouTube video unavailable
+                </Text>
+                <Text style={[styles.errorSubtext, { color: theme.subText }]}>
+                  This video may be restricted or require viewing on YouTube
+                </Text>
+                <TouchableOpacity 
+                  style={styles.retryButton} 
+                  onPress={() => {
+                    setHasError(false);
+                    setIsLoading(true);
+                    setIsVideoReady(false);
+                  }}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <YouTubeVideoPlayer
+                key={`youtube-${video.id}`} // Stable key to prevent recreation
+                ref={youtubeRef}
+                videoUrl={video.videoUrl}
+                isActive={isActive}
+                style={styles.video}
+                onLoadStart={() => {
+                  console.log('📱 [VideoItem] YouTube onLoadStart for:', video.title?.substring(0, 30));
+                  handleYouTubeLoadStart();
+                }}
+                onReady={() => {
+                  console.log('📱 [VideoItem] YouTube onReady for:', video.title?.substring(0, 30));
+                  handleYouTubeReady();
+                }}
+                onError={(error) => {
+                  console.error('📱 [VideoItem] YouTube onError for:', video.title?.substring(0, 30), error);
+                  handleYouTubeError(error);
+                }}
+                muted={!isActive}
+              />
+            )}
+          </View>
       ) : (
         // Regular videos - with TouchableOpacity for controls
         <TouchableOpacity 
@@ -352,13 +462,13 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
         <View key={`controls-${video.id}`} style={styles.rightControls}>
           {/* Share button */}
           <TouchableOpacity style={styles.controlButton} onPress={handleShare}>
-            <Text style={[styles.controlIcon, { color: "#ffffff" }]}>SHARE</Text>
+            <Text style={[styles.controlIcon, { color: "#ffffff" }]}>↗</Text>
             <Text style={styles.controlText}>{video.shares || 0}</Text>
           </TouchableOpacity>
 
           {/* Views */}
           <TouchableOpacity style={styles.controlButton}>
-            <Text style={[styles.controlIcon, { color: "#ffffff" }]}>VIEWS</Text>
+            <Text style={[styles.controlIcon, { color: "#ffffff" }]}>👁</Text>
             <Text style={styles.controlText}>{video.views || 0}</Text>
           </TouchableOpacity>
         </View>
@@ -413,6 +523,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(new Set());
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
   const preloadRangeRef = useRef({ start: 0, end: 2 }); // Preload range
@@ -421,19 +532,42 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
     loadVideos();
   }, []);
 
-  // Preload videos for faster access
+  // Check for no videos only after loading has been attempted and enough time has passed
+  useEffect(() => {
+    if (!loading && hasAttemptedLoad && videos.length === 0 && !error) {
+      const timer = setTimeout(() => {
+        if (videos.length === 0) {
+          console.log('⚠️ [VideoFeed] No videos found after loading attempt');
+          setError('No videos available');
+        }
+      }, 2000); // Wait 2 seconds after loading completes
+
+      return () => clearTimeout(timer);
+    }
+  }, [loading, hasAttemptedLoad, videos.length, error]);
+
+  // Aggressive preloading for instant access
   const preloadVideo = useCallback((video: VideoReel) => {
     const videoIdStr = String(video.id);
     if (preloadedVideos.has(videoIdStr)) return;
     
     console.log('🚀 [VideoFeed] Preloading video:', video.title?.substring(0, 30));
     
-    // For regular videos, we can preload metadata
+    // For regular videos, preload metadata
     if (Platform.OS === 'web' && !isYouTubeUrl(video.videoUrl)) {
       const videoElement = document.createElement('video');
       videoElement.preload = 'metadata';
       videoElement.src = video.videoUrl;
       videoElement.load();
+    }
+    
+    // For YouTube videos, extract video ID for faster loading
+    if (isYouTubeUrl(video.videoUrl)) {
+      const videoId = extractYouTubeVideoId(video.videoUrl);
+      if (videoId) {
+        console.log('🎬 [VideoFeed] YouTube video ID extracted for instant loading:', videoId);
+        // YouTube videos are considered preloaded immediately for smooth scrolling
+      }
     }
     
     setPreloadedVideos(prev => new Set([...prev, videoIdStr]));
@@ -443,6 +577,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
     try {
       setLoading(true);
       setError(null);
+      setHasAttemptedLoad(true);
       console.log('🔄 [VideoFeed] Loading videos with optimization...');
       
       // Try to load from cache first for instant display
@@ -451,8 +586,8 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
         console.log('⚡ [VideoFeed] Using cached videos for instant display:', cachedVideos.length);
         setVideos(cachedVideos);
         setLoading(false);
-
-        // Still fetch fresh data in the background
+        
+        // Still fetch fresh data in the background immediately
         setTimeout(async () => {
           try {
             const { videos: freshVideoList } = await VideoService.getVideos(50);
@@ -489,17 +624,20 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
         const regularCount = currentVideos.length - youtubeCount;
         console.log('📊 [VideoFeed] Video breakdown - YouTube:', youtubeCount, 'Regular:', regularCount);
         
-        // Immediately preload first 3 videos for instant playback
-        currentVideos.slice(0, 3).forEach((video: VideoReel) => {
-          setTimeout(() => preloadVideo(video), 100);
+        // Aggressively preload first 5 videos for instant playback
+        currentVideos.slice(0, 5).forEach((video: VideoReel, index: number) => {
+          setTimeout(() => preloadVideo(video), index * 10); // Stagger by 10ms for optimal loading
         });
       } else {
-        setError('No videos available');
+        // Don't immediately set error - videos may still be loading
+        console.log('⚠️ [VideoFeed] No videos yet, but continuing to try loading...');
       }
     } catch (err) {
       console.error('Error loading videos:', err);
       setError('Failed to load videos');
       setLoading(false);
+      
+
     }
   };
 
@@ -511,25 +649,40 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
       console.log('👀 [VideoFeed] Current video:', newIndex, currentVideo?.title?.substring(0, 30), 'YouTube:', isYT);
       setCurrentIndex(newIndex);
       
-      // Aggressive preloading - preload next 3 and previous 1 videos
-      const preloadRange = { start: Math.max(0, newIndex - 1), end: Math.min(videos.length - 1, newIndex + 3) };
+      // Super aggressive preloading for smooth YouTube scrolling
+      const preloadRange = { start: Math.max(0, newIndex - 2), end: Math.min(videos.length - 1, newIndex + 5) };
       
       if (preloadRange.start !== preloadRangeRef.current.start || preloadRange.end !== preloadRangeRef.current.end) {
         preloadRangeRef.current = preloadRange;
         
-        // Preload videos in range
+        // Prioritized preloading - YouTube videos first for instant scrolling
+        const videosToPreload = [];
         for (let i = preloadRange.start; i <= preloadRange.end; i++) {
           if (videos[i] && i !== newIndex) {
-            setTimeout(() => preloadVideo(videos[i]), i * 50); // Stagger preloading
+            videosToPreload.push(videos[i]);
           }
         }
+        
+        // Sort by YouTube videos first for priority loading
+        videosToPreload.sort((a, b) => {
+          const aIsYT = isYouTubeUrl(a.videoUrl);
+          const bIsYT = isYouTubeUrl(b.videoUrl);
+          if (aIsYT && !bIsYT) return -1;
+          if (!aIsYT && bIsYT) return 1;
+          return 0;
+        });
+        
+        // Preload with minimal staggering
+        videosToPreload.forEach((video, index) => {
+          setTimeout(() => preloadVideo(video), index * 5);
+        });
       }
     }
   }).current;
 
   const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 80, // Require 80% visibility
-    minimumViewTime: 100, // Minimum time to be considered viewable
+    itemVisiblePercentThreshold: 70, // Reduced for faster switching
+    minimumViewTime: 50, // Faster switching for smooth YouTube experience
   }).current;
 
   const theme = {
@@ -560,13 +713,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-        {/* Close button */}
-        <TouchableOpacity 
-          style={[styles.closeButton, { top: insets.top + 10 }]} 
-          onPress={onClose}
-        >
-          <Text style={styles.closeButtonText}>✕</Text>
-        </TouchableOpacity>
+
       </View>
     );
   }
@@ -575,13 +722,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
-      {/* Close button */}
-      <TouchableOpacity 
-        style={[styles.closeButton, { top: insets.top + 10 }]} 
-        onPress={onClose}
-      >
-        <Text style={styles.closeButtonText}>✕</Text>
-      </TouchableOpacity>
+
 
       {/* Strict boundary wrapper for video feed */}
       <View style={styles.videoBoundaryContainer}>
@@ -597,11 +738,11 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        removeClippedSubviews={Platform.OS === 'android'}
-        windowSize={5} // Increased for better preloading
-        initialNumToRender={2} // Render 2 videos initially for faster startup
-        maxToRenderPerBatch={3} // Render more videos per batch
-        updateCellsBatchingPeriod={16} // Faster updates (60fps)
+        removeClippedSubviews={false} // Keep all videos in memory for instant access
+        windowSize={15} // Extremely large window for YouTube video smooth scrolling
+        initialNumToRender={4} // Render 4 videos initially for instant YouTube access
+        maxToRenderPerBatch={7} // Render even more videos per batch
+        updateCellsBatchingPeriod={5} // Ultra-fast updates for instant YouTube switching
         getItemLayout={(data, index) => ({
           length: screenHeight,
           offset: screenHeight * index,
@@ -721,6 +862,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 20,
   },
+  errorSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 20,
+    opacity: 0.7,
+    lineHeight: 18,
+  },
   retryButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 24,
@@ -776,12 +924,12 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     alignItems: 'center',
-    marginVertical: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    marginVertical: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 25,
-    minWidth: 60,
+    borderRadius: 22,
+    minWidth: 50,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     shadowColor: '#000',
@@ -791,16 +939,15 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   controlIcon: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '400',
+    marginBottom: 3,
     textAlign: 'center',
     color: '#ffffff',
   },
   controlText: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',

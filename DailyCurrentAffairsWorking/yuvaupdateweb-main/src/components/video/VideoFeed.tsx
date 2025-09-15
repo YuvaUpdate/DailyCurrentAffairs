@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { VideoService } from '@/services/VideoService';
 import { VideoReel } from '@/types/types';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Share2, Eye, X, ExternalLink } from 'lucide-react';
+import { Play, Pause, Share2, Eye, X, ExternalLink, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VideoUrlUtils } from '@/utils/VideoUrlUtils';
 import '@/styles/video-feed.css';
@@ -23,6 +23,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
   
   // Determine video type and source URL
   const getVideoType = () => {
@@ -68,6 +69,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
       setIsPlaying(!isPlaying);
     }
     // For iframe videos, the user controls playback through the embedded player
+  };
+
+  const toggleMute = () => {
+    if (videoType === 'direct' && videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
   };
 
 
@@ -135,7 +143,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
         togglePlayPause();
         break;
       case 'm':
-        // Mute functionality removed
+      case 'M':
+        e.preventDefault();
+        toggleMute();
         break;
     }
   };
@@ -155,7 +165,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
           src={videoSrc}
           className="w-full h-full object-cover"
           loop
-          muted={true}
+          muted={isMuted}
           playsInline
           onTimeUpdate={handleTimeUpdate}
           onClick={togglePlayPause}
@@ -222,6 +232,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
             <Play className="h-8 w-8 text-white ml-1" />
           </Button>
         </div>
+      )}
+
+      {/* Audio Button (only for direct videos) */}
+      {videoType === 'direct' && (
+        <Button
+          size="sm"
+          variant="secondary"
+          className="absolute top-4 left-4 rounded-full w-10 h-10 bg-black/50 hover:bg-black/70 backdrop-blur-sm border border-white/20"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleMute();
+          }}
+        >
+          {isMuted ? (
+            <VolumeX className="h-4 w-4 text-white" />
+          ) : (
+            <Volume2 className="h-4 w-4 text-white" />
+          )}
+        </Button>
       )}
 
       {/* Progress Bar (only for direct videos) */}

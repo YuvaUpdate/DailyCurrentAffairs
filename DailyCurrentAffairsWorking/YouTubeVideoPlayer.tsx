@@ -64,8 +64,8 @@ const WebYouTubeVideoPlayer: React.FC<Omit<YouTubeVideoPlayerProps, 'videoUrl'> 
   useEffect(() => {
     console.log(`🎬 YouTube Player mounting/updating for video: ${videoId}`);
     onLoadStart?.();
-    // Immediate ready callback since YouTube handles its own loading
-    setTimeout(() => onReady?.(), 100); // Small delay to ensure proper initialization
+    // Immediate ready callback - no delay for instant playback
+    onReady?.();
   }, [videoId]);
 
   // Handle iframe load completion
@@ -81,8 +81,8 @@ const WebYouTubeVideoPlayer: React.FC<Omit<YouTubeVideoPlayerProps, 'videoUrl'> 
     onError?.(error);
   };
 
-  // Create optimized embed URL for fastest loading and best performance
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=${isActive ? 1 : 0}&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&cc_load_policy=0&iv_load_policy=3&autohide=1&disablekb=0&enablejsapi=1&html5=1&vq=hd720&start=0&end=0&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`;
+  // Optimized embed URL for instant autoplay and fastest loading - no black screen
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&cc_load_policy=0&iv_load_policy=3&autohide=1&disablekb=0&enablejsapi=1&html5=1&vq=hd720&start=0&preload=none&poster=0&thumbnail=0&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`;
 
   return (
     <View style={[styles.container, style]}>
@@ -138,22 +138,27 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
   const [playerReady, setPlayerReady] = useState(false);
   const youtubeRef = useRef<any>(null);
 
-  // Initialize YouTube player - no loading timeout needed
+  // Instant YouTube player initialization for fast autoplay
   useEffect(() => {
     setPlayerReady(false);
     onLoadStart?.();
-    // YouTube player handles its own loading, just mark as ready
-    setTimeout(() => {
-      setPlayerReady(true);
-      onReady?.();
-      onLoad?.();
-    }, 100); // Minimal delay for initialization
+    // Mark as ready immediately for instant playback
+    setPlayerReady(true);
+    onReady?.();
+    onLoad?.();
   }, [videoId]);
 
   useImperativeHandle(ref, () => ({
     play: async () => {
+      // Immediate play attempt for instant response
+      setPlaying(true);
       if (playerReady && youtubeRef.current) {
-        setPlaying(true);
+        try {
+          // Force play even if not fully ready
+          setPlaying(true);
+        } catch (error) {
+          console.log('YouTube play error (will retry):', error);
+        }
       }
     },
     pause: async () => {
@@ -185,13 +190,14 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
 
   useEffect(() => {
     console.log('📱 [MobileYouTube] isActive changed for video:', videoId, 'isActive:', isActive, 'playerReady:', playerReady);
-    if (playerReady) {
-      console.log('📱 [MobileYouTube] Setting playing to:', isActive);
-      setPlaying(isActive);
-    } else if (isActive) {
-      // If becoming active but player not ready, set playing state for when it becomes ready
-      console.log('📱 [MobileYouTube] Player not ready yet, but setting playing state for later');
+    
+    // Instant autoplay when becoming active
+    if (isActive) {
       setPlaying(true);
+      console.log('📱 [MobileYouTube] INSTANT autoplay enabled for:', videoId);
+    } else {
+      setPlaying(false);
+      console.log('📱 [MobileYouTube] Pausing video:', videoId);
     }
   }, [isActive, playerReady, videoId]);
 
@@ -222,7 +228,7 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
 
   // Fallback to WebView if YoutubePlayer is not available
   if (!YoutubePlayer) {
-    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=${playing ? 1 : 0}&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=1&widgetid=1&iv_load_policy=3&cc_load_policy=0&start=0&end=0`;
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=1&widgetid=1&iv_load_policy=3&cc_load_policy=0&start=0&preload=none&poster=0`;
     
     return (
       <View style={[styles.fullScreenContainer, style]}>
@@ -241,7 +247,7 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
           scalesPageToFit={false}
           showsHorizontalScrollIndicator={false}
           showsVerticalScrollIndicator={false}
-          cacheEnabled={false}
+          cacheEnabled={false} // Prevent black frame caching
           cacheMode={'LOAD_NO_CACHE'}
           incognito={true}
         />
@@ -251,7 +257,7 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
 
   // Force WebView approach for better full-screen control on mobile
   console.log('📱 [MobileYouTube] Forcing WebView approach for full-screen control');
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=${playing ? 1 : 0}&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=1&widgetid=1&iv_load_policy=3&cc_load_policy=0&start=0&end=0`;
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=1&widgetid=1&iv_load_policy=3&cc_load_policy=0&start=0&preload=none&poster=0`;
   
   return (
     <View style={[styles.fullScreenContainer, style]}>
@@ -272,15 +278,54 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
         scalesPageToFit={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
-        cacheEnabled={true} // Enable caching for better performance
-        cacheMode={'LOAD_CACHE_ELSE_NETWORK'}
-        incognito={false} // Allow caching
+        cacheEnabled={false} // Disable caching to prevent black frames
+        cacheMode={'LOAD_NO_CACHE'}
+        incognito={true} // Fresh load each time
         // Performance optimizations
         androidHardwareAccelerationDisabled={false}
         androidLayerType={'hardware'}
         startInLoadingState={false}
         renderLoading={() => <View />} // Minimal loading indicator for faster perception
         mixedContentMode={'compatibility'}
+        injectedJavaScript={`
+          (function() {
+            // Remove black screen and loading states immediately
+            const removeBlackScreen = () => {
+              // Hide any loading spinners or black overlays
+              const loadingElements = document.querySelectorAll('[class*="loading"], [class*="spinner"], [class*="placeholder"]');
+              loadingElements.forEach(el => el.style.display = 'none');
+              
+              // Remove poster images that might show as black frames
+              const posterElements = document.querySelectorAll('[poster], [data-poster]');
+              posterElements.forEach(el => {
+                el.removeAttribute('poster');
+                el.removeAttribute('data-poster');
+              });
+              
+              const video = document.querySelector('video');
+              if (video) {
+                video.muted = ${muted};
+                video.currentTime = 0;
+                video.poster = ''; // Remove poster to prevent black frame
+                video.preload = 'none'; // Prevent preloading that might cause black frames
+                video.style.backgroundColor = 'transparent';
+                video.play().catch(() => {
+                  video.muted = true;
+                  video.play();
+                });
+                console.log('📺 Video optimized for instant play - no black screen');
+              }
+            };
+            
+            // Execute immediately
+            removeBlackScreen();
+            
+            // Execute multiple times to catch any delayed loading
+            setTimeout(removeBlackScreen, 10);
+            setTimeout(removeBlackScreen, 50);
+            setTimeout(removeBlackScreen, 100);
+          })();
+        `}
       />
     </View>
   );
@@ -321,6 +366,39 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
           scalesPageToFit: false,
           showsHorizontalScrollIndicator: false,
           showsVerticalScrollIndicator: false,
+          injectedJavaScript: `
+            (function() {
+              // Remove black screens and force immediate autoplay
+              const optimizeAndPlay = () => {
+                // Remove any black screens or loading overlays
+                const loadingElements = document.querySelectorAll('[class*="loading"], [class*="spinner"], [class*="placeholder"]');
+                loadingElements.forEach(el => el.style.display = 'none');
+                
+                const iframe = document.querySelector('iframe');
+                if (iframe && iframe.contentWindow) {
+                  try {
+                    iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+                    iframe.contentWindow.postMessage('{"event":"command","func":"setPlaybackRate","args":[1]}', '*');
+                  } catch(e) {}
+                }
+                
+                const video = document.querySelector('video');
+                if (video) {
+                  video.muted = ${muted};
+                  video.currentTime = 0;
+                  video.poster = ''; // Remove poster to prevent black frame
+                  video.style.backgroundColor = 'transparent';
+                  video.play();
+                }
+              };
+              
+              // Execute immediately and multiple times
+              optimizeAndPlay();
+              setTimeout(optimizeAndPlay, 10);
+              setTimeout(optimizeAndPlay, 50);
+              setTimeout(optimizeAndPlay, 150);
+            })();
+          `,
         }}
       />
     </View>
