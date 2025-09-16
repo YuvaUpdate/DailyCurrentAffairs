@@ -594,9 +594,17 @@ interface VideoItemProps {
   onPress: () => void;
   isDarkMode: boolean;
   isPreloaded?: boolean;
+  onNext?: () => void;
+  bottomCardHeight?: number;
+  isManuallyPaused?: boolean;
+  onManualPauseChange?: (paused: boolean) => void;
+  isMuted?: boolean;
+  onMuteChange?: (muted: boolean) => void;
+  onBottomCardLayout?: (height: number) => void;
+  onShare?: (item: VideoReel) => void;
 }
 
-const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkMode, isPreloaded = false }) => {
+const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext, isDarkMode, isPreloaded = false, bottomCardHeight = 0, isManuallyPaused = false, onManualPauseChange, isMuted = false, onMuteChange, onBottomCardLayout, onShare: onShareProp }) => {
   const videoRef = useRef<any>(null);
   const youtubeRef = useRef<YouTubeVideoPlayerRef>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -977,57 +985,77 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
 
         {/* Video overlay content - YouTube gets minimal overlay, others get full overlay */}
         <View key={`overlay-${video.id}`} style={[styles.overlay, isYouTube && styles.youtubeOverlay]}>
-          {/* Right side controls - only share and views */}
-          <View key={`controls-${video.id}`} style={styles.rightControls}>
-            {/* Share button */}
-            <TouchableOpacity style={styles.controlButton} onPress={handleShare}>
-              <ShareIcon size={18} color="#ffffff" />
-              <Text style={styles.controlText}>{video.shares || 0}</Text>
-            </TouchableOpacity>
-
-            {/* Views */}
-            <TouchableOpacity style={styles.controlButton}>
-              <EyeIcon size={18} color="#ffffff" />
-              <Text style={styles.controlText}>{video.views || 0}</Text>
+          {/* Creator profile (positioned just above the bottom details card) */}
+          {/* Move creator profile further up by adding extra offset */}
+          {/* Move creator profile higher above the details card and ensure it sits above via zIndex */}
+          <View pointerEvents="box-none" style={{ position: 'absolute', left: 8, right: 8, bottom: (24 + (bottomCardHeight || 52) + 84), zIndex: 1300, elevation: 16 }}>
+            <TouchableOpacity onPress={() => {
+              // Open creator profile/source if available
+              const url = video.originalSource?.sourceUrl;
+              if (url) {
+                if (typeof window !== 'undefined' && window.open) {
+                  window.open(url, '_blank');
+                } else {
+                  try { const Linking = require('react-native').Linking; Linking.openURL(url); } catch (e) {}
+                }
+              }
+            }} activeOpacity={0.85} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <View style={[styles.creatorInfo, { backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 6 }]}>
+                <View style={styles.profilePictureContainer}>
+                  {video.originalSource?.creatorProfilePic ? (
+                    <Image source={{ uri: video.originalSource.creatorProfilePic }} style={styles.profilePicture} />
+                  ) : (
+                    <View style={[styles.profilePicture, { backgroundColor: '#666', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>{(video.originalSource?.creatorName || 'N').charAt(0)}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.creatorDetails}>
+                  <Text style={styles.creatorName} numberOfLines={1}>{video.originalSource?.creatorName || 'Daily Current Affairs'}</Text>
+                  <Text style={styles.sourcePlatform} numberOfLines={1}>{video.originalSource?.sourcePlatform || ''}</Text>
+                </View>
+              </View>
             </TouchableOpacity>
           </View>
 
-          {/* Professional Creator Profile Section */}
-          <View key={`creator-${video.id}`} style={styles.creatorProfileContainer}>
-            <View style={styles.creatorInfo}>
-              {/* Creator Profile Picture */}
-              <View style={styles.profilePictureContainer}>
-                <Image
-                  source={{
-                    uri: video.originalSource?.creatorProfilePic ||
-                      'https://via.placeholder.com/40x40/4F46E5/FFFFFF?text=' +
-                      (video.originalSource?.creatorName?.charAt(0) || 'N')
-                  }}
-                  style={styles.profilePicture}
-                  defaultSource={{
-                    uri: 'https://via.placeholder.com/40x40/4F46E5/FFFFFF?text=' +
-                      (video.originalSource?.creatorName?.charAt(0) || 'N')
-                  }}
-                />
-              </View>
+          {/* Video Details - Bottom card with title, source link, share and views (centered and fuller) */}
+          <View key={`details-${video.id}`} style={[styles.videoDetailsContainer, { backgroundColor: 'transparent', paddingHorizontal: 0, alignItems: 'center' }]} pointerEvents="box-none">
+            <View pointerEvents="auto" style={{ position: 'absolute', left: 0, right: 0, bottom: 40, zIndex: 1200, elevation: 12 }} onLayout={(e) => { const h = e.nativeEvent.layout?.height || 0; if (h && onBottomCardLayout) onBottomCardLayout(h); }}>
+              <View style={{ width: '100%', alignSelf: 'stretch' }}>
+                <View style={{ backgroundColor: 'rgba(0,0,0,0.92)', borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 6 }}>
+                  <View style={{ flex: 1, minWidth: 0, marginRight: 10, paddingLeft: 6, alignItems: 'flex-start' }}>
+                    <Text style={[styles.title, { color: theme.text, fontSize: 18 }]} numberOfLines={2}>{video.title}</Text>
+                    {video.originalSource?.sourceUrl ? (
+                      <TouchableOpacity onPress={() => {
+                        if (typeof window !== 'undefined' && window.open) {
+                          window.open(video.originalSource.sourceUrl, '_blank');
+                        } else {
+                          try { const Linking = require('react-native').Linking; Linking.openURL(video.originalSource.sourceUrl); } catch (e) {}
+                        }
+                      }} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={{ marginTop: 6 }}>
+                        <View style={{ backgroundColor: '#122F3E', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+                          <Text style={{ color: '#4FC3F7', fontSize: 13, fontWeight: '600' }} numberOfLines={1}>Source Link</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
 
-              {/* Creator Name and Platform */}
-              <View style={styles.creatorDetails}>
-                <Text style={[styles.creatorName, { color: theme.text }]} numberOfLines={1}>
-                  {video.originalSource?.creatorName || 'Daily Current Affairs'}
-                </Text>
-                <Text style={[styles.sourcePlatform, { color: theme.subText }]} numberOfLines={1}>
-                  {video.originalSource?.sourcePlatform || 'News'} • Few hours ago
-                </Text>
+                  <View style={{ width: 68, alignItems: 'center', justifyContent: 'center' }}>
+                    <TouchableOpacity onPress={() => { if (onShareProp) onShareProp(video); else handleShare(); }} style={{ marginBottom: 8, padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <View style={{ borderWidth: 1, borderColor: '#fff', borderRadius: 18, padding: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' }}>
+                        <ShareIcon size={16} color="#fff" />
+                      </View>
+                    </TouchableOpacity>
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={{ borderWidth: 1, borderColor: '#fff', borderRadius: 16, padding: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' }}>
+                        <EyeIcon size={14} color="#fff" />
+                      </View>
+                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12, marginTop: 6 }}>{video.views || 0}</Text>
+                    </View>
+                  </View>
+                </View>
               </View>
             </View>
-          </View>
-
-          {/* Video Details - Simplified Title Only */}
-          <View key={`details-${video.id}`} style={styles.videoDetailsContainer}>
-            <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
-              {video.title}
-            </Text>
           </View>
 
         </View>
