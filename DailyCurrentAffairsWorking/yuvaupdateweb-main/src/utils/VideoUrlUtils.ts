@@ -3,10 +3,10 @@ export interface VideoUrlInfo {
   originalUrl: string;
   embedUrl?: string;
   thumbnailUrl?: string;
-  platform: 'YouTube' | 'Instagram' | 'TikTok' | 'Facebook' | 'Twitter' | 'Direct' | 'Other';
+  platform: 'YouTube' | 'Instagram' | 'TikTok' | 'Facebook' | 'Twitter' | 'Direct' | 'Mega' | 'GoogleDrive' | 'Dropbox' | 'Vimeo' | 'Dailymotion' | 'Archive' | 'Other';
   videoId?: string;
   isSupported: boolean;
-  playbackType: 'embed' | 'direct' | 'external';
+  playbackType: 'embed' | 'direct' | 'external' | 'iframe';
 }
 
 export class VideoUrlUtils {
@@ -44,6 +44,25 @@ export class VideoUrlUtils {
         return this.parseTwitterUrl(url, urlObj);
       }
       
+
+      // Firebase Storage direct video files
+      if (hostname.includes('firebasestorage.googleapis.com')) {
+        // Try to guess type from URL extension, fallback to direct
+        const isVideo = url.match(/\.(mp4|webm|ogg|avi|mov|wmv|flv|m4v)(\?.*)?$/i);
+        return {
+          originalUrl: url,
+          embedUrl: url,
+          platform: 'Direct',
+          isSupported: true,
+          playbackType: 'direct'
+        };
+      }
+
+      // Iframe-embeddable sources
+      if (this.isIframeEmbeddableUrl(url, hostname)) {
+        return this.parseIframeUrl(url, urlObj, hostname);
+      }
+
       // Direct video files
       if (url.match(/\.(mp4|webm|ogg|avi|mov|wmv|flv|m4v)(\?.*)?$/i)) {
         return {
@@ -393,5 +412,113 @@ export class VideoUrlUtils {
     }
     
     return videoInfo.embedUrl;
+  }
+
+  /**
+   * Check if URL is iframe-embeddable
+   */
+  static isIframeEmbeddableUrl(url: string, hostname?: string): boolean {
+    const host = hostname || new URL(url).hostname.toLowerCase();
+    
+    // Iframe-friendly domains
+    const iframeDomains = [
+      'mega.nz',
+      'drive.google.com',
+      'dropbox.com', 
+      'vimeo.com',
+      'dailymotion.com',
+      'streamable.com',
+      'archive.org'
+    ];
+    
+    return iframeDomains.some(domain => host.includes(domain));
+  }
+
+  /**
+   * Parse iframe-embeddable URLs
+   */
+  static parseIframeUrl(url: string, urlObj: URL, hostname: string): VideoUrlInfo {
+    let platform: VideoUrlInfo['platform'] = 'Other';
+    let embedUrl = url;
+    let thumbnailUrl: string | undefined;
+    let videoId: string | undefined;
+
+    // Determine platform and convert to embed format
+    if (hostname.includes('mega.nz')) {
+      platform = 'Mega';
+      // Mega.nz embed URLs are already in the correct format
+      if (url.includes('/embed/')) {
+        embedUrl = url;
+        videoId = url.split('/embed/')[1]?.split('#')[0];
+      } else {
+        // Convert regular Mega URL to embed format if possible
+        const match = url.match(/mega\.nz\/#!([^!]+)!(.+)/);
+        if (match) {
+          videoId = match[1];
+          embedUrl = `https://mega.nz/embed/${match[1]}#${match[2]}`;
+        }
+      }
+    } else if (hostname.includes('drive.google.com')) {
+      platform = 'GoogleDrive';
+      // Convert Google Drive sharing URL to embed format
+      const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileIdMatch) {
+        videoId = fileIdMatch[1];
+        embedUrl = `https://drive.google.com/file/d/${videoId}/preview`;
+        thumbnailUrl = `https://drive.google.com/thumbnail?id=${videoId}`;
+      }
+    } else if (hostname.includes('dropbox.com')) {
+      platform = 'Dropbox';
+      // Convert Dropbox sharing URL to direct/embed format
+      if (url.includes('?dl=0')) {
+        embedUrl = url.replace('?dl=0', '?raw=1');
+      }
+      videoId = url.split('/s/')[1]?.split('/')[0];
+    } else if (hostname.includes('vimeo.com')) {
+      platform = 'Vimeo';
+      const videoIdMatch = url.match(/vimeo\.com\/(\d+)/);
+      if (videoIdMatch) {
+        videoId = videoIdMatch[1];
+        embedUrl = `https://player.vimeo.com/video/${videoId}`;
+        thumbnailUrl = `https://vumbnail.com/${videoId}.jpg`;
+      }
+    } else if (hostname.includes('dailymotion.com')) {
+      platform = 'Dailymotion';
+      const videoIdMatch = url.match(/video\/([a-zA-Z0-9]+)/);
+      if (videoIdMatch) {
+        videoId = videoIdMatch[1];
+        embedUrl = `https://www.dailymotion.com/embed/video/${videoId}`;
+        thumbnailUrl = `https://www.dailymotion.com/thumbnail/video/${videoId}`;
+      }
+    } else if (hostname.includes('streamable.com')) {
+      platform = 'Other';
+      const videoIdMatch = url.match(/streamable\.com\/([a-zA-Z0-9]+)/);
+      if (videoIdMatch) {
+        videoId = videoIdMatch[1];
+        embedUrl = `https://streamable.com/e/${videoId}`;
+      }
+    } else if (hostname.includes('archive.org')) {
+      platform = 'Archive';
+      // Archive.org embed format
+      if (url.includes('/embed/')) {
+        embedUrl = url;
+      } else {
+        const match = url.match(/archive\.org\/details\/([^\/]+)/);
+        if (match) {
+          videoId = match[1];
+          embedUrl = `https://archive.org/embed/${videoId}`;
+        }
+      }
+    }
+
+    return {
+      originalUrl: url,
+      embedUrl,
+      thumbnailUrl,
+      platform,
+      videoId,
+      isSupported: true,
+      playbackType: 'iframe'
+    };
   }
 }

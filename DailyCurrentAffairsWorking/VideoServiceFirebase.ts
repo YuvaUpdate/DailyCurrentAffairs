@@ -24,6 +24,56 @@ export class VideoService {
   private static readonly ENGAGEMENT_COLLECTION = 'video_engagement';
 
   /**
+   * Validate if a video URL is safe and playable
+   */
+  private static isValidVideoUrl(url: string): boolean {
+    if (!url || url.trim() === '') return false;
+    
+    // Check for basic URL structure
+    const urlPattern = /^https?:\/\/.+/;
+    if (!urlPattern.test(url)) return false;
+    
+    // Blocked/problematic domains that cause CORS or other issues
+    const blockedDomains = [
+      'tomp3.cc',
+      'youtube-downloader',
+      'y2mate',
+      'savefrom',
+      'dmate4.online',
+      'dl188',
+      'yt-dlp'
+    ];
+    
+    const isBlocked = blockedDomains.some(domain => url.toLowerCase().includes(domain));
+    if (isBlocked) return false;
+    
+    // Check for supported video formats, YouTube, or iframe-embeddable sources
+    const supportedFormats = ['.mp4', '.webm', '.ogg', '.mov', '.m4v'];
+    const hasValidFormat = supportedFormats.some(format => url.toLowerCase().includes(format));
+    
+    // YouTube URL patterns
+    const youtubePatterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)/,
+      /youtube\.com\/.*[?&]v=/,
+    ];
+    const isYouTube = youtubePatterns.some(pattern => pattern.test(url));
+    
+    // Iframe-embeddable domains (more flexible matching)
+    const iframeDomains = [
+      'mega.nz',
+      'drive.google.com',
+      'dropbox.com',
+      'vimeo.com',
+      'dailymotion.com',
+      'streamable.com',
+      'archive.org'
+    ];
+    const isIframeEmbeddable = iframeDomains.some(domain => url.toLowerCase().includes(domain));
+    
+    return hasValidFormat || isYouTube || isIframeEmbeddable;
+  }
+
+  /**
    * Clean object by removing undefined values recursively
    */
   private static cleanObject(obj: any): any {
@@ -111,12 +161,21 @@ export class VideoService {
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        videos.push({
-          id: doc.id,
-          ...data,
-          // Convert Firestore timestamp to string if needed
-          timestamp: data.timestamp?.toDate?.() ? data.timestamp.toDate().toISOString() : data.timestamp
-        } as VideoReel);
+        
+        // Validate video URL before adding to results
+        const videoUrl = data.videoUrl || '';
+        const isValidUrl = this.isValidVideoUrl(videoUrl);
+        
+        if (isValidUrl) {
+          videos.push({
+            id: doc.id,
+            ...data,
+            // Convert Firestore timestamp to string if needed
+            timestamp: data.timestamp?.toDate?.() ? data.timestamp.toDate().toISOString() : data.timestamp
+          } as VideoReel);
+        } else {
+          console.warn('🚫 VideoService: Filtered out invalid video URL:', videoUrl);
+        }
       });
 
       const lastDocument = querySnapshot.docs[querySnapshot.docs.length - 1] || null;
@@ -275,6 +334,25 @@ export class VideoService {
       console.log(`📊 Video share tracked for ${videoId} by ${userId}`);
     } catch (error) {
       console.error('❌ Error tracking video share:', error);
+    }
+  }
+
+  /**
+   * Identify videos with problematic URLs for admin review
+   */
+  static async getVideosWithInvalidUrls(): Promise<VideoReel[]> {
+    try {
+      const { videos } = await this.getVideos(100); // Get more videos for analysis
+      
+      const invalidVideos = videos.filter(video => !this.isValidVideoUrl(video.videoUrl));
+      
+      console.log(`🔍 Found ${invalidVideos.length} videos with invalid URLs:`, 
+        invalidVideos.map(v => ({ id: v.id, title: v.title, url: v.videoUrl })));
+      
+      return invalidVideos;
+    } catch (error) {
+      console.error('❌ Error analyzing video URLs:', error);
+      throw error;
     }
   }
 }

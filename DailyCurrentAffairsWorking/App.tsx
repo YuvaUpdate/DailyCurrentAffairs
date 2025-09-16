@@ -1417,24 +1417,30 @@ export default function App(props: AppProps) {
               />
             )}
             
-            {/* Emoji action buttons over the image (bottom-right) - single-colored, professional glyphs */}
+            {/* Action buttons over the image (bottom-right) - horizontally aligned */}
             <View style={styles.reelsEmojiContainerImage} pointerEvents="box-none">
+              {/* Theme toggle button */}
+              <FastTouchable 
+                onPress={toggleTheme}
+                style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{isDarkMode ? '☀' : '☽'}</Text>
+              </FastTouchable>
+              
+              {/* Share button */}
               <FastTouchable 
                 onPress={() => shareArticle(article)} 
                 style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>↗</Text>
+                <Image 
+                  source={require('./assets/share.png')}
+                  style={{ width: 14, height: 14, tintColor: '#fff' }}
+                  resizeMode="contain"
+                />
               </FastTouchable>
-              {SHOW_BOOKMARKS && (
-              <FastTouchable 
-                onPress={() => toggleBookmark(article.id as number)} 
-                style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{bookmarkedItems.some(i => String(i) === String(article.id)) ? '★' : '☆'}</Text>
-              </FastTouchable>
-              )}
+              
               {/* TTS Read-aloud button */}
               <FastTouchable 
                 onPress={() => toggleReadAloud(article)} 
@@ -1445,10 +1451,28 @@ export default function App(props: AppProps) {
                 }]}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>
-                  {readingArticleId === String(article.id) ? '⏹️' : '🔊'}
-                </Text>
+                <Image 
+                  source={require('./assets/text-to-speech.png')}
+                  style={{ 
+                    width: 14, 
+                    height: 14, 
+                    tintColor: '#fff',
+                    opacity: readingArticleId === String(article.id) ? 0.8 : 1.0
+                  }}
+                  resizeMode="contain"
+                />
               </FastTouchable>
+              
+              {/* Bookmark button (if enabled) */}
+              {SHOW_BOOKMARKS && (
+              <FastTouchable 
+                onPress={() => toggleBookmark(article.id as number)} 
+                style={[styles.reelsEmojiButton, { backgroundColor: currentTheme.accent }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={[styles.reelsEmojiText, { color: '#fff' }]}>{bookmarkedItems.some(i => String(i) === String(article.id)) ? '★' : '☆'}</Text>
+              </FastTouchable>
+              )}
             </View>
             {/* Date overlay on image */}
             <View style={styles.reelsDateBadge} pointerEvents="none">
@@ -1578,8 +1602,8 @@ export default function App(props: AppProps) {
               position: 'absolute',
               // move to bottom-left of the card to avoid the bottom-centered Tap button
               left: 12,
-              // position above the bottom tap button area
-              bottom: Math.max(12, insets.bottom + 72),
+              // position above the navigation bar (safe area) with proper spacing
+              bottom: insets.bottom + 20,
               // ensure it sits above other overlays
               zIndex: 120,
               alignItems: 'center'
@@ -1659,12 +1683,13 @@ export default function App(props: AppProps) {
         </View>
       )}
         <View style={styles.headerButtons}>
+          {/* Video Button */}
           <FastTouchable 
-            style={[styles.themeButton, { backgroundColor: currentTheme.accent }]}
-            onPress={toggleTheme}
+            style={[styles.headerVideoButton, { backgroundColor: currentTheme.accent }]}
+            onPress={() => setVideoFeedVisible(true)}
             hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
-            <Text style={[styles.themeButtonText, { color: '#FFFFFF' }]}>{isDarkMode ? '☀' : '☽'}</Text>
+            <Text style={[styles.headerVideoButtonText, { color: '#FFFFFF' }]}>VIDEO</Text>
           </FastTouchable>
           {/* Admin Button - Only visible for admin users and when included in this build */}
           {INCLUDE_ADMIN_PANEL && userProfile && authService.isAdminUser(userProfile) && (
@@ -1780,24 +1805,7 @@ export default function App(props: AppProps) {
         />
       )}
 
-      {/* Floating Video Button */}
-      <Animated.View style={[
-        styles.floatingVideoButton, 
-        { 
-          backgroundColor: currentTheme.accent,
-          bottom: insets.bottom + 20,
-          right: 20,
-          transform: [{ scale: pulseAnimation }]
-        }
-      ]}>
-        <FastTouchable 
-          style={styles.floatingVideoButtonTouchable}
-          onPress={() => setVideoFeedVisible(true)}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-        >
-          <Text style={[styles.floatingVideoButtonText, { color: '#FFFFFF' }]}>VIDEO</Text>
-        </FastTouchable>
-      </Animated.View>
+
 
       {/* Video Feed Modal */}
       <Modal
@@ -1894,11 +1902,11 @@ const styles = StyleSheet.create({
   flex: 0,
   justifyContent: 'flex-end',
   },
-  floatingVideoButton: {
+  floatingThemeButton: {
     position: 'absolute',
-    width: 80,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1906,17 +1914,16 @@ const styles = StyleSheet.create({
     elevation: 8,
     zIndex: 1000,
   },
-  floatingVideoButtonTouchable: {
+  floatingThemeButtonTouchable: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 24,
+    borderRadius: 28,
   },
-  floatingVideoButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  floatingThemeButtonText: {
+    fontSize: 20,
+    fontWeight: '600',
     textAlign: 'center',
   },
   themeButton: {
@@ -1949,6 +1956,23 @@ const styles = StyleSheet.create({
     color: '#ffffff', // Keep white text for contrast on accent background
     fontSize: 12,
     fontWeight: '600',
+  },
+  headerVideoButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  headerVideoButtonText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   headerLeft: {
   flexDirection: 'row',
@@ -2353,6 +2377,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingRight: 6,
+  },
+  themeToggleContainer: {
+    position: 'absolute',
+    bottom: 50, // Position above the other action buttons, aligned vertically
+    right: 18, // Align exactly with the share button (12 + 6 margin from paddingRight)
+    zIndex: 30,
+    elevation: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prominentThemeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  prominentThemeButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    lineHeight: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   videoBadge: {
     position: 'absolute',

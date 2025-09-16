@@ -38,38 +38,61 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasCORSError, setHasCORSError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  
-  // Check if URL is likely to have CORS issues
+
+  // Check if URL is likely to have CORS issues or is unsupported
   const isExternalVideo = useMemo(() => {
     const url = source?.uri || '';
-    return url.includes('googlevideo.com') || 
-           url.includes('dmate4.online') || 
-           url.includes('tomp3.cc') ||
-           url.includes('dl188') ||
-           url.includes('yt-dlp') ||
-           url.includes('ytdl');
+    return url.includes('googlevideo.com') ||
+      url.includes('dmate4.online') ||
+      url.includes('tomp3.cc') ||
+      url.includes('dl188') ||
+      url.includes('yt-dlp') ||
+      url.includes('ytdl') ||
+      url.includes('youtube-downloader') ||
+      url.includes('y2mate') ||
+      url.includes('savefrom');
   }, [source?.uri]);
-  
+
+  // Check if the video URL is valid and supported
+  const isValidVideoUrl = useMemo(() => {
+    const url = source?.uri || '';
+    if (!url || url.trim() === '') return false;
+
+    // Check for supported video formats
+    const supportedFormats = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+    const hasValidFormat = supportedFormats.some(format => url.toLowerCase().includes(format));
+
+    // Check for valid URL structure
+    const urlPattern = /^https?:\/\/.+/;
+    const isValidUrl = urlPattern.test(url);
+
+    // Blocked/problematic domains
+    const blockedDomains = ['tomp3.cc', 'y2mate', 'savefrom', 'dmate4.online'];
+    const isBlocked = blockedDomains.some(domain => url.includes(domain));
+
+    return isValidUrl && !isBlocked && (hasValidFormat || !isExternalVideo);
+  }, [source?.uri, isExternalVideo]);
+
   useEffect(() => {
-    if (videoRef.current && source?.uri && !hasCORSError) {
+    if (videoRef.current && source?.uri && !hasCORSError && isValidVideoUrl) {
       const video = videoRef.current;
-      
+
       // Aggressive preloading for faster video start
       video.preload = 'auto'; // Load entire video for instant playback
-      
+
       // Remove crossOrigin for external videos to avoid CORS preflight
       if (!isExternalVideo) {
         video.crossOrigin = 'anonymous';
       }
-      
+
       // Optimize video element for performance
       video.playsInline = true;
       video.muted = true; // Ensure autoplay works
       video.loop = isLooping || false;
-      
+
       // Force immediate loading
       video.load();
-      
+
       if (shouldPlay) {
         // Immediate play attempt without waiting
         const playVideo = async () => {
@@ -82,18 +105,18 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
               await video.play();
             } catch (retryError) {
               console.warn('Muted autoplay also failed:', retryError);
-              video.load(); // Final fallback
+              handleError({ target: { error: { code: 4, message: 'Playback failed' } } });
             }
           }
         };
-        
+
         // Try to play immediately
         playVideo();
       } else {
         video.pause();
       }
     }
-  }, [shouldPlay, source?.uri, hasCORSError, isExternalVideo, isLooping]);
+  }, [shouldPlay, source?.uri, hasCORSError, isExternalVideo, isLooping, isValidVideoUrl]);
 
   const handleLoadStart = () => {
     onLoadStart && onLoadStart();
@@ -107,23 +130,34 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
     console.error('Web video error:', e);
     console.error('Video URL that failed:', source?.uri);
     console.error('Video source type:', typeof source?.uri);
-    
-    // Check if this is likely a CORS error
+    console.error('Error code:', e.target?.error?.code);
+    console.error('Error message:', e.target?.error?.message);
+
+    // Check if this is likely a CORS error or unsupported source
     const url = source?.uri || '';
-    const isCORSError = url.includes('googlevideo.com') || 
-                       url.includes('dmate4.online') || 
-                       url.includes('tomp3.cc') ||
-                       url.includes('dl188') ||
-                       e.target?.error?.code === 4; // MEDIA_ELEMENT_ERROR: MEDIA_ERR_SRC_NOT_SUPPORTED
-    
-    if (isCORSError && retryCount < 2) {
-      console.warn('🚫 CORS error detected for video URL:', url);
+    const errorCode = e.target?.error?.code;
+
+    const isCORSError = url.includes('googlevideo.com') ||
+      url.includes('dmate4.online') ||
+      url.includes('tomp3.cc') ||
+      url.includes('dl188') ||
+      url.includes('youtube-downloader') ||
+      errorCode === 4; // MEDIA_ELEMENT_ERROR: MEDIA_ERR_SRC_NOT_SUPPORTED
+
+    const isNetworkError = errorCode === 2; // MEDIA_ERR_NETWORK
+    const isDecodeError = errorCode === 3; // MEDIA_ERR_DECODE
+
+    if ((isCORSError || isNetworkError || isDecodeError) && retryCount < 2) {
+      console.warn('🚫 Video loading error detected:', {
+        url,
+        errorCode,
+        type: isCORSError ? 'CORS' : isNetworkError ? 'Network' : 'Decode'
+      });
       setHasCORSError(true);
       setRetryCount(prev => prev + 1);
-      // Try iframe fallback
       return;
     }
-    
+
     onError && onError(e);
   };
 
@@ -132,13 +166,17 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
     onLoad && onLoad();
   };
 
-  // If CORS error detected, show a placeholder with message
-  if (hasCORSError && isExternalVideo) {
+  // If video is invalid or has errors, show appropriate message
+  if (!isValidVideoUrl || (hasCORSError && isExternalVideo)) {
+    const isBlocked = source?.uri?.includes('tomp3.cc') ||
+      source?.uri?.includes('youtube-downloader') ||
+      source?.uri?.includes('y2mate');
+
     return React.createElement('div', {
       style: {
         width: '100%',
         height: '100%',
-        backgroundColor: '#000',
+        backgroundColor: '#1a1a1a',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -152,18 +190,27 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
       React.createElement('div', {
         key: 'icon',
         style: { fontSize: '48px', marginBottom: '16px' }
-      }, '📹'),
+      }, isBlocked ? '�' : '�📹'),
       React.createElement('div', {
         key: 'message',
-        style: { fontSize: '16px', marginBottom: '8px' }
-      }, 'Video Unavailable'),
+        style: { fontSize: '16px', marginBottom: '8px', fontWeight: '600' }
+      }, isBlocked ? 'Video Source Blocked' : 'Video Unavailable'),
       React.createElement('div', {
         key: 'reason',
-        style: { fontSize: '12px', opacity: 0.7, maxWidth: '300px' }
-      }, 'This video cannot be played due to browser security restrictions. Try opening in a new tab.'),
-      React.createElement('button', {
-        key: 'button',
-        onClick: () => window.open(source?.uri, '_blank'),
+        style: { fontSize: '12px', opacity: 0.7, maxWidth: '300px', lineHeight: '1.4' }
+      }, isBlocked
+        ? 'This video source is not supported due to security restrictions. The video may be available through other sources.'
+        : 'This video cannot be played due to format or network issues. Please try again later.'
+      ),
+      !isBlocked && source?.uri && React.createElement('button', {
+        key: 'retry',
+        onClick: () => {
+          setHasCORSError(false);
+          setRetryCount(0);
+          if (videoRef.current) {
+            videoRef.current.load();
+          }
+        },
         style: {
           marginTop: '16px',
           padding: '8px 16px',
@@ -173,7 +220,31 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
           borderRadius: '4px',
           cursor: 'pointer'
         }
-      }, 'Open Video')
+      }, 'Retry')
+    ]);
+  }
+
+  // Only render video element if URL is valid
+  if (!isValidVideoUrl) {
+    return React.createElement('div', {
+      style: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#1a1a1a',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        ...style,
+      }
+    }, [
+      React.createElement('div', {
+        key: 'message',
+        style: { textAlign: 'center' }
+      }, [
+        React.createElement('div', { key: 'icon', style: { fontSize: '32px', marginBottom: '8px' } }, '⚠️'),
+        React.createElement('div', { key: 'text', style: { fontSize: '14px' } }, 'Invalid video source')
+      ])
     ]);
   }
 
@@ -194,15 +265,144 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
     preload: 'auto', // Aggressive preloading for instant start
     crossOrigin: isExternalVideo ? undefined : 'anonymous', // No CORS for external videos
     // Performance optimizations
-    'webkit-playsinline': true,
+    'webkit-playsinline': 'true',
     'x5-video-player-type': 'h5',
-    'x5-video-player-fullscreen': false,
+    'x5-video-player-fullscreen': 'false',
     onLoadStart: handleLoadStart,
     onCanPlay: handleCanPlay,
     onLoadedData: handleLoadedData,
     onError: handleError,
     ...props,
   });
+} : null;
+
+// Iframe Video Player for embeddable sources
+const IframeVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, onError, ...props }: WebVideoProps) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    onLoadStart && onLoadStart();
+    setIsLoading(true);
+    setHasError(false);
+  }, [source?.uri, onLoadStart]);
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+    onLoad && onLoad();
+  };
+
+  const handleIframeError = () => {
+    setIsLoading(false);
+    setHasError(true);
+
+    // Determine the likely cause of iframe failure
+    const url = source?.uri || '';
+    let errorReason = 'This embedded content could not be loaded.';
+
+    if (url.includes('mega.nz')) {
+      errorReason = 'Mega.nz content may be private or restricted.';
+    } else if (url.includes('drive.google.com')) {
+      errorReason = 'Google Drive file may be private or sharing restricted.';
+    } else if (url.includes('dropbox.com')) {
+      errorReason = 'Dropbox file may be private or sharing disabled.';
+    }
+
+    onError && onError({ message: 'Iframe failed to load', reason: errorReason });
+  };
+
+  if (hasError) {
+    return React.createElement('div', {
+      style: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#1a1a1a',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        padding: '20px',
+        textAlign: 'center',
+        ...style,
+      }
+    }, [
+      React.createElement('div', {
+        key: 'icon',
+        style: { fontSize: '48px', marginBottom: '16px' }
+      }, '🚫'),
+      React.createElement('div', {
+        key: 'message',
+        style: { fontSize: '16px', marginBottom: '8px', fontWeight: '600' }
+      }, 'Embed Failed'),
+      React.createElement('div', {
+        key: 'reason',
+        style: { fontSize: '12px', opacity: 0.7, maxWidth: '300px', lineHeight: '1.4' }
+      }, 'This embedded content could not be loaded. It may be restricted or unavailable.'),
+      React.createElement('button', {
+        key: 'open',
+        onClick: () => window.open(source?.uri, '_blank'),
+        style: {
+          marginTop: '16px',
+          padding: '8px 16px',
+          backgroundColor: '#007bff',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer'
+        }
+      }, 'Open in New Tab')
+    ]);
+  }
+
+  return React.createElement('div', {
+    style: {
+      width: '100%',
+      height: '100%',
+      position: 'relative',
+      backgroundColor: '#000',
+      ...style,
+    }
+  }, [
+    isLoading && React.createElement('div', {
+      key: 'loading',
+      style: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#1a1a1a',
+        color: '#fff',
+        zIndex: 1
+      }
+    }, [
+      React.createElement('div', { key: 'spinner', style: { fontSize: '24px' } }, '⏳'),
+      React.createElement('div', {
+        key: 'text',
+        style: { marginLeft: '10px', fontSize: '14px' }
+      }, 'Loading embed...')
+    ]),
+    React.createElement('iframe', {
+      key: 'iframe',
+      src: source?.uri,
+      style: {
+        width: '100%',
+        height: '100%',
+        border: 'none',
+        backgroundColor: '#000'
+      },
+      allowFullScreen: true,
+      onLoad: handleIframeLoad,
+      onError: handleIframeError,
+      // Security attributes
+      sandbox: 'allow-scripts allow-same-origin allow-presentation allow-forms',
+      referrerPolicy: 'no-referrer-when-downgrade'
+    })
+  ]);
 } : null;
 
 // Import Video and ResizeMode conditionally
@@ -219,7 +419,7 @@ if (Platform.OS === 'web') {
 }
 
 // Use web-compatible Firebase service when running in browser
-const VideoService = Platform.OS === 'web' 
+const VideoService = Platform.OS === 'web'
   ? require('./VideoServiceFirebase').VideoService
   : require('./VideoServiceMobile').VideoService;
 
@@ -229,14 +429,14 @@ const isYouTubeUrl = (url: string): boolean => {
     console.log('🔍 [VideoFeed] Invalid URL:', url);
     return false;
   }
-  
+
   const youtubePatterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)/,
     /youtube\.com\/.*[?&]v=/,
   ];
-  
+
   const isYT = youtubePatterns.some(pattern => pattern.test(url));
-  
+
   // Additional validation - check if video ID can be extracted
   if (isYT) {
     const videoId = extractYouTubeVideoId(url);
@@ -245,7 +445,7 @@ const isYouTubeUrl = (url: string): boolean => {
       return false;
     }
   }
-  
+
   console.log('🔍 [VideoFeed] URL check:', url, '-> YouTube:', isYT);
   return isYT;
 };
@@ -266,167 +466,121 @@ const extractYouTubeVideoId = (url: string): string | null => {
   return null;
 };
 
+// Helper function to convert URLs to embeddable iframe format
+const convertToEmbedUrl = (url: string): string => {
+  if (!url) return url;
+
+  // Google Drive: Convert sharing URL to embed URL
+  if (url.includes('drive.google.com/file/d/')) {
+    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch) {
+      return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
+    }
+  }
+
+  // Dropbox: Convert sharing URL to embed URL
+  if (url.includes('dropbox.com') && url.includes('?dl=0')) {
+    return url.replace('?dl=0', '?raw=1');
+  }
+
+  // Vimeo: Convert to embed format
+  if (url.includes('vimeo.com/') && !url.includes('/embed/')) {
+    const videoIdMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (videoIdMatch) {
+      return `https://player.vimeo.com/video/${videoIdMatch[1]}`;
+    }
+  }
+
+  // Dailymotion: Convert to embed format
+  if (url.includes('dailymotion.com/video/') && !url.includes('/embed/')) {
+    const videoIdMatch = url.match(/video\/([a-zA-Z0-9]+)/);
+    if (videoIdMatch) {
+      return `https://www.dailymotion.com/embed/video/${videoIdMatch[1]}`;
+    }
+  }
+
+  // Return original URL if no conversion needed
+  return url;
+};
+
+// Helper function to check if URL is an iframe-embeddable source
+const isIframeEmbeddableUrl = (url: string): boolean => {
+  if (!url || url.trim() === '') return false;
+
+  // Check for iframe-friendly domains (more flexible matching)
+  const iframeDomains = [
+    'mega.nz',
+    'drive.google.com',
+    'dropbox.com',
+    'vimeo.com',
+    'dailymotion.com',
+    'streamable.com',
+    'archive.org'
+  ];
+
+  return iframeDomains.some(domain => url.toLowerCase().includes(domain));
+};
+
+// Helper function to validate if a video URL is safe and playable
+const isValidVideoUrl = (url: string): boolean => {
+  if (!url || url.trim() === '') return false;
+
+  // Check for basic URL structure
+  const urlPattern = /^https?:\/\/.+/;
+  if (!urlPattern.test(url)) return false;
+
+  // Blocked/problematic domains that cause CORS or other issues
+  const blockedDomains = [
+    'tomp3.cc',
+    'youtube-downloader',
+    'y2mate',
+    'savefrom',
+    'dmate4.online',
+    'dl188',
+    'yt-dlp'
+  ];
+
+  const isBlocked = blockedDomains.some(domain => url.toLowerCase().includes(domain));
+  if (isBlocked) {
+    console.warn('🚫 Blocked video URL detected:', url);
+    return false;
+  }
+
+  // Check for supported video formats, YouTube, or iframe-embeddable sources
+  const supportedFormats = ['.mp4', '.webm', '.ogg', '.mov', '.m4v'];
+  const hasValidFormat = supportedFormats.some(format => url.toLowerCase().includes(format));
+  const isYouTube = isYouTubeUrl(url);
+  const isIframeEmbeddable = isIframeEmbeddableUrl(url);
+
+  return hasValidFormat || isYouTube || isIframeEmbeddable;
+};
+
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Super Professional Custom Icon Components
+// Share Icon using asset
 const ShareIcon = ({ size = 16, color = "#ffffff" }) => (
-  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    {/* Top Node - with gradient effect */}
-    <View style={{
-      width: size * 0.28,
-      height: size * 0.28,
-      borderRadius: size * 0.14,
-      backgroundColor: color,
-      position: 'absolute',
-      top: size * 0.02,
-      right: size * 0.12,
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.8,
-      shadowRadius: 3,
-      elevation: 5,
-    }} />
-    
-    {/* Left Node - main hub */}
-    <View style={{
-      width: size * 0.32,
-      height: size * 0.32,
-      borderRadius: size * 0.16,
-      backgroundColor: color,
-      position: 'absolute',
-      left: size * 0.02,
-      top: size * 0.34,
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.8,
-      shadowRadius: 4,
-      elevation: 6,
-    }} />
-    
-    {/* Bottom Node */}
-    <View style={{
-      width: size * 0.28,
-      height: size * 0.28,
-      borderRadius: size * 0.14,
-      backgroundColor: color,
-      position: 'absolute',
-      bottom: size * 0.02,
-      right: size * 0.12,
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.8,
-      shadowRadius: 3,
-      elevation: 5,
-    }} />
-    
-    {/* Connection Lines with gradient effect */}
-    <View style={{
-      width: size * 0.45,
-      height: 3,
-      backgroundColor: color,
-      position: 'absolute',
-      top: size * 0.22,
-      left: size * 0.18,
-      transform: [{ rotate: '25deg' }],
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.6,
-      shadowRadius: 2,
-      elevation: 3,
-    }} />
-    <View style={{
-      width: size * 0.45,
-      height: 3,
-      backgroundColor: color,
-      position: 'absolute',
-      bottom: size * 0.22,
-      left: size * 0.18,
-      transform: [{ rotate: '-25deg' }],
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.6,
-      shadowRadius: 2,
-      elevation: 3,
-    }} />
-  </View>
+  <Image
+    source={require('./assets/share.png')}
+    style={{
+      width: size,
+      height: size,
+      tintColor: color,
+    }}
+    resizeMode="contain"
+  />
 );
 
+// Eye Icon using asset
 const EyeIcon = ({ size = 16, color = "#ffffff" }) => (
-  <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    {/* Outer Eye Shape with gradient */}
-    <View style={{
-      width: size * 0.95,
-      height: size * 0.65,
-      borderRadius: size * 0.475,
-      backgroundColor: 'transparent',
-      borderWidth: 2.5,
-      borderColor: color,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: color,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.8,
-      shadowRadius: 4,
-      elevation: 6,
-    }}>
-      {/* Iris */}
-      <View style={{
-        width: size * 0.42,
-        height: size * 0.42,
-        borderRadius: size * 0.21,
-        backgroundColor: color,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.3,
-        shadowRadius: 2,
-        elevation: 3,
-      }}>
-        {/* Pupil */}
-        <View style={{
-          width: size * 0.18,
-          height: size * 0.18,
-          borderRadius: size * 0.09,
-          backgroundColor: '#000',
-        }} />
-        
-        {/* Light reflection */}
-        <View style={{
-          width: size * 0.08,
-          height: size * 0.08,
-          borderRadius: size * 0.04,
-          backgroundColor: color,
-          position: 'absolute',
-          top: size * 0.06,
-          left: size * 0.12,
-          opacity: 0.8,
-        }} />
-      </View>
-    </View>
-    
-    {/* Eye lashes effect */}
-    <View style={{
-      width: size * 0.15,
-      height: 2,
-      backgroundColor: color,
-      position: 'absolute',
-      top: size * 0.12,
-      left: size * 0.25,
-      transform: [{ rotate: '-15deg' }],
-      opacity: 0.7,
-    }} />
-    <View style={{
-      width: size * 0.15,
-      height: 2,
-      backgroundColor: color,
-      position: 'absolute',
-      top: size * 0.12,
-      right: size * 0.25,
-      transform: [{ rotate: '15deg' }],
-      opacity: 0.7,
-    }} />
-  </View>
+  <Image
+    source={require('./assets/eye.png')}
+    style={{
+      width: size,
+      height: size,
+      tintColor: color,
+    }}
+    resizeMode="contain"
+  />
 );
 
 interface VideoFeedProps {
@@ -448,23 +602,30 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showControls, setShowControls] = useState(false);
-  
+
   const isYouTube = useMemo(() => isYouTubeUrl(video.videoUrl), [video.videoUrl]);
-  
+  const isIframeEmbeddable = useMemo(() => isIframeEmbeddableUrl(video.videoUrl), [video.videoUrl]);
+  const isValidUrl = useMemo(() => isValidVideoUrl(video.videoUrl), [video.videoUrl]);
+
   // Instant loading state management for smooth scrolling
-  const [isLoading, setIsLoading] = useState(!isYouTube && !isPreloaded); // Preloaded videos skip loading
-  const [isVideoReady, setIsVideoReady] = useState(isYouTube || isPreloaded); // YouTube and preloaded videos are always ready
-  const [hasError, setHasError] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(!isYouTube && !isIframeEmbeddable && !isPreloaded && isValidUrl); // Preloaded videos skip loading
+  const [isVideoReady, setIsVideoReady] = useState(isYouTube || isIframeEmbeddable || isPreloaded || !isValidUrl); // YouTube, iframe and preloaded videos are always ready
+  const [hasError, setHasError] = useState(!isValidUrl);
+
   // Debug logging for video type and state
   useEffect(() => {
-    console.log(`� [VideoItem] "${video.title?.substring(0, 30)}..." - YouTube: ${isYouTube}, Active: ${isActive}, Loading: ${isLoading}, Ready: ${isVideoReady}, Platform: ${Platform.OS}`);
-  }, [isYouTube, isActive, isLoading, isVideoReady, video.title]);
+    console.log(`� [VideoItem] "${video.title?.substring(0, 30)}..." - YouTube: ${isYouTube}, Iframe: ${isIframeEmbeddable}, Active: ${isActive}, Loading: ${isLoading}, Ready: ${isVideoReady}, Platform: ${Platform.OS}`);
 
-  // Instant initialization for YouTube videos
+    if (isIframeEmbeddable) {
+      console.log(`🖼️ [VideoItem] Iframe source detected:`, video.videoUrl);
+      console.log(`🖼️ [VideoItem] Will use embed URL:`, convertToEmbedUrl(video.videoUrl));
+    }
+  }, [isYouTube, isIframeEmbeddable, isActive, isLoading, isVideoReady, video.title, video.videoUrl]);
+
+  // Instant initialization for YouTube and iframe videos
   useEffect(() => {
-    if (isYouTube) {
-      // YouTube videos are instantly ready - no delays
+    if (isYouTube || isIframeEmbeddable) {
+      // YouTube and iframe videos are instantly ready - no delays
       setIsLoading(false);
       setIsVideoReady(true);
       setHasError(false);
@@ -472,7 +633,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
       // Regular videos start ready but can show loading if needed
       setIsVideoReady(true);
     }
-  }, [isYouTube, video.id]);
+  }, [isYouTube, isIframeEmbeddable, video.id]);
 
   // Ultra-minimal timeout for instant experience
   useEffect(() => {
@@ -497,20 +658,20 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
       if (isYouTube && youtubeRef.current) {
         const attemptPlay = (attempt = 0) => {
           if (attempt > 10) return; // Max 10 attempts for reliability
-          
+
           youtubeRef.current?.play().catch((error: any) => {
             console.log(`YouTube play attempt ${attempt + 1} failed:`, error);
             // Ultra-fast retry with 25ms delay
             setTimeout(() => attemptPlay(attempt + 1), 25);
           });
         };
-        
+
         // Try to play immediately, then with rapid retries
         attemptPlay();
-        
+
         // Also try a second immediate attempt
         setTimeout(() => attemptPlay(0), 10);
-      } 
+      }
       // Handle regular videos with minimal delay
       else if (!isYouTube && videoRef.current) {
         setTimeout(() => {
@@ -523,10 +684,10 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
           }
         }, 30); // Minimal delay only for regular videos
       }
-      
+
       // Track view
       VideoService.trackVideoView(String(video.id), 'anonymous_user');
-      
+
       // Faster fade in animation
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -599,10 +760,10 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
     setIsLoading(false);
     setHasError(true);
     setIsVideoReady(false);
-    
+
     // Extract YouTube video ID for debugging
     const videoId = extractYouTubeVideoId(video.videoUrl);
-    
+
     // Try to provide helpful error message
     const errorMessage = error?.message || error || 'YouTube video configuration error';
     console.log('🔧 [YouTube] Error details:', {
@@ -613,7 +774,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
       userAgent: Platform.OS === 'web' ? (typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown') : `${Platform.OS} app`,
       timestamp: new Date().toISOString()
     });
-    
+
     // Log common YouTube issues
     if (errorMessage.includes('configuration')) {
       console.log('💡 [YouTube] Tip: Video may be restricted, age-gated, or unavailable in this region');
@@ -639,8 +800,8 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
                 <Text style={[styles.errorSubtext, { color: theme.subText }]}>
                   This video may be restricted or require viewing on YouTube
                 </Text>
-                <TouchableOpacity 
-                  style={styles.retryButton} 
+                <TouchableOpacity
+                  style={styles.retryButton}
                   onPress={() => {
                     setHasError(false);
                     setIsLoading(true);
@@ -673,136 +834,203 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, isDarkM
               />
             )}
           </View>
-      ) : (
-        // Regular videos - with TouchableOpacity for controls
-        <TouchableOpacity 
-          key={`regular-video-${video.id}`}
-          style={styles.videoTouchable} 
-          activeOpacity={1} 
-          onPress={toggleControls}
-        >
-          <VideoComponent
-            key={`video-component-${video.id}`}
-            ref={videoRef}
-            source={{ uri: video.videoUrl }}
-            style={styles.video}
-            onLoadStart={() => {
-              // Only show loading for non-preloaded videos
-              if (!isPreloaded) {
-                setIsLoading(true);
-              }
-            }}
-            onLoad={() => {
-              if (loadingTimeoutRef.current) {
-                clearTimeout(loadingTimeoutRef.current);
-              }
-              setIsLoading(false);
-              setIsVideoReady(true);
-              
-              // For preloaded videos, ensure instant playback
-              if (isPreloaded && Platform.OS === 'web') {
-                const videoElement = videoRef.current;
-                if (videoElement && isActive) {
-                  videoElement.play().catch(() => {
-                    console.log('Instant play failed, retrying...');
-                    videoElement.muted = true;
-                    videoElement.play();
-                  });
-                }
-              }
-            }}
-            onError={(error: any) => {
-              console.error('Video error:', error);
-              if (loadingTimeoutRef.current) {
-                clearTimeout(loadingTimeoutRef.current);
-              }
-              setIsLoading(false);
-              setHasError(true);
-            }}
-            onReady={() => {
-              // Immediate ready state for faster responsiveness
-              setIsVideoReady(true);
-              setIsLoading(false);
-            }}
-            {...(Platform.OS === 'web' ? {
-              // Web-specific props (already handled in WebVideo component)
-            } : {
-              // Mobile-specific props (expo-av)
-              rate: 1.0,
-              volume: 1.0,
-              isMuted: false,
-              resizeMode: ResizeMode.COVER,
-              shouldPlay: isActive,
-              isLooping: true,
-            })}
-          />
-        </TouchableOpacity>
-      )}
-
-      {/* Loading indicator */}
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#ffffff" />
-          <Text style={styles.loadingText}>Loading video...</Text>
-        </View>
-      )}
-
-      {/* Video overlay content - YouTube gets minimal overlay, others get full overlay */}
-      <View key={`overlay-${video.id}`} style={[styles.overlay, isYouTube && styles.youtubeOverlay]}>
-        {/* Right side controls - only share and views */}
-        <View key={`controls-${video.id}`} style={styles.rightControls}>
-          {/* Share button */}
-          <TouchableOpacity style={styles.controlButton} onPress={handleShare}>
-            <ShareIcon size={18} color="#ffffff" />
-            <Text style={styles.controlText}>{video.shares || 0}</Text>
-          </TouchableOpacity>
-
-          {/* Views */}
-          <TouchableOpacity style={styles.controlButton}>
-            <EyeIcon size={18} color="#ffffff" />
-            <Text style={styles.controlText}>{video.views || 0}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Professional Creator Profile Section */}
-        <View key={`creator-${video.id}`} style={styles.creatorProfileContainer}>
-          <View style={styles.creatorInfo}>
-            {/* Creator Profile Picture */}
-            <View style={styles.profilePictureContainer}>
-              <Image
-                source={{
-                  uri: video.originalSource?.creatorProfilePic || 
-                       'https://via.placeholder.com/40x40/4F46E5/FFFFFF?text=' + 
-                       (video.originalSource?.creatorName?.charAt(0) || 'N')
+        ) : isIframeEmbeddable ? (
+          // Iframe embeddable videos (Mega, Google Drive, etc.)
+          <View key={`iframe-container-${video.id}`} style={styles.videoTouchable}>
+            {Platform.OS === 'web' && IframeVideo ? (
+              <IframeVideo
+                key={`iframe-${video.id}`}
+                source={{ uri: convertToEmbedUrl(video.videoUrl) }}
+                style={styles.video}
+                onLoadStart={() => {
+                  console.log('🖼️ [VideoItem] Iframe onLoadStart for:', video.title?.substring(0, 30));
+                  console.log('🖼️ [VideoItem] Using embed URL:', convertToEmbedUrl(video.videoUrl));
+                  setIsLoading(true);
                 }}
-                style={styles.profilePicture}
-                defaultSource={{
-                  uri: 'https://via.placeholder.com/40x40/4F46E5/FFFFFF?text=' + 
-                       (video.originalSource?.creatorName?.charAt(0) || 'N')
+                onLoad={() => {
+                  console.log('✅ [VideoItem] Iframe onLoad for:', video.title?.substring(0, 30));
+                  setIsLoading(false);
+                  setIsVideoReady(true);
+                  setHasError(false);
+                }}
+                onError={(error) => {
+                  console.error('❌ [VideoItem] Iframe onError for:', video.title?.substring(0, 30), error);
+                  setIsLoading(false);
+                  setHasError(true);
+                  setIsVideoReady(false);
                 }}
               />
-            </View>
-            
-            {/* Creator Name and Platform */}
-            <View style={styles.creatorDetails}>
-              <Text style={[styles.creatorName, { color: theme.text }]} numberOfLines={1}>
-                {video.originalSource?.creatorName || 'Daily Current Affairs'}
+            ) : (
+              // Fallback for non-web platforms
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorIcon}>🖼️</Text>
+                <Text style={[styles.errorText, { color: theme.text }]}>
+                  Embedded Content
+                </Text>
+                <Text style={[styles.errorSubtext, { color: theme.subText }]}>
+                  This embedded video is only available on web platforms
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => {
+                    // Open in external browser/app
+                    if (Platform.OS !== 'web') {
+                      // For mobile, this would open in default browser
+                      console.log('Opening iframe URL in external app:', video.videoUrl);
+                    }
+                  }}
+                >
+                  <Text style={styles.retryButtonText}>Open Externally</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ) : !isValidUrl ? (
+          // Invalid video URL fallback
+          <View key={`invalid-video-${video.id}`} style={styles.videoTouchable}>
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorIcon}>🚫</Text>
+              <Text style={[styles.errorText, { color: theme.text }]}>
+                Invalid Video Source
               </Text>
-              <Text style={[styles.sourcePlatform, { color: theme.subText }]} numberOfLines={1}>
-                {video.originalSource?.sourcePlatform || 'News'} • Few hours ago
+              <Text style={[styles.errorSubtext, { color: theme.subText }]}>
+                This video cannot be played due to an unsupported or blocked source
+              </Text>
+              <Text style={[styles.errorUrl, { color: theme.subText }]}>
+                {video.videoUrl.length > 50 ? video.videoUrl.substring(0, 50) + '...' : video.videoUrl}
               </Text>
             </View>
           </View>
-        </View>
+        ) : (
+          // Regular videos - with TouchableOpacity for controls
+          <TouchableOpacity
+            key={`regular-video-${video.id}`}
+            style={styles.videoTouchable}
+            activeOpacity={1}
+            onPress={toggleControls}
+          >
+            <VideoComponent
+              key={`video-component-${video.id}`}
+              ref={videoRef}
+              source={{ uri: video.videoUrl }}
+              style={styles.video}
+              onLoadStart={() => {
+                // Only show loading for non-preloaded videos
+                if (!isPreloaded) {
+                  setIsLoading(true);
+                }
+              }}
+              onLoad={() => {
+                if (loadingTimeoutRef.current) {
+                  clearTimeout(loadingTimeoutRef.current);
+                }
+                setIsLoading(false);
+                setIsVideoReady(true);
 
-        {/* Video Details - Simplified Title Only */}
-        <View key={`details-${video.id}`} style={styles.videoDetailsContainer}>
-          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
-            {video.title}
-          </Text>
-        </View>
+                // For preloaded videos, ensure instant playback
+                if (isPreloaded && Platform.OS === 'web') {
+                  const videoElement = videoRef.current;
+                  if (videoElement && isActive) {
+                    videoElement.play().catch(() => {
+                      console.log('Instant play failed, retrying...');
+                      videoElement.muted = true;
+                      videoElement.play();
+                    });
+                  }
+                }
+              }}
+              onError={(error: any) => {
+                console.error('Video error:', error);
+                if (loadingTimeoutRef.current) {
+                  clearTimeout(loadingTimeoutRef.current);
+                }
+                setIsLoading(false);
+                setHasError(true);
+              }}
+              onReady={() => {
+                // Immediate ready state for faster responsiveness
+                setIsVideoReady(true);
+                setIsLoading(false);
+              }}
+              {...(Platform.OS === 'web' ? {
+                // Web-specific props (already handled in WebVideo component)
+              } : {
+                // Mobile-specific props (expo-av)
+                rate: 1.0,
+                volume: 1.0,
+                isMuted: false,
+                resizeMode: ResizeMode.COVER,
+                shouldPlay: isActive,
+                isLooping: true,
+              })}
+            />
+          </TouchableOpacity>
+        )}
 
-      </View>
+        {/* Loading indicator */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#ffffff" />
+            <Text style={styles.loadingText}>Loading video...</Text>
+          </View>
+        )}
+
+        {/* Video overlay content - YouTube gets minimal overlay, others get full overlay */}
+        <View key={`overlay-${video.id}`} style={[styles.overlay, isYouTube && styles.youtubeOverlay]}>
+          {/* Right side controls - only share and views */}
+          <View key={`controls-${video.id}`} style={styles.rightControls}>
+            {/* Share button */}
+            <TouchableOpacity style={styles.controlButton} onPress={handleShare}>
+              <ShareIcon size={18} color="#ffffff" />
+              <Text style={styles.controlText}>{video.shares || 0}</Text>
+            </TouchableOpacity>
+
+            {/* Views */}
+            <TouchableOpacity style={styles.controlButton}>
+              <EyeIcon size={18} color="#ffffff" />
+              <Text style={styles.controlText}>{video.views || 0}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Professional Creator Profile Section */}
+          <View key={`creator-${video.id}`} style={styles.creatorProfileContainer}>
+            <View style={styles.creatorInfo}>
+              {/* Creator Profile Picture */}
+              <View style={styles.profilePictureContainer}>
+                <Image
+                  source={{
+                    uri: video.originalSource?.creatorProfilePic ||
+                      'https://via.placeholder.com/40x40/4F46E5/FFFFFF?text=' +
+                      (video.originalSource?.creatorName?.charAt(0) || 'N')
+                  }}
+                  style={styles.profilePicture}
+                  defaultSource={{
+                    uri: 'https://via.placeholder.com/40x40/4F46E5/FFFFFF?text=' +
+                      (video.originalSource?.creatorName?.charAt(0) || 'N')
+                  }}
+                />
+              </View>
+
+              {/* Creator Name and Platform */}
+              <View style={styles.creatorDetails}>
+                <Text style={[styles.creatorName, { color: theme.text }]} numberOfLines={1}>
+                  {video.originalSource?.creatorName || 'Daily Current Affairs'}
+                </Text>
+                <Text style={[styles.sourcePlatform, { color: theme.subText }]} numberOfLines={1}>
+                  {video.originalSource?.sourcePlatform || 'News'} • Few hours ago
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Video Details - Simplified Title Only */}
+          <View key={`details-${video.id}`} style={styles.videoDetailsContainer}>
+            <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
+              {video.title}
+            </Text>
+          </View>
+
+        </View>
       </View>
     </Animated.View>
   );
@@ -841,9 +1069,9 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
   const preloadVideo = useCallback((video: VideoReel) => {
     const videoIdStr = String(video.id);
     if (preloadedVideos.has(videoIdStr)) return;
-    
+
     console.log('🚀 [VideoFeed] Preloading video:', video.title?.substring(0, 30));
-    
+
     // For regular videos, preload entire video for instant playback
     if (Platform.OS === 'web' && !isYouTubeUrl(video.videoUrl)) {
       const videoElement = document.createElement('video');
@@ -851,32 +1079,32 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
       videoElement.muted = true; // Enable autoplay compatibility
       videoElement.playsInline = true;
       videoElement.src = video.videoUrl;
-      
+
       // Force immediate loading
       videoElement.load();
-      
+
       // Try to buffer video data immediately
       videoElement.addEventListener('canplaythrough', () => {
         console.log('✅ [VideoPreload] Video ready for instant playback:', video.title?.substring(0, 20));
       });
-      
+
       // Store video element for instant access
       (window as any).preloadedVideoElements = (window as any).preloadedVideoElements || new Map();
       (window as any).preloadedVideoElements.set(videoIdStr, videoElement);
     }
-    
+
     // For YouTube videos, prefetch embed and extract video ID for faster loading
     if (isYouTubeUrl(video.videoUrl)) {
       const videoId = extractYouTubeVideoId(video.videoUrl);
       if (videoId) {
         console.log('🎬 [VideoFeed] YouTube video ID extracted for instant loading:', videoId);
-        
+
         // Prefetch YouTube embed page
         const link = document.createElement('link');
         link.rel = 'prefetch';
         link.href = `https://www.youtube-nocookie.com/embed/${videoId}`;
         document.head.appendChild(link);
-        
+
         // Also prefetch thumbnail for immediate display
         const thumbLink = document.createElement('link');
         thumbLink.rel = 'prefetch';
@@ -884,7 +1112,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
         document.head.appendChild(thumbLink);
       }
     }
-    
+
     setPreloadedVideos(prev => new Set([...prev, videoIdStr]));
   }, [preloadedVideos]);
 
@@ -894,14 +1122,14 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
       setError(null);
       setHasAttemptedLoad(true);
       console.log('🔄 [VideoFeed] Loading videos with optimization...');
-      
+
       // Try to load from cache first for instant display
       const cachedVideos = await VideoCacheService.getCachedVideoMetadata();
       if (cachedVideos && cachedVideos.length > 0) {
         console.log('⚡ [VideoFeed] Using cached videos for instant display:', cachedVideos.length);
         setVideos(cachedVideos);
         setLoading(false);
-        
+
         // Still fetch fresh data in the background immediately
         setTimeout(async () => {
           try {
@@ -919,26 +1147,26 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
         // No cache, load fresh data
         const { videos: videoList } = await VideoService.getVideos(50);
         console.log('📽️ [VideoFeed] Loaded fresh videos:', videoList.length);
-        
+
         setVideos(videoList);
-        
+
         // Cache for next time
         if (videoList.length > 0) {
           await VideoCacheService.cacheVideoMetadata(videoList);
         }
-        
+
         setLoading(false);
       }
-      
+
       // Get current videos for preloading
       const currentVideos = cachedVideos && cachedVideos.length > 0 ? cachedVideos : videos;
-      
+
       if (currentVideos.length > 0) {
         // Log video types
         const youtubeCount = currentVideos.filter((v: VideoReel) => isYouTubeUrl(v.videoUrl)).length;
         const regularCount = currentVideos.length - youtubeCount;
         console.log('📊 [VideoFeed] Video breakdown - YouTube:', youtubeCount, 'Regular:', regularCount);
-        
+
         // Aggressively preload first 5 videos for instant playback
         currentVideos.slice(0, 5).forEach((video: VideoReel, index: number) => {
           setTimeout(() => preloadVideo(video), index * 2); // Stagger by 2ms for ultra-fast loading
@@ -951,7 +1179,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
       console.error('Error loading videos:', err);
       setError('Failed to load videos');
       setLoading(false);
-      
+
 
     }
   };
@@ -963,13 +1191,13 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
       const isYT = currentVideo ? isYouTubeUrl(currentVideo.videoUrl) : false;
       console.log('👀 [VideoFeed] Current video:', newIndex, currentVideo?.title?.substring(0, 30), 'YouTube:', isYT);
       setCurrentIndex(newIndex);
-      
+
       // Super aggressive preloading for smooth YouTube scrolling
       const preloadRange = { start: Math.max(0, newIndex - 2), end: Math.min(videos.length - 1, newIndex + 5) };
-      
+
       if (preloadRange.start !== preloadRangeRef.current.start || preloadRange.end !== preloadRangeRef.current.end) {
         preloadRangeRef.current = preloadRange;
-        
+
         // Prioritized preloading - YouTube videos first for instant scrolling
         const videosToPreload = [];
         for (let i = preloadRange.start; i <= preloadRange.end; i++) {
@@ -977,7 +1205,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
             videosToPreload.push(videos[i]);
           }
         }
-        
+
         // Sort by YouTube videos first for priority loading
         videosToPreload.sort((a, b) => {
           const aIsYT = isYouTubeUrl(a.videoUrl);
@@ -986,7 +1214,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
           if (!aIsYT && bIsYT) return 1;
           return 0;
         });
-        
+
         // Preload with minimal staggering
         videosToPreload.forEach((video, index) => {
           setTimeout(() => preloadVideo(video), index * 1); // Ultra-fast 1ms stagger
@@ -1036,44 +1264,44 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      
+
 
 
       {/* Strict boundary wrapper for video feed */}
       <View style={styles.videoBoundaryContainer}>
         <FlatList
-        ref={flatListRef}
-        data={videos}
-        keyExtractor={(item) => `video-${item.id}`}
-        pagingEnabled
-        showsVerticalScrollIndicator={false}
-        style={styles.flatListContainer}
-        snapToInterval={screenHeight}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        removeClippedSubviews={false} // Keep all videos in memory for instant access
-        windowSize={15} // Extremely large window for YouTube video smooth scrolling
-        initialNumToRender={4} // Render 4 videos initially for instant YouTube access
-        maxToRenderPerBatch={7} // Render even more videos per batch
-        updateCellsBatchingPeriod={5} // Ultra-fast updates for instant YouTube switching
-        getItemLayout={(data, index) => ({
-          length: screenHeight,
-          offset: screenHeight * index,
-          index,
-        })}
-        renderItem={({ item, index }) => (
-          <VideoItem
-            key={`video-item-${item.id}-${index}`}
-            video={item}
-            isActive={index === currentIndex}
-            onPress={() => {}}
-            isDarkMode={isDarkMode}
-            isPreloaded={preloadedVideos.has(String(item.id))}
-          />
-        )}
-      />
+          ref={flatListRef}
+          data={videos}
+          keyExtractor={(item) => `video-${item.id}`}
+          pagingEnabled
+          showsVerticalScrollIndicator={false}
+          style={styles.flatListContainer}
+          snapToInterval={screenHeight}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          removeClippedSubviews={false} // Keep all videos in memory for instant access
+          windowSize={15} // Extremely large window for YouTube video smooth scrolling
+          initialNumToRender={4} // Render 4 videos initially for instant YouTube access
+          maxToRenderPerBatch={7} // Render even more videos per batch
+          updateCellsBatchingPeriod={5} // Ultra-fast updates for instant YouTube switching
+          getItemLayout={(data, index) => ({
+            length: screenHeight,
+            offset: screenHeight * index,
+            index,
+          })}
+          renderItem={({ item, index }) => (
+            <VideoItem
+              key={`video-item-${item.id}-${index}`}
+              video={item}
+              isActive={index === currentIndex}
+              onPress={() => { }}
+              isDarkMode={isDarkMode}
+              isPreloaded={preloadedVideos.has(String(item.id))}
+            />
+          )}
+        />
       </View>
     </View>
   );
@@ -1183,6 +1411,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     opacity: 0.7,
     lineHeight: 18,
+  },
+  errorUrl: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 10,
+    fontFamily: 'monospace',
+    opacity: 0.5,
+    paddingHorizontal: 20,
   },
   retryButton: {
     backgroundColor: '#007AFF',
@@ -1317,7 +1553,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    bottom: 120, // Position above video details
+    bottom: 70, // Move closer to video details section
     backgroundColor: 'transparent',
     paddingVertical: 8,
   },

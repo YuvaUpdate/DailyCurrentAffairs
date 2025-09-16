@@ -1,5 +1,5 @@
 import { storage } from './firebase.config';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 export interface UploadResult {
   url: string;
@@ -17,7 +17,7 @@ class WebFileUploadService {
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      
+
       // Set accept attribute based on type
       switch (type) {
         case 'image':
@@ -30,9 +30,9 @@ class WebFileUploadService {
           input.accept = 'image/*,video/*';
           break;
       }
-      
+
       input.style.display = 'none';
-      
+
       input.onchange = (event) => {
         const file = (event.target as HTMLInputElement).files?.[0];
         if (file) {
@@ -43,13 +43,13 @@ class WebFileUploadService {
         }
         document.body.removeChild(input);
       };
-      
+
       input.oncancel = () => {
         console.log('❌ User cancelled file selection');
         resolve(null);
         document.body.removeChild(input);
       };
-      
+
       document.body.appendChild(input);
       input.click();
     });
@@ -63,32 +63,44 @@ class WebFileUploadService {
       // Determine file type
       const isVideo = file.type.startsWith('video/');
       const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
-      
+
       // Validate file size (max 50MB for videos, 10MB for images)
       const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
       if (file.size > maxSize) {
         throw new Error(`File too large. Maximum size is ${isVideo ? '50MB' : '10MB'}`);
       }
-      
+
       // Generate unique filename
       const timestamp = Date.now();
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
       const fileName = `${timestamp}_${sanitizedName}`;
-      
+
       // Create storage path
       const storagePath = `media/${category}/${mediaType}s/${fileName}`;
       const storageRef = ref(storage, storagePath);
-      
+
       console.log('📤 Uploading file to:', storagePath);
-      
-      // Upload file
-      const uploadTask = await uploadBytes(storageRef, file);
+
+      // Use resumable upload with explicit metadata for faster CDN delivery
+      const metadata = {
+        contentType: file.type || (isVideo ? 'video/mp4' : 'image/jpeg'),
+        cacheControl: 'public, max-age=31536000, s-maxage=31536000, immutable'
+      } as const;
+      const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on('state_changed',
+          () => { },
+          (error) => reject(error),
+          () => resolve()
+        );
+      });
       console.log('✅ Upload completed');
-      
-      // Get download URL
-      const downloadURL = await getDownloadURL(uploadTask.ref);
+
+      // Get download URL (tokened, CDN cached via cacheControl above)
+      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
       console.log('🔗 Download URL:', downloadURL);
-      
+
       return {
         url: downloadURL,
         path: storagePath,
@@ -155,7 +167,7 @@ class WebFileUploadService {
       /youtube\.com\/v\/([^&\n?#]+)/,
       /youtube\.com\/shorts\/([^&\n?#]+)/
     ];
-    
+
     for (const pattern of patterns) {
       const match = url.match(pattern);
       if (match) return match[1];

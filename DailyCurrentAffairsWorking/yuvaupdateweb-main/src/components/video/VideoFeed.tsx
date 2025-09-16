@@ -23,8 +23,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  
+  const [isMuted, setIsMuted] = useState(true);
+
   // Determine video type and source URL
   const getVideoType = () => {
     if (video.embedUrl && (video.platformInfo?.detectedPlatform === 'YouTube' || video.videoUrl.includes('youtube.com') || video.videoUrl.includes('youtu.be'))) {
@@ -38,18 +38,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
     }
     return 'direct';
   };
-  
+
   const videoType = getVideoType();
-  const videoSrc = videoType === 'direct' 
-    ? video.videoUrl 
-    : (isActive 
-        ? VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, true, true) || video.embedUrl
-        : VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, false, true) || video.embedUrl
-      );
+  const videoSrc = videoType === 'direct'
+    ? video.videoUrl
+    : (isActive
+      ? VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, true, true) || video.embedUrl
+      : VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, false, true) || video.embedUrl
+    );
 
   useEffect(() => {
     if (isActive && videoType === 'direct' && videoRef.current) {
-      videoRef.current.play();
+      // Ensure muted before attempting autoplay (required by most browsers)
+      videoRef.current.muted = true;
+      // Some browsers require the muted attribute to be set before play()
+      try {
+        videoRef.current.play();
+      } catch (e) {
+        // Retry once more muted
+        videoRef.current.muted = true;
+        videoRef.current.play().catch(() => { });
+      }
       setIsPlaying(true);
     } else if (videoType === 'direct' && videoRef.current) {
       videoRef.current.pause();
@@ -95,12 +104,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
       } else {
         // Fallback to copying link to clipboard
         await navigator.clipboard.writeText(shareUrl);
-        
+
         // Show a temporary success message
         const button = document.activeElement as HTMLElement;
         const originalText = button?.querySelector('span')?.textContent;
         const spanElement = button?.querySelector('span');
-        
+
         if (spanElement) {
           spanElement.textContent = 'Copied!';
           setTimeout(() => {
@@ -108,7 +117,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
           }, 2000);
         }
       }
-      
+
       // Track the share action
       try {
         await VideoService.trackVideoShare(String(video.id), 'user');
@@ -117,7 +126,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
       }
     } catch (error) {
       console.error('Error sharing video:', error);
-      
+
       // Fallback error handling
       try {
         await navigator.clipboard.writeText(video.videoUrl || window.location.href);
@@ -151,7 +160,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
   };
 
   return (
-    <div 
+    <div
       className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden"
       tabIndex={0}
       onKeyDown={handleKeyDown}
@@ -166,6 +175,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
           className="w-full h-full object-cover"
           loop
           muted={isMuted}
+          autoPlay
           playsInline
           onTimeUpdate={handleTimeUpdate}
           onClick={togglePlayPause}
@@ -175,8 +185,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
         // Instagram special case - show thumbnail with "Open in Instagram" overlay
         <div className="relative w-full h-full bg-black flex items-center justify-center">
           {video.thumbnailUrl && (
-            <img 
-              src={video.thumbnailUrl} 
+            <img
+              src={video.thumbnailUrl}
               alt={video.title}
               className="w-full h-full object-cover"
             />
@@ -185,7 +195,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
           <div className="absolute inset-0 bg-black bg-opacity-40 flex flex-col items-center justify-center">
             <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-4 rounded-full mb-4">
               <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
               </svg>
             </div>
             <h3 className="text-white text-lg font-semibold mb-2">Instagram Reel</h3>
@@ -207,7 +217,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
           key={`${video.id}-${isActive}`}
           src={videoSrc}
           className="w-full h-full absolute inset-0 border-0"
-          style={{ 
+          style={{
             overflow: 'hidden',
             objectFit: 'cover',
             pointerEvents: 'auto',
@@ -256,13 +266,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
       {/* Progress Bar (only for direct videos) */}
       {videoType === 'direct' && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-          <div 
+          <div
             className="h-full bg-white transition-all duration-100"
             style={{ width: `${progress}%` }}
           />
         </div>
       )}
-      
+
       {/* Platform indicator for embedded videos */}
       {videoType !== 'direct' && (
         <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
@@ -277,8 +287,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
         <div className="flex items-center gap-3 bg-black/60 backdrop-blur-sm border border-white/20 rounded-full px-3 py-2 max-w-fit shadow-xl">
           {/* Creator Profile Picture */}
           {video.originalSource?.creatorProfilePic ? (
-            <img 
-              src={video.originalSource.creatorProfilePic} 
+            <img
+              src={video.originalSource.creatorProfilePic}
               alt={`${video.originalSource.creatorName || 'Creator'} profile`}
               className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border-2 border-white/30 shadow-lg"
               onError={(e) => {
@@ -292,7 +302,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
               </span>
             </div>
           )}
-          
+
           {/* Creator Details */}
           <div className="flex-1 min-w-0">
             <div className="text-white font-semibold text-xs sm:text-sm leading-tight drop-shadow-lg">
@@ -331,7 +341,11 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
       setError(null);
       const { videos: videoList } = await VideoService.getVideos(20);
       setVideos(videoList);
-      
+      // Prewarm network for first items to reduce startup delay
+      try {
+        prewarmVideoResources(videoList.slice(0, 5));
+      } catch { }
+
       if (videoList.length === 0) {
         setError('No videos available');
       }
@@ -341,6 +355,50 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Add <link rel="preconnect|dns-prefetch|preload|prefetch"> for first videos
+  const prewarmVideoResources = (items: VideoReel[]) => {
+    const head = document.head;
+    const appendOnce = (rel: string, href: string, attrs: Record<string, string> = {}) => {
+      if (!href) return;
+      const key = `${rel}:${href}`;
+      if ((window as any).__prewarmKeys?.has(key)) return;
+      (window as any).__prewarmKeys = (window as any).__prewarmKeys || new Set();
+      (window as any).__prewarmKeys.add(key);
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = href;
+      Object.entries(attrs).forEach(([k, v]) => link.setAttribute(k, v));
+      head.appendChild(link);
+    };
+
+    // Global preconnects
+    ['https://firebasestorage.googleapis.com', 'https://www.youtube-nocookie.com', 'https://img.youtube.com']
+      .forEach(origin => {
+        appendOnce('preconnect', origin, { crossOrigin: '' });
+        appendOnce('dns-prefetch', origin);
+      });
+
+    items.forEach((v) => {
+      const url = v.videoUrl || v.embedUrl;
+      if (!url) return;
+      const isYouTube = /youtube\.com|youtu\.be/.test(url);
+      const isDirect = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url) || /firebasestorage\.googleapis\.com/.test(url);
+
+      if (isDirect) {
+        appendOnce('preload', url, { as: 'video', crossOrigin: 'anonymous' });
+        appendOnce('prefetch', url, { as: 'video', crossOrigin: 'anonymous' });
+      } else if (isYouTube) {
+        // Prefetch thumbnail for instant paint
+        const idMatch = url.match(/(?:v=|youtu\.be\/|\/embed\/|\/shorts\/)([^&\n?#]+)/);
+        const vid = idMatch?.[1];
+        if (vid) {
+          appendOnce('prefetch', `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`, { as: 'image' });
+          appendOnce('preconnect', 'https://www.youtube-nocookie.com', { crossOrigin: '' });
+        }
+      }
+    });
   };
 
   const handleNext = () => {
@@ -408,12 +466,12 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
           prompt('Copy this link to share:', shareUrl);
         }
       }
-      
+
       // Track the share action in background (non-blocking)
       VideoService.trackVideoShare(String(currentVideo.id), 'user')
         .then(() => console.log('Share tracked successfully'))
         .catch((error) => console.log('Share tracking failed:', error));
-        
+
     } catch (error) {
       console.error('Share failed:', error);
       // Quick fallback
@@ -457,7 +515,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black z-50 overflow-hidden">
-      
+
       {/* CLOSE BUTTON - Top Right - Completely Independent */}
       <button
         onClick={(e) => {
@@ -468,7 +526,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
           setTimeout(() => {
             e.currentTarget.style.transform = 'scale(1)';
           }, 100);
-          
+
           console.log('CLOSE CLICKED!');
           // Execute immediately without delay
           onClose();
@@ -478,7 +536,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
           e.stopPropagation();
         }}
         className="fixed top-4 sm:top-6 right-4 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 border-2 border-white/50 shadow-2xl flex items-center justify-center transition-all duration-100 hover:scale-110 active:scale-95 z-[99999]"
-        style={{ 
+        style={{
           pointerEvents: 'auto',
           zIndex: 99999,
           position: 'fixed',
@@ -493,14 +551,14 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          
+
           // Immediate visual feedback
           const button = e.currentTarget;
           button.style.transform = 'scale(0.95)';
           button.style.backgroundColor = '#1d4ed8'; // darker blue
-          
+
           console.log('SHARE CLICKED!');
-          
+
           // Execute share function without blocking UI
           setTimeout(async () => {
             try {
@@ -523,7 +581,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
           e.stopPropagation();
         }}
         className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 border-2 border-white/50 shadow-2xl flex items-center justify-center transition-all duration-100 hover:scale-110 active:scale-95 z-[99999]"
-        style={{ 
+        style={{
           pointerEvents: 'auto',
           zIndex: 99999,
           position: 'fixed',
@@ -550,7 +608,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
       </div>
 
       {/* Scrollable Video Feed with proper containment */}
-      <div 
+      <div
         className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-hide"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         onScroll={(e) => {
@@ -564,8 +622,8 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
         }}
       >
         {videos.map((video, index) => (
-          <div 
-            key={`video-${video.id}-${index}`} 
+          <div
+            key={`video-${video.id}-${index}`}
             className="h-screen snap-start relative overflow-hidden"
             style={{ contain: 'layout style paint' }}
           >

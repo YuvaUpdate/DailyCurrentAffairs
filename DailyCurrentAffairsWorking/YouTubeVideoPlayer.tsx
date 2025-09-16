@@ -82,7 +82,8 @@ const WebYouTubeVideoPlayer: React.FC<Omit<YouTubeVideoPlayerProps, 'videoUrl'> 
   };
 
   // Ad-blocker friendly embed URL without tracking APIs
-  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&cc_load_policy=0&iv_load_policy=3&disablekb=1&enablejsapi=0&html5=1&start=0&preload=none`;
+  // Force muted=1 to guarantee autoplay on web
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&cc_load_policy=0&iv_load_policy=3&disablekb=1&enablejsapi=0&html5=1&start=0&preload=none`;
 
   return (
     <View style={[styles.container, style]}>
@@ -190,7 +191,7 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
 
   useEffect(() => {
     console.log('📱 [MobileYouTube] isActive changed for video:', videoId, 'isActive:', isActive, 'playerReady:', playerReady);
-    
+
     // Instant autoplay when becoming active
     if (isActive) {
       setPlaying(true);
@@ -229,7 +230,7 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
   // Fallback to WebView if YoutubePlayer is not available
   if (!YoutubePlayer) {
     const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=0&iv_load_policy=3&cc_load_policy=0&start=0&preload=none`;
-    
+
     return (
       <View style={[styles.fullScreenContainer, style]}>
         <WebView
@@ -257,8 +258,9 @@ const MobileYouTubeVideoPlayer = forwardRef<YouTubeVideoPlayerRef, Omit<YouTubeV
 
   // Force WebView approach for better full-screen control on mobile
   console.log('📱 [MobileYouTube] Forcing WebView approach for full-screen control');
-  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=0&iv_load_policy=3&cc_load_policy=0&start=0&preload=none`;
-  
+  // Force muted=1 to guarantee autoplay on mobile WebView
+  const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=1&controls=1&showinfo=0&rel=0&modestbranding=1&playsinline=1&loop=1&playlist=${videoId}&fs=1&enablejsapi=0&iv_load_policy=3&cc_load_policy=0&start=0&preload=none`;
+
   return (
     <View style={[styles.fullScreenContainer, style]}>
       <WebView
