@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,51 @@ import {
 } from 'react-native';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import InshortsFeed from './InshortsFeed';
+import { newsService } from './NewsService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VideoReel } from './types';
 import YouTubeVideoPlayer, { YouTubeVideoPlayerRef } from './YouTubeVideoPlayer';
 import VideoCacheService from './VideoCacheService';
+
+// Lightweight safe require used for optional native modules
+function safeRequire(name: string) {
+  try {
+    // Use an indirect require call to avoid Metro bundler static-analysis errors for dynamic requires
+    // (similar approach used elsewhere in this codebase).
+    // eslint-disable-next-line no-new-func
+    const r = Function('return require')();
+    return r(name);
+  } catch (e) {
+    return null;
+  }
+}
+
+// Simple time-ago formatter (lightweight, avoids extra deps)
+const formatTimeAgo = (iso?: string) => {
+  try {
+    if (!iso) return '';
+    const ts = typeof iso === 'string' ? new Date(iso).getTime() : (iso as any).getTime();
+    if (!ts) return '';
+    const diff = Date.now() - ts;
+    const sec = Math.floor(diff / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const d = Math.floor(hr / 24);
+    if (d < 7) return `${d}d ago`;
+    const wk = Math.floor(d / 7);
+    if (wk < 4) return `${wk}w ago`;
+    const mo = Math.floor(d / 30);
+    if (mo < 12) return `${mo}mo ago`;
+    const yr = Math.floor(d / 365);
+    return `${yr}y ago`;
+  } catch (e) {
+    return '';
+  }
+};
 
 // Types for web video component
 interface WebVideoProps {
@@ -34,7 +76,7 @@ interface WebVideoProps {
 }
 
 // Web-compatible video player with CORS fallback
-const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, onError, shouldPlay, isLooping, ...props }: WebVideoProps) => {
+const WebVideo = Platform.OS === 'web' ? forwardRef<HTMLVideoElement, WebVideoProps>(({ source, style, onLoadStart, onLoad, onError, shouldPlay, isLooping, ...props }: WebVideoProps, forwardedRef) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasCORSError, setHasCORSError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -74,8 +116,8 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
   }, [source?.uri, isExternalVideo]);
 
   useEffect(() => {
-    if (videoRef.current && source?.uri && !hasCORSError && isValidVideoUrl) {
-      const video = videoRef.current;
+  const video = videoRef.current;
+  if (video && source?.uri && !hasCORSError && isValidVideoUrl) {
 
       // Aggressive preloading for faster video start
       video.preload = 'auto'; // Load entire video for instant playback
@@ -83,7 +125,7 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
       // Remove crossOrigin for external videos to avoid CORS preflight
       if (!isExternalVideo) {
         video.crossOrigin = 'anonymous';
-      }
+  }
 
       // Optimize video element for performance
       video.playsInline = true;
@@ -249,7 +291,14 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
   }
 
   return React.createElement('video', {
-    ref: videoRef,
+    ref: (el: HTMLVideoElement | null) => {
+      videoRef.current = el;
+      // Forward the DOM node to parent ref
+      try {
+        if (typeof forwardedRef === 'function') forwardedRef(el);
+        else if (forwardedRef) (forwardedRef as any).current = el;
+      } catch (e) {}
+    },
     src: source?.uri,
     style: {
       width: '100%',
@@ -274,7 +323,7 @@ const WebVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, 
     onError: handleError,
     ...props,
   });
-} : null;
+}) : null;
 
 // Iframe Video Player for embeddable sources
 const IframeVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoad, onError, ...props }: WebVideoProps) => {
@@ -409,13 +458,32 @@ const IframeVideo = Platform.OS === 'web' ? ({ source, style, onLoadStart, onLoa
 let VideoComponent: any = null;
 let ResizeMode: any = null;
 
+let useReactNativeVideo = false;
 if (Platform.OS === 'web') {
   VideoComponent = WebVideo;
   ResizeMode = { COVER: 'cover' }; // Mock ResizeMode for web
 } else {
-  const expoAv = require('expo-av');
-  VideoComponent = expoAv.Video;
-  ResizeMode = expoAv.ResizeMode;
+  // Prefer react-native-video if available (better native compatibility on some devices)
+  try {
+    // attempt to require react-native-video
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const RNV = require('react-native-video');
+    if (RNV && (RNV as any).default) {
+      VideoComponent = (RNV as any).default;
+      useReactNativeVideo = true;
+    } else if (RNV) {
+      VideoComponent = RNV;
+      useReactNativeVideo = true;
+    }
+  } catch (e) {
+    useReactNativeVideo = false;
+  }
+
+  if (!useReactNativeVideo) {
+    const expoAv = require('expo-av');
+    VideoComponent = expoAv.Video;
+    ResizeMode = expoAv.ResizeMode;
+  }
 }
 
 // Use web-compatible Firebase service when running in browser
@@ -602,11 +670,29 @@ interface VideoItemProps {
   onMuteChange?: (muted: boolean) => void;
   onBottomCardLayout?: (height: number) => void;
   onShare?: (item: VideoReel) => void;
+  remountVersion?: number;
+  onRequestRemount?: (id: string | number) => void;
+  isFirst?: boolean;
 }
 
-const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext, isDarkMode, isPreloaded = false, bottomCardHeight = 0, isManuallyPaused = false, onManualPauseChange, isMuted = false, onMuteChange, onBottomCardLayout, onShare: onShareProp }) => {
+const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext, isDarkMode, isPreloaded = false, bottomCardHeight = 0, isManuallyPaused = false, onManualPauseChange, isMuted = false, onMuteChange, onBottomCardLayout, onShare: onShareProp, remountVersion = 0, onRequestRemount, isFirst = false }) => {
   const videoRef = useRef<any>(null);
   const youtubeRef = useRef<YouTubeVideoPlayerRef>(null);
+  const progressIntervalRef = useRef<any>(null);
+  const progressLoggedForIdRef = useRef<string | number | null>(null);
+  const nativePollAttemptsRef = useRef<number>(0);
+  const forcePlayDoneRef = useRef<boolean>(false);
+  const estimatedDurationRef = useRef<number | null>(null);
+  const [positionMillis, setPositionMillis] = useState<number>(0);
+  const [durationMillis, setDurationMillis] = useState<number>(0);
+  const [isProgressReady, setIsProgressReady] = useState<boolean>(false);
+  // Local playback UI state: whether playback appears to be playing and local manual pause flag
+  const [isPlayingState, setIsPlayingState] = useState<boolean>(false);
+  const [localManuallyPaused, setLocalManuallyPaused] = useState<boolean>(!!isManuallyPaused);
+  const remountAttemptsRef = useRef<number>(0);
+  const lastPositionRef = useRef<number>(0);
+  const lastPositionTsRef = useRef<number>(Date.now());
+  const progressWidthRef = useRef<number>(screenWidth - 16);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showControls, setShowControls] = useState(false);
@@ -643,6 +729,11 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
     }
   }, [isYouTube, isIframeEmbeddable, video.id]);
 
+  // Keep local manual pause state in-sync with parent prop
+  useEffect(() => {
+    setLocalManuallyPaused(!!isManuallyPaused);
+  }, [isManuallyPaused]);
+
   // Ultra-minimal timeout for instant experience
   useEffect(() => {
     if (isLoading) {
@@ -667,11 +758,21 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
         const attemptPlay = (attempt = 0) => {
           if (attempt > 10) return; // Max 10 attempts for reliability
 
-          youtubeRef.current?.play().catch((error: any) => {
-            console.log(`YouTube play attempt ${attempt + 1} failed:`, error);
-            // Ultra-fast retry with 25ms delay
+          try {
+            const y = youtubeRef.current as any;
+            if (y && typeof y.play === 'function') {
+              y.play().catch((error: any) => {
+                console.log(`YouTube play attempt ${attempt + 1} failed:`, error);
+                // Ultra-fast retry with 25ms delay
+                setTimeout(() => attemptPlay(attempt + 1), 25);
+              });
+            } else {
+              console.warn('[VideoItem] youtubeRef.play not available for video id', video.id);
+            }
+          } catch (err) {
+            console.warn('[VideoItem] youtube play attempt threw', err);
             setTimeout(() => attemptPlay(attempt + 1), 25);
-          });
+          }
         };
 
         // Try to play immediately, then with rapid retries
@@ -681,16 +782,70 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
         setTimeout(() => attemptPlay(0), 10);
       }
       // Handle regular videos with minimal delay
-      else if (!isYouTube && videoRef.current) {
-        setTimeout(() => {
-          if (Platform.OS === 'web') {
-            videoRef.current.play().catch((error: any) => {
-              console.log('Video play failed:', error);
-            });
-          } else {
-            videoRef.current.playAsync();
-          }
-        }, 30); // Minimal delay only for regular videos
+      else if (!isYouTube) {
+        // Retry loop to start playback robustly on various native players
+        const tryStart = (attempt = 0) => {
+          setTimeout(async () => {
+            const v = videoRef.current;
+            if (!v) {
+              if (attempt < 8) {
+                tryStart(attempt + 1);
+              } else {
+                console.warn('[VideoItem] play requested but videoRef is null for video id', video.id);
+              }
+              return;
+            }
+
+            // If using react-native-video, attempt to nudge the player via native props
+            if (useReactNativeVideo && Platform.OS !== 'web') {
+              try {
+                if (typeof v.setNativeProps === 'function') {
+                  v.setNativeProps({ paused: false });
+                }
+              } catch (e) {}
+
+              // Also try seek to current position as a nudge
+              try {
+                if (typeof v.seek === 'function') {
+                  // seek to current pos or 0
+                  try { v.seek(0); } catch (e) {}
+                }
+              } catch (e) {}
+
+              // schedule another attempt if not started yet
+              if (attempt < 8) tryStart(attempt + 1);
+              return;
+            }
+
+            // Web path
+            if (Platform.OS === 'web') {
+              try {
+                v.play && v.play().catch((error: any) => {
+                  // ignore and retry
+                });
+              } catch (e) {}
+              if (attempt < 8) tryStart(attempt + 1);
+              return;
+            }
+
+            // expo-av path: attempt playAsync with retries
+            try {
+              if (typeof v.playAsync === 'function') {
+                try {
+                  await v.playAsync();
+                } catch (err) {
+                  // ignore: schedule retry
+                }
+              } else if (typeof v.play === 'function') {
+                try { v.play(); } catch (e) {}
+              }
+            } catch (e) {}
+
+            if (attempt < 8) tryStart(attempt + 1);
+          }, attempt === 0 ? 30 : 200);
+        };
+
+        tryStart(0);
       }
 
       // Track view
@@ -704,21 +859,357 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
       }).start();
     } else {
       // Handle pause for YouTube videos
-      if (isYouTube && youtubeRef.current) {
-        youtubeRef.current.pause().catch((error: any) => {
-          console.log('YouTube pause failed:', error);
-        });
+      if (isYouTube) {
+        try {
+          const y = youtubeRef.current as any;
+          if (y && typeof y.pause === 'function') {
+            y.pause().catch((error: any) => {
+              console.log('YouTube pause failed:', error);
+            });
+          } else {
+            console.warn('[VideoItem] pause requested but youtubeRef.pause not available for video id', video.id);
+          }
+        } catch (err) {
+          console.warn('[VideoItem] youtube pause attempt threw', err);
+        }
       }
       // Handle pause for regular videos
-      else if (!isYouTube && videoRef.current) {
-        if (Platform.OS === 'web') {
-          videoRef.current.pause();
+      else if (!isYouTube) {
+        const v = videoRef.current;
+        if (!v) {
+          console.warn('[VideoItem] pause requested but videoRef is null for video id', video.id);
         } else {
-          videoRef.current.pauseAsync();
+          try {
+            if (Platform.OS === 'web') {
+              v.pause && v.pause();
+            } else {
+              if (typeof v.pauseAsync === 'function') {
+                v.pauseAsync().catch((err: any) => console.warn('[VideoItem] pauseAsync failed', err));
+              } else if (typeof v.pause === 'function') {
+                v.pause();
+              }
+            }
+          } catch (e) {
+            console.warn('[VideoItem] pause attempt threw', e);
+          }
         }
       }
     }
   }, [isActive, video.id, fadeAnim, isYouTube]);
+
+  // Apply the `isMuted` prop to the platform player whenever it or active state changes.
+  useEffect(() => {
+    try {
+      const applyMute = async (muted: boolean) => {
+        if (isYouTube) {
+          const y = (youtubeRef.current as any);
+          if (!y) return;
+          try {
+            if (muted) {
+              if (typeof y.mute === 'function') y.mute();
+              else if (typeof y.pause === 'function') y.pause();
+            } else {
+              if (typeof y.unMute === 'function') y.unMute();
+            }
+          } catch (err) { console.warn('[VideoItem] youtube mute/unmute attempt threw', err); }
+          return;
+        }
+
+        const v = videoRef.current;
+        if (!v) return;
+
+        if (Platform.OS === 'web') {
+          try { if (typeof v.muted !== 'undefined') v.muted = muted; } catch (e) { console.warn('[VideoItem] setting web muted failed', e); }
+        } else {
+          try {
+            if (useReactNativeVideo) {
+              try { if (typeof v.setNativeProps === 'function') v.setNativeProps({ muted }); } catch (e) {}
+            } else if (typeof v.setIsMutedAsync === 'function') {
+              await v.setIsMutedAsync(muted);
+            }
+          } catch (e) { console.warn('[VideoItem] setIsMutedAsync attempt threw', e); }
+        }
+      };
+
+      // If this item is active or the global mute changed, apply mute state.
+      applyMute(!!isMuted);
+    } catch (e) {
+      console.warn('[VideoItem] applyMute effect failed', e);
+    }
+  }, [isMuted, isYouTube, isActive]);
+
+  // Playback progress tracking: expo-av supports onPlaybackStatusUpdate, web uses timeupdate events
+  useEffect(() => {
+    // Clear any existing interval/listeners
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+
+    // For web (HTMLVideoElement), attach timeupdate listener
+    if (Platform.OS === 'web' && videoRef.current && !isYouTube) {
+      const el = videoRef.current as HTMLVideoElement;
+      const onTime = () => {
+        try {
+          const pos = Math.floor(el.currentTime * 1000) || 0;
+          const rawDur = Math.floor((el.duration || 0) * 1000) || 0;
+          const dur = rawDur >= 1000 ? rawDur : 0;
+          setSafePosition(pos);
+          if (dur > 0) setDurationMillis(dur);
+          // One-time log when we first observe timeupdate for this video id
+          if (progressLoggedForIdRef.current !== video.id) {
+            progressLoggedForIdRef.current = video.id;
+            console.log('👂 [VideoFeed] onTime fired for video id', video.id, 'currentTime(ms)=', pos, 'duration(ms)=', dur);
+          }
+        } catch (e) {}
+      };
+      el.addEventListener('timeupdate', onTime);
+      el.addEventListener('durationchange', onTime);
+      // Initialize values
+      onTime();
+
+      return () => {
+        try { el.removeEventListener('timeupdate', onTime); el.removeEventListener('durationchange', onTime); } catch (e) {}
+      };
+    }
+
+    // For mobile/native expo-av, we will rely on onPlaybackStatusUpdate prop (no extra interval here)
+      // Fallback: on some platforms the onPlaybackStatusUpdate may not fire immediately for the first video.
+      // Use getStatusAsync polling as a short-term fallback when running on native (Android/iOS) and videoRef exposes the method.
+      if (!isYouTube && Platform.OS !== 'web' && videoRef.current) {
+        try {
+          const v: any = videoRef.current;
+          if (typeof v.getStatusAsync === 'function') {
+            // Initial read
+            (async () => {
+              try {
+                const status = await v.getStatusAsync();
+                    console.log('👂 [VideoFeed] native getStatusAsync initial for video id', video.id, 'rawStatus:', status && { positionMillis: status.positionMillis, durationMillis: status.durationMillis });
+                    if (status) {
+                      const pos = Math.floor((status.positionMillis || 0));
+                      const rawDur = Math.floor(status.durationMillis || 0);
+                      const dur = rawDur >= 1000 ? rawDur : 0;
+                      setSafePosition(pos);
+                      if (dur > 0) setDurationMillis(dur);
+                    }
+              } catch (e) { console.warn('[VideoFeed] native getStatusAsync initial read failed', e); }
+            })();
+
+            // Start a short polling interval to update progress until playback status update takes over
+            nativePollAttemptsRef.current = 0;
+            progressIntervalRef.current = setInterval(async () => {
+              try {
+                nativePollAttemptsRef.current += 1;
+                    const status = await v.getStatusAsync();
+                    if (status) {
+                      const pos = Math.floor((status.positionMillis || 0));
+                      const rawDur = Math.floor(status.durationMillis || 0);
+                      const dur = rawDur >= 1000 ? rawDur : 0;
+                      setPositionMillis(pos);
+                      if (dur > 0) setDurationMillis(dur);
+                    }
+                // Stop polling after 12 attempts (~4.8s) or when we have progress
+                    if (nativePollAttemptsRef.current > 12 || (status && (status.positionMillis || 0) > 0 && (Math.floor(status.durationMillis || 0) > 1000))) {
+                  if (progressIntervalRef.current) {
+                    clearInterval(progressIntervalRef.current);
+                    progressIntervalRef.current = null;
+                  }
+                }
+              } catch (e) {
+                // ignore individual read errors but stop if too many
+                if (nativePollAttemptsRef.current > 12) {
+                  if (progressIntervalRef.current) {
+                    clearInterval(progressIntervalRef.current);
+                    progressIntervalRef.current = null;
+                  }
+                }
+              }
+            }, 400);
+
+            return () => {
+              if (progressIntervalRef.current) {
+                clearInterval(progressIntervalRef.current);
+                progressIntervalRef.current = null;
+              }
+            };
+          }
+        } catch (e) {}
+      }
+    // For YouTube, try a polling fallback if the youtubeRef provides getCurrentTime
+    if (isYouTube && youtubeRef.current) {
+      const anyRef = youtubeRef.current as any;
+      if (typeof anyRef.getCurrentTime === 'function') {
+        progressIntervalRef.current = setInterval(async () => {
+          try {
+            const sec = await anyRef.getCurrentTime();
+            const durSec = typeof anyRef.getDuration === 'function' ? await anyRef.getDuration() : 0;
+            const p = Math.floor((sec || 0) * 1000);
+            const rawDurMs = Math.floor((durSec || 0) * 1000);
+            const d = rawDurMs >= 1000 ? rawDurMs : 0;
+            setSafePosition(p);
+            if (d > 0) setDurationMillis(d);
+          } catch (e) {}
+        }, 500);
+
+        return () => {
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
+          }
+        };
+      }
+    }
+
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    };
+  }, [isYouTube, isVideoReady, video.id]);
+
+  // Reset progress when switching to a new video item to avoid stale values (prevents first-video showing full)
+  useEffect(() => {
+    setPositionMillis(0);
+    setDurationMillis(0);
+    setIsProgressReady(false);
+    estimatedDurationRef.current = null;
+    // Reset smoothing and force-play state for new video
+    lastPositionRef.current = 0;
+    lastPositionTsRef.current = Date.now();
+    forcePlayDoneRef.current = false;
+  }, [video.id]);
+
+  // Helper to set position with basic smoothing to avoid sudden large jumps
+  const setSafePosition = (newPos: number) => {
+    try {
+      const now = Date.now();
+      const last = lastPositionRef.current || 0;
+      const elapsed = Math.max(0, now - (lastPositionTsRef.current || now));
+      // Allow up to elapsed + 500ms of forward progress; cap excessively large jumps
+      const maxAdvance = elapsed + 500;
+      const allowed = last + maxAdvance;
+      const finalPos = newPos > allowed ? allowed : newPos;
+      lastPositionRef.current = finalPos;
+      lastPositionTsRef.current = now;
+      setPositionMillis(finalPos);
+      // If duration is not yet known but position is progressing, create an estimated duration
+      // so the progress UI can show approximate progress instead of staying empty.
+      if ((!durationMillis || durationMillis === 0) && finalPos > 0 && !estimatedDurationRef.current) {
+        // Estimate conservatively: assume at least 15s, or 4x current position (to avoid early full bar)
+        estimatedDurationRef.current = Math.max(15000, finalPos * 4);
+        try { setIsProgressReady(true); } catch (e) {}
+        console.log('🧭 [VideoItem] Estimated duration set for video id', video.id, estimatedDurationRef.current);
+      }
+    } catch (e) {}
+  };
+
+  // Mark progress ready only when we get a reasonable duration (avoid showing full bar for unknown duration)
+  useEffect(() => {
+    try {
+      // Consider progress ready if we have a real non-zero duration, or if we have an estimated duration and playback has started.
+      const hasRealDuration = !!durationMillis && durationMillis >= 200;
+      const hasEstimated = !!estimatedDurationRef.current && estimatedDurationRef.current >= 200;
+      if (hasRealDuration || (hasEstimated && positionMillis > 0)) {
+        setIsProgressReady(true);
+      } else {
+        setIsProgressReady(false);
+      }
+    } catch (e) {}
+  }, [durationMillis, positionMillis]);
+
+  // Force-play fallback: if polling didn't yield duration/position for the active native video,
+  // briefly play muted then pause to coax platforms (notably some Android devices) to populate metadata.
+  useEffect(() => {
+    // Only for regular native videos
+    if (!isActive || isYouTube || Platform.OS === 'web' || !isVideoReady) return;
+
+    // Only run once per video
+    if (forcePlayDoneRef.current) return;
+
+    // Trigger fallback only when we've polled a few times and still have no useful duration/position
+    if ((nativePollAttemptsRef.current >= 4 || nativePollAttemptsRef.current === 0) && durationMillis === 0 && positionMillis === 0) {
+      const v = videoRef.current;
+      if (!v) {
+        console.warn('⚡ [VideoItem] Force-play fallback requested but videoRef is null for video id', video.id);
+        forcePlayDoneRef.current = true;
+        return;
+      }
+
+      (async () => {
+        try {
+          console.log('⚡ [VideoItem] Force-play fallback initiating for video id', video.id, 'nativePollAttempts=', nativePollAttemptsRef.current);
+
+          // Remember previous mute state if possible
+          let prevMuted = false;
+          try {
+            if (typeof v.getStatusAsync === 'function') {
+              const s = await v.getStatusAsync();
+              prevMuted = !!(s && s.isMuted);
+            } else if (typeof v.muted !== 'undefined') {
+              prevMuted = !!v.muted;
+            }
+          } catch (e) {}
+
+          // Ensure muted play to avoid audible blip
+          try {
+            if (typeof v.setIsMutedAsync === 'function') {
+              await v.setIsMutedAsync(true);
+            } else if (typeof v.muted !== 'undefined') {
+              try { v.muted = true; } catch (e) {}
+            }
+          } catch (e) {}
+
+          // Short play then pause
+          try {
+            if (typeof v.playAsync === 'function') {
+              await v.playAsync();
+              await new Promise((res) => setTimeout(res, 220));
+              if (typeof v.pauseAsync === 'function') await v.pauseAsync();
+            } else if (typeof v.play === 'function') {
+              // Rare fallback
+              try { await v.play(); } catch (e) {}
+              await new Promise((res) => setTimeout(res, 220));
+              try { if (typeof v.pause === 'function') v.pause(); } catch (e) {}
+            }
+          } catch (e) {
+            console.warn('⚡ [VideoItem] Force-play play/pause attempt failed for video id', video.id, e);
+          }
+
+          // Restore mute to previous value (or keep unmuted if parent requested unmute)
+          try {
+            // If parent requested unmute for the active item, respect that by unmuting
+            if (typeof v.setIsMutedAsync === 'function') {
+              // If parent intends unmuted (isActive auto-unmute earlier), set to false; otherwise restore previous
+              await v.setIsMutedAsync(false);
+            } else if (typeof v.muted !== 'undefined') {
+              try { v.muted = false; } catch (e) {}
+            }
+          } catch (e) {}
+
+          console.log('⚡ [VideoItem] Force-play fallback complete for video id', video.id);
+        } catch (e) {
+          console.warn('⚡ [VideoItem] Force-play fallback failed for video id', video.id, e);
+        } finally {
+          forcePlayDoneRef.current = true;
+        }
+      })();
+    }
+  }, [isActive, isYouTube, isVideoReady, durationMillis, positionMillis, video.id]);
+
+  // If metadata never arrives after force-play, remount the component once to recover
+  useEffect(() => {
+    if (!isActive || isYouTube || Platform.OS === 'web') return;
+    if (durationMillis > 0 || positionMillis > 0) return;
+
+    if (forcePlayDoneRef.current && remountAttemptsRef.current < 1) {
+      remountAttemptsRef.current += 1;
+      console.log('🔁 [VideoItem] Requesting remount to recover metadata for video id', video.id);
+      try {
+        if (typeof onRequestRemount === 'function') onRequestRemount(video.id);
+      } catch (e) {}
+    }
+  }, [isActive, isYouTube, durationMillis, positionMillis, video.id, onRequestRemount]);
 
 
 
@@ -934,6 +1425,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
                 }
                 setIsLoading(false);
                 setIsVideoReady(true);
+                console.log('🛬 [VideoItem] onLoad fired for video id', video.id, 'isActive:', isActive, 'videoRef current:', !!videoRef.current);
 
                 // For preloaded videos, ensure instant playback
                 if (isPreloaded && Platform.OS === 'web') {
@@ -962,6 +1454,26 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
               }}
               {...(Platform.OS === 'web' ? {
                 // Web-specific props (already handled in WebVideo component)
+              } : (useReactNativeVideo ? {
+                // react-native-video props
+                paused: !isActive,
+                muted: !isActive,
+                repeat: true,
+                resizeMode: 'cover',
+                onLoad: (meta: any) => {
+                  try {
+                    const durMs = Math.floor((meta.duration || 0) * 1000);
+                    if (durMs >= 1000) setDurationMillis(durMs);
+                    setIsLoading(false);
+                    setIsVideoReady(true);
+                  } catch (e) {}
+                },
+                onProgress: (data: any) => {
+                  try {
+                    const pos = Math.floor((data.currentTime || 0) * 1000);
+                    setSafePosition(pos);
+                  } catch (e) {}
+                }
               } : {
                 // Mobile-specific props (expo-av)
                 rate: 1.0,
@@ -970,7 +1482,29 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
                 resizeMode: ResizeMode.COVER,
                 shouldPlay: isActive,
                 isLooping: true,
-              })}
+                onPlaybackStatusUpdate: (status: any) => {
+                  try {
+                    // Debug log playback status for this video id
+                    if (status) {
+                        const posRaw = typeof status.positionMillis === 'number' ? Math.floor(status.positionMillis) : -1;
+                        const durRaw = typeof status.durationMillis === 'number' ? Math.floor(status.durationMillis) : 0;
+                        // Treat tiny durations (<1000ms) as invalid/unknown until a real duration is provided
+                        const dur = durRaw >= 1000 ? durRaw : 0;
+                        const playing = !!status.isPlaying || !!status.shouldPlay || false;
+                        console.log('🔔 [VideoItem] onPlaybackStatusUpdate for id', video.id, { pos: posRaw, dur, playing, rawDur: durRaw });
+                        // Update playing UI state only when user hasn't manually paused this item
+                        if (!localManuallyPaused) setIsPlayingState(playing);
+                        if (posRaw >= 0) setSafePosition(posRaw);
+                        if (dur > 0) {
+                          // Real duration has arrived; clear any estimated duration and mark ready
+                          estimatedDurationRef.current = null;
+                          setDurationMillis(dur);
+                          try { setIsProgressReady(true); } catch (e) {}
+                        }
+                    }
+                  } catch (e) { console.warn('[VideoItem] onPlaybackStatusUpdate error', e); }
+                },
+              }))}
             />
           </TouchableOpacity>
         )}
@@ -988,6 +1522,176 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
           {/* Creator profile (positioned just above the bottom details card) */}
           {/* Move creator profile further up by adding extra offset */}
           {/* Move creator profile higher above the details card and ensure it sits above via zIndex */}
+          {/* Progress bar (above creator) */}
+          {isVideoReady && !isFirst && (
+            // Progress controls positioned lower now that creator profile is removed
+            <View pointerEvents="box-none" style={{ position: 'absolute', left: 8, right: 8, bottom: (24 + (bottomCardHeight || 52) + 100), zIndex: 9999, elevation: 30, alignItems: 'center' }}>
+              {/* Row with play/pause button (left) and interactive progress bar (right) */}
+              <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                {/* Play/Pause button on the left */}
+                  <TouchableOpacity
+                  accessibilityLabel={localManuallyPaused ? 'Play video' : 'Pause video'}
+                  onPress={() => {
+                    try {
+                      // Toggle local manual paused state immediately for snappy UI
+                      const newPaused = !localManuallyPaused;
+                      setLocalManuallyPaused(newPaused);
+                      // Notify parent about manual pause change if provided
+                      if (onManualPauseChange) onManualPauseChange(newPaused);
+
+                      // Update local playing state immediately to reflect action
+                      setIsPlayingState(!newPaused);
+
+                      // Control player with guarded calls
+                      if (isYouTube) {
+                        const y = youtubeRef.current as any;
+                        if (y) {
+                          if (newPaused) {
+                            if (typeof y.pause === 'function') {
+                              try { y.pause(); } catch (e) { console.warn('[VideoItem] youtube pause failed', e); }
+                            }
+                          } else {
+                            if (typeof y.play === 'function') {
+                              try { y.play(); } catch (e) { console.warn('[VideoItem] youtube play failed', e); }
+                            }
+                          }
+                        } else {
+                          console.warn('[VideoItem] play/pause requested but youtubeRef is null for video id', video.id);
+                        }
+                      } else {
+                        const v = videoRef.current;
+                        if (v) {
+                          if (newPaused) {
+                            try {
+                              if (typeof v.pauseAsync === 'function') v.pauseAsync().catch((e: any) => console.warn('[VideoItem] pauseAsync failed', e));
+                              else if (typeof v.pause === 'function') v.pause();
+                            } catch (e) { console.warn('[VideoItem] pause attempt threw', e); }
+                          } else {
+                            try {
+                              if (typeof v.playAsync === 'function') v.playAsync().catch((e: any) => console.warn('[VideoItem] playAsync failed', e));
+                              else if (typeof v.play === 'function') v.play().catch((e: any) => console.warn('[VideoItem] web play failed', e));
+                            } catch (e) { console.warn('[VideoItem] play attempt threw', e); }
+                          }
+                        } else {
+                          console.warn('[VideoItem] play/pause requested but videoRef is null for video id', video.id);
+                        }
+                      }
+                    } catch (err) {
+                      console.warn('[VideoItem] play/pause button handler error', err);
+                    }
+                  }}
+                  style={{ width: 44, height: 44, marginRight: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderRadius: 22, borderWidth: 1, borderColor: '#FFFFFF', zIndex: 10000, elevation: 20 }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  {/* Show original PNG colors; tintColor removed to ensure icon visible */}
+                  <Image source={localManuallyPaused ? require('./assets/play-button.png') : require('./assets/video-pause-button.png')} style={{ width: 24, height: 24, tintColor: '#FFFFFF' }} resizeMode="contain" />
+                </TouchableOpacity>
+
+                {/* Interactive progress bar - overlaps creator profile */}
+                <View
+                  style={{ flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}
+                onLayout={(e) => {
+                  try {
+                    const w = e.nativeEvent.layout?.width || (screenWidth - 16);
+                    progressWidthRef.current = w;
+                  } catch (err) {}
+                }}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderGrant={(e) => {
+                  try {
+                    const { locationX } = e.nativeEvent;
+                    const total = progressWidthRef.current || (screenWidth - 16);
+                    const pct = Math.max(0, Math.min(1, locationX / total));
+                    const seekMs = Math.floor((durationMillis || 1) * pct);
+                    console.log('🎯 [VideoFeed] onResponderGrant seekMs for video id', video.id, seekMs);
+                    // Seek platform-specific players (guard refs/methods)
+                    try {
+                      if (Platform.OS === 'web' && videoRef.current && !isYouTube) {
+                        const v = videoRef.current as HTMLVideoElement;
+                        try { if (typeof v.currentTime !== 'undefined') v.currentTime = (seekMs / 1000); } catch (err) { console.warn('[VideoItem] Web seek failed', err); }
+                      } else if (!isYouTube) {
+                        const v = videoRef.current;
+                        if (!v) {
+                          console.warn('[VideoItem] seek requested but videoRef is null for video id', video.id);
+                        } else {
+                          try {
+                            if (typeof v.setPositionAsync === 'function') {
+                              v.setPositionAsync(seekMs).catch((err: any) => console.warn('[VideoItem] setPositionAsync failed', err));
+                            } else if (typeof v.seek === 'function') {
+                              v.seek(seekMs / 1000);
+                            }
+                          } catch (err) { console.warn('[VideoItem] seek attempt threw', err); }
+                        }
+                      } else if (isYouTube) {
+                        const y = (youtubeRef.current as any);
+                        if (y && typeof y.seekTo === 'function') {
+                          try { y.seekTo(seekMs / 1000); } catch (err) { console.warn('[VideoItem] youtube seekTo failed', err); }
+                        } else {
+                          console.warn('[VideoItem] seek requested but youtubeRef or seekTo missing for video id', video.id);
+                        }
+                      }
+                    } catch (err) { console.warn('[VideoItem] seek error', err); }
+                    setPositionMillis(seekMs);
+                  } catch (err) {}
+                }}
+                onResponderMove={(e) => {
+                  try {
+                    const { locationX } = e.nativeEvent;
+                    const total = progressWidthRef.current || (screenWidth - 16);
+                    const pct = Math.max(0, Math.min(1, locationX / total));
+                    const seekMs = Math.floor((durationMillis || 1) * pct);
+                    setPositionMillis(seekMs);
+                  } catch (err) {}
+                }}
+                onResponderRelease={(e) => {
+                  try {
+                    const { locationX } = e.nativeEvent;
+                    const total = progressWidthRef.current || (screenWidth - 16);
+                    const pct = Math.max(0, Math.min(1, locationX / total));
+                    const seekMs = Math.floor((durationMillis || 1) * pct);
+                    console.log('🎯 [VideoFeed] onResponderRelease seekMs for video id', video.id, seekMs);
+                    try {
+                      if (Platform.OS === 'web' && videoRef.current && !isYouTube) {
+                        const v = videoRef.current as HTMLVideoElement;
+                        try { if (typeof v.currentTime !== 'undefined') v.currentTime = (seekMs / 1000); } catch (err) { console.warn('[VideoItem] Web seek failed', err); }
+                      } else if (!isYouTube) {
+                        const v = videoRef.current;
+                        if (!v) {
+                          console.warn('[VideoItem] seek requested but videoRef is null for video id', video.id);
+                        } else {
+                          try {
+                            if (typeof v.setPositionAsync === 'function') {
+                              v.setPositionAsync(seekMs).catch((err: any) => console.warn('[VideoItem] setPositionAsync failed', err));
+                            } else if (typeof v.seek === 'function') {
+                              v.seek(seekMs / 1000);
+                            }
+                          } catch (err) { console.warn('[VideoItem] seek attempt threw', err); }
+                        }
+                      } else if (isYouTube) {
+                        const y = (youtubeRef.current as any);
+                        if (y && typeof y.seekTo === 'function') {
+                          try { y.seekTo(seekMs / 1000); } catch (err) { console.warn('[VideoItem] youtube seekTo failed', err); }
+                        } else {
+                          console.warn('[VideoItem] seek requested but youtubeRef or seekTo missing for video id', video.id);
+                        }
+                      }
+                    } catch (err) { console.warn('[VideoItem] seek error', err); }
+                    setPositionMillis(seekMs);
+                  } catch (err) {}
+                }}
+              >
+                {/* Compute safe percent; show 0% until progress is ready to avoid initial full bar */}
+                {(() => {
+                  const durForPct = (durationMillis > 0) ? durationMillis : (estimatedDurationRef.current || 0);
+                  const pct = (durForPct > 0 && isProgressReady) ? Math.min(100, Math.round((positionMillis / durForPct) * 100)) : 0;
+                  return <View style={{ width: `${pct}%`, height: '100%', backgroundColor: '#FF3333' }} />;
+                })()}
+                </View>
+              </View>
+            </View>
+          )}
+
           <View pointerEvents="box-none" style={{ position: 'absolute', left: 8, right: 8, bottom: (24 + (bottomCardHeight || 52) + 84), zIndex: 1300, elevation: 16 }}>
             <TouchableOpacity onPress={() => {
               // Open creator profile/source if available
@@ -1000,21 +1704,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
                 }
               }
             }} activeOpacity={0.85} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <View style={[styles.creatorInfo, { backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 6 }]}>
-                <View style={styles.profilePictureContainer}>
-                  {video.originalSource?.creatorProfilePic ? (
-                    <Image source={{ uri: video.originalSource.creatorProfilePic }} style={styles.profilePicture} />
-                  ) : (
-                    <View style={[styles.profilePicture, { backgroundColor: '#666', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Text style={{ color: '#fff', fontWeight: '700' }}>{(video.originalSource?.creatorName || 'N').charAt(0)}</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.creatorDetails}>
-                  <Text style={styles.creatorName} numberOfLines={1}>{video.originalSource?.creatorName || 'Daily Current Affairs'}</Text>
-                  <Text style={styles.sourcePlatform} numberOfLines={1}>{video.originalSource?.sourcePlatform || ''}</Text>
-                </View>
-              </View>
+              
             </TouchableOpacity>
           </View>
 
@@ -1024,7 +1714,10 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
               <View style={{ width: '100%', alignSelf: 'stretch' }}>
                 <View style={{ backgroundColor: 'rgba(0,0,0,0.92)', borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.35, shadowRadius: 6 }}>
                   <View style={{ flex: 1, minWidth: 0, marginRight: 10, paddingLeft: 6, alignItems: 'flex-start' }}>
-                    <Text style={[styles.title, { color: theme.text, fontSize: 18 }]} numberOfLines={2}>{video.title}</Text>
+                    <Text style={[styles.title, { color: '#FFFFFF', fontSize: 18, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }]} numberOfLines={2}>{video.title}</Text>
+                    {video.timestamp ? (
+                      <Text style={{ color: 'rgba(255,255,255,0.72)', fontSize: 12, marginTop: 6 }}>{formatTimeAgo(video.timestamp)}</Text>
+                    ) : null}
                     {video.originalSource?.sourceUrl ? (
                       <TouchableOpacity onPress={() => {
                         if (typeof window !== 'undefined' && window.open) {
@@ -1041,7 +1734,17 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
                   </View>
 
                   <View style={{ width: 68, alignItems: 'center', justifyContent: 'center' }}>
-                    <TouchableOpacity onPress={() => { if (onShareProp) onShareProp(video); else handleShare(); }} style={{ marginBottom: 8, padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <TouchableOpacity onPress={async () => {
+                      try {
+                        const url = video?.videoUrl || '';
+                        const message = video?.title ? `${video.title}\n${url}` : url;
+                        await Share.share({ message, url });
+                        // Track share if VideoService available
+                        try { if (typeof VideoService?.trackVideoShare === 'function') VideoService.trackVideoShare(String(video.id), 'anonymous_user'); } catch (e) { }
+                      } catch (err) {
+                        console.warn('Share failed', err);
+                      }
+                    }} style={{ marginBottom: 8, padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                       <View style={{ borderWidth: 1, borderColor: '#fff', borderRadius: 18, padding: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' }}>
                         <ShareIcon size={16} color="#fff" />
                       </View>
@@ -1065,13 +1768,92 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
 };
 
 export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
+  const [isMutedGlobal, setIsMutedGlobal] = useState<boolean>(false);
+
+  // Load persisted mute preference on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem('video_muted');
+        if (v !== null) {
+          setIsMutedGlobal(v === '1');
+        } else {
+          // Default: audio enabled on initial open. Persist this default so subsequent
+          // openings behave consistently unless the user toggles mute.
+          try {
+            await AsyncStorage.setItem('video_muted', '0');
+          } catch (e) {
+            console.warn('Failed to persist default mute preference', e);
+          }
+          setIsMutedGlobal(false);
+        }
+      } catch (e) {
+        console.warn('Failed to load mute preference', e);
+        setIsMutedGlobal(false);
+      }
+    })();
+  }, []);
+
+  // AV warm-up: initialize native audio mode to help expo-av cold-starts on some Android devices.
+  // This is guarded so it only runs when expo-av is available at runtime. Low-risk and helps first-video autoplay.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Delay slightly to avoid blocking startup (200ms)
+        await new Promise(res => setTimeout(res, 200));
+        const expoAv = safeRequire('expo-av');
+        if (!expoAv || !expoAv.Audio || typeof expoAv.Audio.setAudioModeAsync !== 'function') return;
+        // Call with conservative options that work across platforms
+        await expoAv.Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          staysActiveInBackground: true,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+        if (!cancelled) console.log('✅ [VideoFeed] AV warm-up completed');
+      } catch (err) {
+        console.warn('⚠️ [VideoFeed] AV warm-up failed', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  const setMutedGlobally = async (muted: boolean) => {
+    setIsMutedGlobal(muted);
+    try {
+      await AsyncStorage.setItem('video_muted', muted ? '1' : '0');
+    } catch (e) {
+      console.warn('Failed to save mute preference', e);
+    }
+  };
   const [videos, setVideos] = useState<VideoReel[]>([]);
+  // remountMap holds per-video remount version counters. Child can request remount via onRequestRemount.
+  const [remountMap, setRemountMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [preloadedVideos, setPreloadedVideos] = useState<Set<string>>(new Set());
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  // Animated scroll value to drive background reveal when scrolling between videos
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [articles, setArticles] = useState<any[]>([]);
+  const [showArticlesBackground, setShowArticlesBackground] = useState(false);
+  const showTimerRef = useRef<number | null>(null);
+  const stopTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Load sample articles for background preview (fast, avoids network during scroll)
+    try {
+      const sample = newsService.getSampleNews();
+      setArticles(sample);
+    } catch (err) {
+      setArticles([]);
+    }
+  }, []);
   const insets = useSafeAreaInsets();
   const preloadRangeRef = useRef({ start: 0, end: 2 }); // Preload range
 
@@ -1295,9 +2077,40 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
 
 
 
+      {/* Top-right global audio toggle */}
+      <TouchableOpacity
+        style={{ position: 'absolute', right: 12, top: insets.top + 12, zIndex: 2000, width: 42, height: 42, borderRadius: 21, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }}
+        onPress={() => {
+          setMutedGlobally(!isMutedGlobal);
+        }}
+        activeOpacity={0.85}
+      >
+        <Image source={isMutedGlobal ? require('./assets/mute.png') : require('./assets/high-volume.png')} style={{ width: 22, height: 22, tintColor: '#fff' }} />
+      </TouchableOpacity>
+
       {/* Strict boundary wrapper for video feed */}
       <View style={styles.videoBoundaryContainer}>
-        <FlatList
+
+        {/* Animated background that will fade/translate as user scrolls */}
+        <Animated.View pointerEvents="none" style={[styles.animatedBackground, {
+          opacity: showArticlesBackground ? scrollY.interpolate({
+            // Require a slightly larger scroll before background becomes visible to prevent sparks
+            inputRange: [0, 20, screenHeight * 0.5, screenHeight],
+            outputRange: [0, 0.18, 0.6, 1],
+            extrapolate: 'clamp'
+          }) : 0,
+          transform: [{
+            translateY: scrollY.interpolate({ inputRange: [0, screenHeight], outputRange: [0, -40], extrapolate: 'clamp' })
+          }]
+        }]}
+        >
+          {/* Render a lightweight read-only articles preview behind the videos. Pointer events disabled so feed remains interactive. */}
+          <View style={{ flex: 1, backgroundColor: 'transparent' }} pointerEvents="none">
+            <InshortsFeed articles={articles} refreshing={false} onRefresh={() => {}} onArticlePress={() => {}} bookmarkedArticles={new Set()} onBookmarkToggle={() => {}} />
+          </View>
+        </Animated.View>
+
+        <Animated.FlatList
           ref={flatListRef}
           data={videos}
           keyExtractor={(item) => `video-${item.id}`}
@@ -1319,14 +2132,65 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
             offset: screenHeight * index,
             index,
           })}
+          // Wire animated scroll to scrollY for background interpolation
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            {
+              useNativeDriver: true,
+              listener: (e: any) => {
+                try {
+                  const offsetY = e?.nativeEvent?.contentOffset?.y || 0;
+                  // If user has scrolled at least a tiny bit, start the 1s show timer
+                  // Require a meaningful scroll delta to begin the show timer so quick sparks don't reveal home
+                  if (Math.abs(offsetY) > 16) {
+                    if (showTimerRef.current) {
+                      clearTimeout(showTimerRef.current as any);
+                      showTimerRef.current = null;
+                    }
+                    // Start show timer to reveal articles after a short confirmation (300ms)
+                    // This avoids revealing on very short quick flicks
+                    showTimerRef.current = setTimeout(() => {
+                      setShowArticlesBackground(true);
+                      showTimerRef.current = null;
+                    }, 300) as unknown as number;
+                  }
+
+                  // Clear any existing stop timer (we're still scrolling)
+                  if (stopTimerRef.current) {
+                    clearTimeout(stopTimerRef.current as any);
+                    stopTimerRef.current = null;
+                  }
+
+                  // After 700ms of no scroll events, hide the articles background
+                  stopTimerRef.current = setTimeout(() => {
+                    setShowArticlesBackground(false);
+                    stopTimerRef.current = null;
+                    if (showTimerRef.current) {
+                      clearTimeout(showTimerRef.current as any);
+                      showTimerRef.current = null;
+                    }
+                  }, 300) as unknown as number;
+                } catch (err) {}
+              }
+            }
+          )}
+          scrollEventThrottle={16}
           renderItem={({ item, index }) => (
             <VideoItem
-              key={`video-item-${item.id}-${index}`}
+              key={`video-item-${item.id}-${index}-${remountMap[String(item.id)] || 0}`}
               video={item}
               isActive={index === currentIndex}
               onPress={() => { }}
               isDarkMode={isDarkMode}
               isPreloaded={preloadedVideos.has(String(item.id))}
+              isMuted={isMutedGlobal}
+              onMuteChange={(m) => setMutedGlobally(m)}
+              isFirst={index === 0}
+              remountVersion={remountMap[String(item.id)] || 0}
+              onRequestRemount={(id: string | number) => {
+                const key = String(id);
+                setRemountMap(prev => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
+              }}
             />
           )}
         />
@@ -1412,6 +2276,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     zIndex: 0, // Below video player
+  },
+  animatedBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: screenHeight,
+    backgroundColor: '#0a1220',
+    zIndex: 0,
   },
   loadingText: {
     marginTop: 16,
