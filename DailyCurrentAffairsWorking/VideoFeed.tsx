@@ -1478,7 +1478,8 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
                 // Mobile-specific props (expo-av)
                 rate: 1.0,
                 volume: 1.0,
-                isMuted: false,
+                // Ensure non-active items are muted so only the active video plays audio
+                isMuted: !!isMuted || !isActive,
                 resizeMode: ResizeMode.COVER,
                 shouldPlay: isActive,
                 isLooping: true,
@@ -1840,10 +1841,14 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
   const flatListRef = useRef<FlatList>(null);
   // Animated scroll value to drive background reveal when scrolling between videos
   const scrollY = useRef(new Animated.Value(0)).current;
+  // Transition mask (black) used to cover animated background when scrolling down on mobile APK
+  const maskAnim = useRef(new Animated.Value(0)).current;
   const [articles, setArticles] = useState<any[]>([]);
   const [showArticlesBackground, setShowArticlesBackground] = useState(false);
   const showTimerRef = useRef<number | null>(null);
   const stopTimerRef = useRef<number | null>(null);
+  const prevOffsetRef = useRef<number>(0);
+  const upStreakRef = useRef<number>(0);
 
   useEffect(() => {
     // Load sample articles for background preview (fast, avoids network during scroll)
@@ -1860,6 +1865,18 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
   useEffect(() => {
     loadVideos();
   }, []);
+
+  // Ensure previous video is fully stopped when switching: force a remount of the previous item
+  const prevIndexRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevIndexRef.current;
+    if (prev !== null && prev !== currentIndex && videos[prev]) {
+      const key = String(videos[prev].id);
+      setRemountMap((m) => ({ ...m, [key]: (m[key] || 0) + 1 }));
+      console.log('🔁 [VideoFeed] Forcing remount of previous video id', key);
+    }
+    prevIndexRef.current = currentIndex;
+  }, [currentIndex, videos]);
 
   // Check for no videos only after loading has been attempted and enough time has passed
   useEffect(() => {
@@ -2110,6 +2127,11 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
           </View>
         </Animated.View>
 
+        {/* Mobile-only black transition mask to prevent background flash when scrolling down */}
+        {Platform.OS !== 'web' && (
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#000', zIndex: 2, opacity: maskAnim }]} />
+        )}
+
         <Animated.FlatList
           ref={flatListRef}
           data={videos}
@@ -2140,19 +2162,47 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
               listener: (e: any) => {
                 try {
                   const offsetY = e?.nativeEvent?.contentOffset?.y || 0;
-                  // If user has scrolled at least a tiny bit, start the 1s show timer
-                  // Require a meaningful scroll delta to begin the show timer so quick sparks don't reveal home
-                  if (Math.abs(offsetY) > 16) {
+                  const prev = prevOffsetRef.current || 0;
+                  const dy = offsetY - prev; // positive when scrolling down, negative when scrolling up
+                  prevOffsetRef.current = offsetY;
+
+                  // Only trigger background reveal when user is scrolling UP (dy < -threshold).
+                  // This avoids showing homepage when user scrolls DOWN quickly.
+                  const directionThreshold = 16;
+                  if (dy < -directionThreshold) {
+                    // Hide mask when scrolling up (allow articles to reveal)
+                    try { Animated.timing(maskAnim, { toValue: 0, duration: 140, useNativeDriver: true }).start(); } catch (err) {}
+                    // Scrolling up meaningfully - increment streak
+                    upStreakRef.current = (upStreakRef.current || 0) + 1;
+                    // Require at least 2 consecutive upward events to avoid accidental shows
+                    if (upStreakRef.current >= 2) {
+                      if (showTimerRef.current) {
+                        clearTimeout(showTimerRef.current as any);
+                        showTimerRef.current = null;
+                      }
+                      // Confirm sustained upward scroll before showing
+                      showTimerRef.current = setTimeout(() => {
+                        setShowArticlesBackground(true);
+                        showTimerRef.current = null;
+                      }, 300) as unknown as number;
+                    }
+                  } else if (dy > directionThreshold) {
+                    // Scrolling down significantly: show black mask to prevent background flashes
+                    try { Animated.timing(maskAnim, { toValue: 1, duration: 120, useNativeDriver: true }).start(); } catch (err) {}
+                    // Scrolling down significantly: cancel any pending show and hide immediately
+                    upStreakRef.current = 0;
                     if (showTimerRef.current) {
                       clearTimeout(showTimerRef.current as any);
                       showTimerRef.current = null;
                     }
-                    // Start show timer to reveal articles after a short confirmation (300ms)
-                    // This avoids revealing on very short quick flicks
-                    showTimerRef.current = setTimeout(() => {
-                      setShowArticlesBackground(true);
-                      showTimerRef.current = null;
-                    }, 300) as unknown as number;
+                    if (stopTimerRef.current) {
+                      clearTimeout(stopTimerRef.current as any);
+                      stopTimerRef.current = null;
+                    }
+                    setShowArticlesBackground(false);
+                  } else {
+                    // small movements - reset streak
+                    upStreakRef.current = 0;
                   }
 
                   // Clear any existing stop timer (we're still scrolling)
@@ -2161,9 +2211,11 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
                     stopTimerRef.current = null;
                   }
 
-                  // After 700ms of no scroll events, hide the articles background
+                  // After a short idle (300ms) hide the articles background
                   stopTimerRef.current = setTimeout(() => {
                     setShowArticlesBackground(false);
+                    // Also hide the mask after idle so background can be revealed later
+                    try { Animated.timing(maskAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(); } catch (err) {}
                     stopTimerRef.current = null;
                     if (showTimerRef.current) {
                       clearTimeout(showTimerRef.current as any);
@@ -2174,6 +2226,13 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
               }
             }
           )}
+          onScrollBeginDrag={(e: any) => {
+            try {
+              prevOffsetRef.current = e?.nativeEvent?.contentOffset?.y || 0;
+              upStreakRef.current = 0;
+              if (showTimerRef.current) { clearTimeout(showTimerRef.current as any); showTimerRef.current = null; }
+            } catch (err) {}
+          }}
           scrollEventThrottle={16}
           renderItem={({ item, index }) => (
             <VideoItem
@@ -2183,7 +2242,8 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
               onPress={() => { }}
               isDarkMode={isDarkMode}
               isPreloaded={preloadedVideos.has(String(item.id))}
-              isMuted={isMutedGlobal}
+              // Mute child if global mute is enabled or if this item is not the active one
+              isMuted={!!isMutedGlobal || index !== currentIndex}
               onMuteChange={(m) => setMutedGlobally(m)}
               isFirst={index === 0}
               remountVersion={remountMap[String(item.id)] || 0}

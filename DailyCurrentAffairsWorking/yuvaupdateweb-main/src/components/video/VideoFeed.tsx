@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { VideoService } from '@/services/VideoService';
 import { VideoReel } from '@/types/types';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Share2, Eye, X, ExternalLink, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Share2, Eye, X, ExternalLink, Volume2, VolumeX, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VideoUrlUtils } from '@/utils/VideoUrlUtils';
 import '@/styles/video-feed.css';
@@ -24,6 +24,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const seekingRef = useRef(false);
+  const lastSeekPct = useRef(0);
 
   // Determine video type and source URL
   const getVideoType = () => {
@@ -46,6 +49,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
       ? VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, true, true) || video.embedUrl
       : VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, false, true) || video.embedUrl
     );
+
+  
 
   useEffect(() => {
     if (isActive && videoType === 'direct' && videoRef.current) {
@@ -138,10 +143,43 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
     }
   };
 
+  
+
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       const progress = (videoRef.current.currentTime / videoRef.current.duration) * 100;
       setProgress(progress);
+    }
+  };
+
+  // Helper: format timestamp (milliseconds or ISO) into a short relative time string
+  const formatRelativeTime = (ts?: number | string | null) => {
+    if (!ts) return 'Unknown';
+    const t = typeof ts === 'string' ? Date.parse(ts) : (typeof ts === 'number' ? ts : NaN);
+    if (!t || Number.isNaN(t)) return 'Unknown';
+    const diff = Date.now() - t;
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+    const weeks = Math.floor(days / 7);
+    return `${weeks}w`;
+  };
+
+  const openSource = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const href = (video.originalSource && (video.originalSource as any).sourceUrl) || video.videoUrl;
+    if (href) {
+      try {
+        window.open(href, '_blank', 'noopener');
+      } catch (err) {
+        // fallback
+        window.location.href = href;
+      }
     }
   };
 
@@ -265,10 +303,56 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
 
       {/* Progress Bar (only for direct videos) */}
       {videoType === 'direct' && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+        <div
+          className="absolute bottom-0 left-0 right-0 h-3 bg-white/20 cursor-pointer"
+          onMouseDown={(e) => {
+            // Begin seeking
+            seekingRef.current = true;
+            setIsSeeking(true);
+            const el = e.currentTarget as HTMLDivElement;
+            const rect = el.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            lastSeekPct.current = pct;
+            if (videoRef.current && videoRef.current.duration) {
+              try {
+                videoRef.current.currentTime = pct * videoRef.current.duration;
+                setProgress(pct * 100);
+              } catch (err) {
+                // ignore
+              }
+            }
+
+            const onMove = (ev: MouseEvent) => {
+              if (!seekingRef.current) return;
+              const movePct = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+              lastSeekPct.current = movePct;
+              if (videoRef.current && videoRef.current.duration) {
+                try {
+                  videoRef.current.currentTime = movePct * videoRef.current.duration;
+                  setProgress(movePct * 100);
+                } catch (err) {}
+              }
+            };
+
+            const onUp = () => {
+              seekingRef.current = false;
+              setIsSeeking(false);
+              window.removeEventListener('mousemove', onMove);
+              window.removeEventListener('mouseup', onUp);
+            };
+
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+          }}
+        >
           <div
             className="h-full bg-white transition-all duration-100"
             style={{ width: `${progress}%` }}
+          />
+          {/* Thumb */}
+          <div
+            className="absolute top-0 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow-lg"
+            style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
           />
         </div>
       )}
@@ -282,43 +366,44 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
 
 
 
-      {/* Creator Profile Section - App-like rounded bar */}
-      <div className="absolute bottom-28 sm:bottom-32 left-3 sm:left-4 right-16 sm:right-20 z-10" style={{ pointerEvents: 'none' }}>
-        <div className="flex items-center gap-3 bg-black/60 backdrop-blur-sm border border-white/20 rounded-full px-3 py-2 max-w-fit shadow-xl">
-          {/* Creator Profile Picture */}
-          {video.originalSource?.creatorProfilePic ? (
-            <img
-              src={video.originalSource.creatorProfilePic}
-              alt={`${video.originalSource.creatorName || 'Creator'} profile`}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border-2 border-white/30 shadow-lg"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-600 border-2 border-white/30 flex items-center justify-center shadow-lg">
-              <span className="text-white text-xs sm:text-sm font-bold">
-                {video.originalSource?.creatorName?.charAt(0) || 'N'}
-              </span>
+      {/* Bottom details card - mobile friendly: stacks on small screens, aligns buttons to the right */}
+      <div className="absolute bottom-4 sm:bottom-16 left-4 right-4 sm:left-20 sm:right-24 z-10">
+        <div className="bg-black/70 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-3 flex flex-col sm:flex-row items-center gap-3">
+          {/* Source + time (clickable) */}
+          <button onClick={openSource} className="flex items-center gap-2 min-w-0 text-white text-left truncate focus:outline-none" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+            <ExternalLink className="w-5 h-5 text-white/90 flex-shrink-0" />
+            <div className="font-medium text-sm truncate">{video.originalSource?.sourcePlatform || 'Source'}</div>
+            <div className="text-white/80 text-xs flex items-center gap-1 ml-2">
+              <Clock className="w-4 h-4 text-white/70" />
+              <span className="whitespace-nowrap">{formatRelativeTime(video.timestamp)}</span>
             </div>
-          )}
+          </button>
 
-          {/* Creator Details */}
+          {/* Title */}
           <div className="flex-1 min-w-0">
-            <div className="text-white font-semibold text-xs sm:text-sm leading-tight drop-shadow-lg">
-              {video.originalSource?.creatorName || 'Daily Current Affairs'}
-            </div>
-            <div className="text-white/80 text-[10px] sm:text-xs leading-tight drop-shadow-md">
-              {video.originalSource?.sourcePlatform || 'News'} • Few hours ago
-            </div>
+            <h3 className="text-white font-semibold text-sm sm:text-base line-clamp-2 leading-tight">{video.title}</h3>
           </div>
-        </div>
-      </div>
 
-      {/* Video Details - Simplified Title Only */}
-      <div className="absolute bottom-16 sm:bottom-20 left-3 sm:left-4 max-w-[70%] sm:max-w-[75%] bg-gradient-to-t from-black/80 via-black/60 to-transparent px-3 sm:px-4 py-2 sm:py-3 rounded-t-lg z-10" style={{ pointerEvents: 'none' }}>
-        <div>
-          <h3 className="text-white font-semibold text-sm sm:text-base line-clamp-2 leading-tight drop-shadow-lg">{video.title}</h3>
+          {/* Buttons - right aligned; horizontal on mobile, vertical on desktop */}
+          <div className="flex items-center gap-2 sm:flex-col sm:items-center">
+            <button
+              className="h-10 px-3 rounded-full flex items-center justify-center border border-white/10 bg-transparent whitespace-nowrap"
+              title={`${video.views || 0} views`}
+              onClick={(e) => { e.stopPropagation(); /* optional: show view details */ }}
+              aria-label="Views"
+            >
+              <Eye className="h-4 w-4 text-white mr-2" />
+              <span className="text-white text-xs font-medium">{video.views || 0}</span>
+            </button>
+            <button
+              className="w-10 h-10 rounded-full flex items-center justify-center border border-white/10 bg-transparent"
+              title="Share"
+              onClick={(e) => { e.stopPropagation(); handleShare(); }}
+              aria-label="Share"
+            >
+              <Share2 className="h-4 w-4 text-white" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -330,6 +415,9 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Black transition mask state
+  const maskTimerRef = useRef<number | null>(null);
+  const [maskVisible, setMaskVisible] = useState(false);
 
   useEffect(() => {
     loadVideos();
@@ -355,6 +443,26 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Scroll handler used for the parent container: updates current index and shows a short black mask during scroll
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const scrollTop = container.scrollTop;
+    const videoHeight = container.clientHeight;
+    const newIndex = Math.round(scrollTop / videoHeight);
+    if (newIndex !== currentIndex && newIndex >= 0 && newIndex < videos.length) {
+      setCurrentIndex(newIndex);
+    }
+
+    setMaskVisible(true);
+    if (maskTimerRef.current) {
+      window.clearTimeout(maskTimerRef.current);
+    }
+    maskTimerRef.current = window.setTimeout(() => {
+      setMaskVisible(false);
+      maskTimerRef.current = null;
+    }, 260);
   };
 
   // Add <link rel="preconnect|dns-prefetch|preload|prefetch"> for first videos
@@ -535,7 +643,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
           e.preventDefault();
           e.stopPropagation();
         }}
-        className="fixed top-4 sm:top-6 right-4 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 border-2 border-white/50 shadow-2xl flex items-center justify-center transition-all duration-100 hover:scale-110 active:scale-95 z-[99999]"
+        className="fixed top-4 sm:top-6 right-4 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-transparent hover:bg-white/5 active:bg-white/10 border border-white/20 flex items-center justify-center transition-all duration-100 hover:scale-105 active:scale-95 z-[99999]"
         style={{
           pointerEvents: 'auto',
           zIndex: 99999,
@@ -546,80 +654,17 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
         <X className="h-6 w-6 sm:h-8 sm:w-8 text-white font-bold" />
       </button>
 
-      {/* SHARE BUTTON - Bottom Right - Completely Independent */}
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-
-          // Immediate visual feedback
-          const button = e.currentTarget;
-          button.style.transform = 'scale(0.95)';
-          button.style.backgroundColor = '#1d4ed8'; // darker blue
-
-          console.log('SHARE CLICKED!');
-
-          // Execute share function without blocking UI
-          setTimeout(async () => {
-            try {
-              await handleShare();
-              console.log('Share completed successfully');
-              // Reset button appearance
-              button.style.transform = 'scale(1)';
-              button.style.backgroundColor = '#2563eb'; // original blue
-            } catch (error) {
-              console.error('Share failed:', error);
-              alert('Sharing failed. Please try again.');
-              // Reset button appearance
-              button.style.transform = 'scale(1)';
-              button.style.backgroundColor = '#2563eb';
-            }
-          }, 50); // Very short delay to allow UI update
-        }}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 border-2 border-white/50 shadow-2xl flex items-center justify-center transition-all duration-100 hover:scale-110 active:scale-95 z-[99999]"
-        style={{
-          pointerEvents: 'auto',
-          zIndex: 99999,
-          position: 'fixed',
-          touchAction: 'manipulation'
-        }}
-      >
-        <svg className="h-5 w-5 sm:h-6 sm:w-6" viewBox="0 0 512 512" fill="white">
-          <circle cx="389" cy="154" r="85" />
-          <circle cx="123" cy="277" r="85" />
-          <circle cx="389" cy="431" r="85" />
-          <path d="M208 277L348 154" stroke="white" strokeWidth="20" strokeLinecap="round" />
-          <path d="M208 277L348 431" stroke="white" strokeWidth="20" strokeLinecap="round" />
-        </svg>
-      </button>
-
-      {/* VIEWS COUNTER - Middle Right - Simple Display */}
-      <div className="fixed right-4 sm:right-6 top-1/2 transform -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/80 border-2 border-white/30 shadow-xl flex flex-col items-center justify-center z-[50000]">
-        <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 512 512" fill="white">
-          <path d="M256 144c79.4 0 144 64.6 144 144s-64.6 144-144 144S112 367.4 112 256S176.6 144 256 144z" />
-          <circle cx="256" cy="256" r="64" fill="#000" />
-          <path d="M256 96C123.9 96 14.4 186.1 2.3 255.5c-0.8 4.5-0.8 9.1 0 13.6C14.4 325.9 123.9 416 256 416s241.6-90.1 253.7-146.9c0.8-4.5 0.8-9.1 0-13.6C497.6 186.1 388.1 96 256 96zM256 352c-53 0-96-43-96-96s43-96 96-96s96 43 96 96S309 352 256 352z" />
-        </svg>
-        <span className="text-[8px] sm:text-[10px] text-white font-bold leading-none">{videos[currentIndex]?.views || 0}</span>
-      </div>
+      {/* Removed large fixed share and views widgets - using compact right-side buttons near video details */}
 
       {/* Scrollable Video Feed with proper containment */}
+      {/* Black mask covers background during transitions to avoid flash */}
+      {maskVisible && (
+        <div className="absolute inset-0 bg-black z-[40000] pointer-events-none" />
+      )}
       <div
         className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-hide"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        onScroll={(e) => {
-          const container = e.currentTarget;
-          const scrollTop = container.scrollTop;
-          const videoHeight = container.clientHeight;
-          const newIndex = Math.round(scrollTop / videoHeight);
-          if (newIndex !== currentIndex && newIndex >= 0 && newIndex < videos.length) {
-            setCurrentIndex(newIndex);
-          }
-        }}
+        onScroll={handleScroll}
       >
         {videos.map((video, index) => (
           <div

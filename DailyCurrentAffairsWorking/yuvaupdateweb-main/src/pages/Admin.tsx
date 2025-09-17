@@ -63,8 +63,7 @@ export default function AdminPanel() {
   const [videoUrl, setVideoUrl] = useState("");
   const [originalSource, setOriginalSource] = useState("");
   const [originalSourceUrl, setOriginalSourceUrl] = useState("");
-  const [originalCreator, setOriginalCreator] = useState("");
-  const [creatorProfilePic, setCreatorProfilePic] = useState("");
+  // removed originalCreator and creatorProfilePic as part of admin simplification
   const [videoCategory, setVideoCategory] = useState("General");
   const [videoTags, setVideoTags] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -178,8 +177,7 @@ export default function AdminPanel() {
     setVideoUrl("");
     setOriginalSource("");
     setOriginalSourceUrl("");
-    setOriginalCreator("");
-    setCreatorProfilePic("");
+    // creator fields removed
     setVideoCategory("General");
     setVideoTags("");
     setThumbnailUrl("");
@@ -299,9 +297,7 @@ export default function AdminPanel() {
         originalSource: {
           sourcePlatform: (originalSource || detectedPlatform) as 'Instagram' | 'TikTok' | 'YouTube' | 'Facebook' | 'Twitter' | 'Other',
           sourceUrl: originalSourceUrl?.trim() || videoUrl,
-          creatorName: originalCreator?.trim() || 'Unknown',
-          creatorProfilePic: creatorProfilePic?.trim() || '',
-          ...(originalCreator?.trim() && { creatorHandle: originalCreator.trim() }),
+          creatorName: 'Unknown',
         },
         // Add metadata about video platform support
         platformInfo: {
@@ -526,8 +522,6 @@ export default function AdminPanel() {
     setVideoUrl(video.videoUrl);
     setOriginalSource(video.originalSource?.sourcePlatform || '');
     setOriginalSourceUrl(video.originalSource?.sourceUrl || '');
-    setOriginalCreator(video.originalSource?.creatorName || '');
-    setCreatorProfilePic(video.originalSource?.creatorProfilePic || '');
     setVideoCategory(video.category);
     setVideoTags(video.tags?.join(', ') || '');
     setThumbnailUrl(video.thumbnailUrl);
@@ -1969,34 +1963,7 @@ export default function AdminPanel() {
                         <option value="Other">🌐 Other</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block font-semibold mb-1">Original Creator</label>
-                      <Input
-                        value={originalCreator}
-                        onChange={e => setOriginalCreator(e.target.value)}
-                        placeholder="Creator username or name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1">Creator Profile Picture</label>
-                      <Input
-                        value={creatorProfilePic}
-                        onChange={e => setCreatorProfilePic(e.target.value)}
-                        placeholder="URL to creator's profile picture"
-                      />
-                      {creatorProfilePic && (
-                        <div className="mt-2">
-                          <img
-                            src={creatorProfilePic}
-                            alt="Creator profile preview"
-                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
+                    {/* Original Creator fields removed - simplified attribution */}
                   </div>
                   <div className="mt-3">
                     <label className="block font-semibold mb-1">Original Source URL</label>
@@ -2089,7 +2056,6 @@ export default function AdminPanel() {
                           <div className="flex items-center gap-1 mt-2 text-xs text-purple-700 dark:text-purple-300">
                             <span>FROM:</span>
                             <span className="font-medium">{originalSource}</span>
-                            {originalCreator && <span>• @{originalCreator}</span>}
                           </div>
                         )}
 

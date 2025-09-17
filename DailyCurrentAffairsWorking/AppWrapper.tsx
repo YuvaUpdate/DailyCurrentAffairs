@@ -84,7 +84,7 @@ const LoadingDots = () => {
 export default function AppWrapper() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMessage, setLoadingMessage] = useState('Welcome to YuvaUpdate! ⭐');
+  const [loadingMessage, setLoadingMessage] = useState('Welcome to YuvaUpdate');
   // startup overlay removed to avoid duplicate logo screen.
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [articlesReady, setArticlesReady] = useState(false);
@@ -108,12 +108,12 @@ export default function AppWrapper() {
     // admin sign-in events. We don't force authentication here.
     checkAuthState();
     
-    // Progressive loading messages with engaging content
+    // Progressive loading messages (professional tone, no emojis)
     const messageTimers = [
-      setTimeout(() => setLoadingMessage('Curating fresh news for you ⚡'), 600),
-      setTimeout(() => setLoadingMessage('Connecting to trusted sources ⭐'), 1400),
-      setTimeout(() => setLoadingMessage('Preparing your personalized feed ⚪'), 2200),
-      setTimeout(() => setLoadingMessage('Ready to explore! ▶'), 2800),
+      setTimeout(() => setLoadingMessage('Preparing your personalized news feed'), 600),
+      setTimeout(() => setLoadingMessage('Connecting to trusted sources'), 1400),
+      setTimeout(() => setLoadingMessage('Finalizing your feed preferences'), 2200),
+      setTimeout(() => setLoadingMessage('Ready to explore'), 2800),
     ];
     
     // Extend startup fallback timeout: wait up to 15s for articles to arrive
