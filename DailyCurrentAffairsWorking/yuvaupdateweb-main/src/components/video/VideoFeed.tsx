@@ -16,14 +16,24 @@ interface VideoPlayerProps {
   isActive: boolean;
   onNext: () => void;
   onPrevious: () => void;
+  // If true, the player should try to unmute immediately when it becomes active
+  forceUnmuteOnOpen?: boolean;
+  // Global muted state controlled by the feed (persisted)
+  globalMuted?: boolean;
+  onGlobalMuteChange?: (muted: boolean) => void;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPrevious }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPrevious, forceUnmuteOnOpen, globalMuted, onGlobalMuteChange }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    // Initialize muted from global setting if provided
+    try {
+      if (typeof globalMuted === 'boolean') return !!globalMuted;
+    } catch (e) {}
+    return true;
+  });
   const [isSeeking, setIsSeeking] = useState(false);
   const seekingRef = useRef(false);
   const lastSeekPct = useRef(0);
@@ -46,8 +56,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
   const videoSrc = videoType === 'direct'
     ? video.videoUrl
     : (isActive
-      ? VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, true, true) || video.embedUrl
-      : VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, false, true) || video.embedUrl
+      ? VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, true, /*muted=*/ !!globalMuted) || video.embedUrl
+      : VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, false, /*muted=*/ true) || video.embedUrl
     );
 
   
@@ -55,6 +65,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
   useEffect(() => {
     if (isActive && videoType === 'direct' && videoRef.current) {
       // Ensure muted before attempting autoplay (required by most browsers)
+      // We'll attempt an immediate unmute if requested via forceUnmuteOnOpen
       videoRef.current.muted = true;
       // Some browsers require the muted attribute to be set before play()
       try {
@@ -63,6 +74,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
         // Retry once more muted
         videoRef.current.muted = true;
         videoRef.current.play().catch(() => { });
+      }
+      // If the feed was opened with unmute requested, try to unmute now.
+      if (forceUnmuteOnOpen) {
+        try {
+          videoRef.current.muted = false;
+          setIsMuted(false);
+          // Try a short play to satisfy autoplay policies
+          videoRef.current.play().catch(() => {});
+        } catch (e) { }
       }
       setIsPlaying(true);
     } else if (videoType === 'direct' && videoRef.current) {
@@ -87,10 +107,32 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
 
   const toggleMute = () => {
     if (videoType === 'direct' && videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
+      const next = !isMuted;
+      videoRef.current.muted = next;
+      setIsMuted(next);
+      try { onGlobalMuteChange && onGlobalMuteChange(next); } catch (e) {}
     }
   };
+
+  // Keep local isMuted in sync when globalMuted changes
+  useEffect(() => {
+    try {
+      if (typeof globalMuted === 'boolean') {
+        const desired = !!globalMuted;
+        setIsMuted(desired);
+        if (videoType === 'direct' && videoRef.current) {
+          try { videoRef.current.muted = desired; } catch (e) {}
+        }
+        // For iframe/embed players we may need to reload src with muted param when active
+        if (videoType !== 'direct' && isActive && iframeRef.current && video.embedUrl) {
+          try {
+            const newSrc = VideoUrlUtils.getEmbedUrlWithAutoplay(video.videoUrl, true, desired) || video.embedUrl;
+            iframeRef.current.src = newSrc;
+          } catch (e) {}
+        }
+      }
+    } catch (e) {}
+  }, [globalMuted, videoType, isActive, video.videoUrl, video.embedUrl]);
 
 
 
@@ -145,12 +187,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
 
   
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const progress = (videoRef.current.currentTime / videoRef.current.duration) * 100;
-      setProgress(progress);
-    }
-  };
+  // Time update handler removed: progress bar/seek UI suppressed per UX change
 
   // Helper: format timestamp (milliseconds or ISO) into a short relative time string
   const formatRelativeTime = (ts?: number | string | null) => {
@@ -215,7 +252,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
           muted={isMuted}
           autoPlay
           playsInline
-          onTimeUpdate={handleTimeUpdate}
           onClick={togglePlayPause}
           poster={video.thumbnailUrl}
         />
@@ -301,61 +337,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
         </Button>
       )}
 
-      {/* Progress Bar (only for direct videos) */}
-      {videoType === 'direct' && (
-        <div
-          className="absolute bottom-0 left-0 right-0 h-3 bg-white/20 cursor-pointer"
-          onMouseDown={(e) => {
-            // Begin seeking
-            seekingRef.current = true;
-            setIsSeeking(true);
-            const el = e.currentTarget as HTMLDivElement;
-            const rect = el.getBoundingClientRect();
-            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            lastSeekPct.current = pct;
-            if (videoRef.current && videoRef.current.duration) {
-              try {
-                videoRef.current.currentTime = pct * videoRef.current.duration;
-                setProgress(pct * 100);
-              } catch (err) {
-                // ignore
-              }
-            }
-
-            const onMove = (ev: MouseEvent) => {
-              if (!seekingRef.current) return;
-              const movePct = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
-              lastSeekPct.current = movePct;
-              if (videoRef.current && videoRef.current.duration) {
-                try {
-                  videoRef.current.currentTime = movePct * videoRef.current.duration;
-                  setProgress(movePct * 100);
-                } catch (err) {}
-              }
-            };
-
-            const onUp = () => {
-              seekingRef.current = false;
-              setIsSeeking(false);
-              window.removeEventListener('mousemove', onMove);
-              window.removeEventListener('mouseup', onUp);
-            };
-
-            window.addEventListener('mousemove', onMove);
-            window.addEventListener('mouseup', onUp);
-          }}
-        >
-          <div
-            className="h-full bg-white transition-all duration-100"
-            style={{ width: `${progress}%` }}
-          />
-          {/* Thumb */}
-          <div
-            className="absolute top-0 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow-lg"
-            style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
-          />
-        </div>
-      )}
+      {/* Progress/seek UI removed for a cleaner in-video experience */}
 
       {/* Platform indicator for embedded videos */}
       {videoType !== 'direct' && (
@@ -412,6 +394,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
 
 export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
   const [videos, setVideos] = useState<VideoReel[]>([]);
+  // Global muted state persisted to localStorage ('1' = muted, '0' = unmuted)
+  const [globalMuted, setGlobalMuted] = useState<boolean>(() => {
+    try {
+      const v = typeof window !== 'undefined' ? window.localStorage.getItem('video_muted') : null;
+      if (v === '1') return true;
+      if (v === '0') return false;
+    } catch (e) {}
+    // default to unmuted
+    try { if (typeof window !== 'undefined') window.localStorage.setItem('video_muted', '0'); } catch (e) {}
+    return false;
+  });
+  const forceUnmuteRef = useRef<boolean>(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -421,7 +415,28 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
 
   useEffect(() => {
     loadVideos();
+
+    // Listen for open events that request unmuting on open
+    const handler = (e: any) => {
+      try {
+        const d = e?.detail || {};
+        if (d && d.unmute) {
+          forceUnmuteRef.current = true;
+        }
+      } catch (err) {}
+    };
+    if (typeof window !== 'undefined') window.addEventListener('video-feed-open', handler as EventListener);
+    return () => { if (typeof window !== 'undefined') window.removeEventListener('video-feed-open', handler as EventListener); };
   }, []);
+
+  const handleGlobalMuteChange = (muted: boolean) => {
+    try {
+      setGlobalMuted(muted);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('video_muted', muted ? '1' : '0');
+      }
+    } catch (e) { console.warn('Failed to persist global mute', e); }
+  };
 
   const loadVideos = async () => {
     try {
@@ -677,6 +692,10 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({ onClose }) => {
               isActive={index === currentIndex}
               onNext={handleNext}
               onPrevious={handlePrevious}
+              // Pass a prop so the player can unmute immediately if the feed was opened with unmute request
+              {...(forceUnmuteRef.current && index === currentIndex ? { forceUnmuteOnOpen: true } : {})}
+              globalMuted={globalMuted}
+              onGlobalMuteChange={handleGlobalMuteChange}
             />
           </div>
         ))}

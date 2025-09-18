@@ -16,7 +16,7 @@ const ARTICLES_PER_PAGE = 5;
 const COLLECTION_NAME = "news_articles";
 
 export function NewsFeed() {
-  const { isVideoFeedOpen } = useVideoFeed();
+  const { isVideoFeedOpen, openVideoFeed } = useVideoFeed();
   const [articles, setArticles] = useState<ArticleType[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -255,8 +255,10 @@ export function NewsFeed() {
     }
   };
 
+
   return (
     <div className="min-h-screen w-full flex flex-col bg-background">
+      {/* videos anchor removed per request */}
       {/* Floating Back to Top Button - hidden when video feed is open */}
       {!isVideoFeedOpen && (
         <button

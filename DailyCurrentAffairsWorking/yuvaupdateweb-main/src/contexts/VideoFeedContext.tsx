@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 interface VideoFeedContextType {
   isVideoFeedOpen: boolean;
-  openVideoFeed: () => void;
+  // If `unmute` is true, listeners should open the feed with audio enabled when possible
+  openVideoFeed: (unmute?: boolean) => void;
   closeVideoFeed: () => void;
 }
 
@@ -23,9 +24,17 @@ interface VideoFeedProviderProps {
 export const VideoFeedProvider: React.FC<VideoFeedProviderProps> = ({ children }) => {
   const [isVideoFeedOpen, setIsVideoFeedOpen] = useState(false);
 
-  const openVideoFeed = () => {
-    console.log('Opening video feed...');
+  const openVideoFeed = (unmute?: boolean) => {
+    console.log('Opening video feed...', { unmute });
     setIsVideoFeedOpen(true);
+    try {
+      if (typeof window !== 'undefined' && typeof (window as any).CustomEvent === 'function') {
+        const ev = new CustomEvent('video-feed-open', { detail: { unmute: !!unmute } });
+        window.dispatchEvent(ev);
+      }
+    } catch (e) {
+      console.warn('video-feed-open dispatch failed', e);
+    }
   };
   
   const closeVideoFeed = () => {
