@@ -1398,7 +1398,6 @@ export default function App(props: AppProps) {
               <VideoPlayerComponent
                 videoUrl={article.image}
                 style={styles.fullScreenImage}
-                showControls={true}
                 autoPlay={false}
               />
             ) : (

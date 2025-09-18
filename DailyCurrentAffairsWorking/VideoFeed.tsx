@@ -36,6 +36,22 @@ function safeRequire(name: string) {
   }
 }
 
+// Safe helper for keep-awake: prefer expo-keep-awake when available, otherwise noop functions
+function safeKeepAwake() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const k = require('expo-keep-awake');
+    if (k && typeof k.activateKeepAwake === 'function' && typeof k.deactivateKeepAwake === 'function') {
+      return {
+        activate: () => { try { k.activateKeepAwake(); } catch (e) {} },
+        deactivate: () => { try { k.deactivateKeepAwake(); } catch (e) {} },
+      };
+    }
+  } catch (e) {}
+  // Fallback no-ops
+  return { activate: () => {}, deactivate: () => {} };
+}
+
 // Simple time-ago formatter (lightweight, avoids extra deps)
 const formatTimeAgo = (iso?: string) => {
   try {
@@ -688,6 +704,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
   const [isProgressReady, setIsProgressReady] = useState<boolean>(false);
   // Local playback UI state: whether playback appears to be playing and local manual pause flag
   const [isPlayingState, setIsPlayingState] = useState<boolean>(false);
+  const keepAwake = useRef<{ activate: () => void; deactivate: () => void } | null>(null);
   const [localManuallyPaused, setLocalManuallyPaused] = useState<boolean>(!!isManuallyPaused);
   const remountAttemptsRef = useRef<number>(0);
   const lastPositionRef = useRef<number>(0);
@@ -716,6 +733,17 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
     }
   }, [isYouTube, isIframeEmbeddable, isActive, isLoading, isVideoReady, video.title, video.videoUrl]);
 
+  // Initialize keep-awake helper once per item
+  useEffect(() => {
+    keepAwake.current = safeKeepAwake();
+    return () => {
+      try {
+        keepAwake.current && keepAwake.current.deactivate();
+      } catch (e) {}
+      keepAwake.current = null;
+    };
+  }, []);
+
   // Instant initialization for YouTube and iframe videos
   useEffect(() => {
     if (isYouTube || isIframeEmbeddable) {
@@ -729,10 +757,34 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
     }
   }, [isYouTube, isIframeEmbeddable, video.id]);
 
+  // For players that don't reliably emit playback status (YouTube/iframe), use isActive as proxy to manage keep-awake
+  useEffect(() => {
+    try {
+      if (isYouTube || isIframeEmbeddable) {
+        if (isActive) {
+          keepAwake.current && keepAwake.current.activate();
+        } else {
+          keepAwake.current && keepAwake.current.deactivate();
+        }
+      }
+    } catch (e) {}
+    // Also deactivate keep-awake on unmount of this effect
+    return () => {
+      try { keepAwake.current && keepAwake.current.deactivate(); } catch (e) {}
+    };
+  }, [isActive, isYouTube, isIframeEmbeddable]);
+
   // Keep local manual pause state in-sync with parent prop
   useEffect(() => {
     setLocalManuallyPaused(!!isManuallyPaused);
   }, [isManuallyPaused]);
+
+  // Debug: log when parent mute prop changes for this item
+  useEffect(() => {
+    try {
+      console.log('🔊 [VideoItem] isMuted prop for id', video.id, isMuted);
+    } catch (e) {}
+  }, [isMuted, video.id]);
 
   // Ultra-minimal timeout for instant experience
   useEffect(() => {
@@ -1438,6 +1490,35 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
                     });
                   }
                 }
+
+                // Enforce mute/unmute according to parent prop immediately when video is ready
+                try {
+                  const desiredMuted = !!isMuted;
+                  const v = videoRef.current;
+                  if (v) {
+                    if (Platform.OS === 'web') {
+                      try {
+                        v.muted = desiredMuted;
+                        // If unmuted is desired and autoplay may have started muted, attempt a short unmute/play
+                        if (!desiredMuted && isActive) {
+                          try { v.muted = false; } catch (e) {}
+                          // try to play with sound if allowed
+                          try { v.play && v.play().catch(() => {}); } catch (e) {}
+                        }
+                      } catch (e) { console.warn('[VideoItem] apply web muted failed', e); }
+                    } else {
+                      try {
+                        if (typeof v.setIsMutedAsync === 'function') {
+                          v.setIsMutedAsync(desiredMuted).catch((err: any) => console.warn('[VideoItem] setIsMutedAsync failed', err));
+                        } else if (typeof v.setNativeProps === 'function') {
+                          try { v.setNativeProps({ muted: desiredMuted }); } catch (e) {}
+                        } else if (typeof v.muted !== 'undefined') {
+                          try { v.muted = desiredMuted; } catch (e) {}
+                        }
+                      } catch (e) { console.warn('[VideoItem] apply native muted failed', e); }
+                    }
+                  }
+                } catch (e) {}
               }}
               onError={(error: any) => {
                 console.error('Video error:', error);
@@ -1495,6 +1576,14 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
                         console.log('🔔 [VideoItem] onPlaybackStatusUpdate for id', video.id, { pos: posRaw, dur, playing, rawDur: durRaw });
                         // Update playing UI state only when user hasn't manually paused this item
                         if (!localManuallyPaused) setIsPlayingState(playing);
+                        // Keep screen awake while actually playing
+                        try {
+                          if (playing) {
+                            keepAwake.current && keepAwake.current.activate();
+                          } else {
+                            keepAwake.current && keepAwake.current.deactivate();
+                          }
+                        } catch (e) {}
                         if (posRaw >= 0) setSafePosition(posRaw);
                         if (dur > 0) {
                           // Real duration has arrived; clear any estimated duration and mark ready
@@ -1523,175 +1612,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
           {/* Creator profile (positioned just above the bottom details card) */}
           {/* Move creator profile further up by adding extra offset */}
           {/* Move creator profile higher above the details card and ensure it sits above via zIndex */}
-          {/* Progress bar (above creator) */}
-          {isVideoReady && !isFirst && (
-            // Progress controls positioned lower now that creator profile is removed
-            <View pointerEvents="box-none" style={{ position: 'absolute', left: 8, right: 8, bottom: (24 + (bottomCardHeight || 52) + 100), zIndex: 9999, elevation: 30, alignItems: 'center' }}>
-              {/* Row with play/pause button (left) and interactive progress bar (right) */}
-              <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                {/* Play/Pause button on the left */}
-                  <TouchableOpacity
-                  accessibilityLabel={localManuallyPaused ? 'Play video' : 'Pause video'}
-                  onPress={() => {
-                    try {
-                      // Toggle local manual paused state immediately for snappy UI
-                      const newPaused = !localManuallyPaused;
-                      setLocalManuallyPaused(newPaused);
-                      // Notify parent about manual pause change if provided
-                      if (onManualPauseChange) onManualPauseChange(newPaused);
-
-                      // Update local playing state immediately to reflect action
-                      setIsPlayingState(!newPaused);
-
-                      // Control player with guarded calls
-                      if (isYouTube) {
-                        const y = youtubeRef.current as any;
-                        if (y) {
-                          if (newPaused) {
-                            if (typeof y.pause === 'function') {
-                              try { y.pause(); } catch (e) { console.warn('[VideoItem] youtube pause failed', e); }
-                            }
-                          } else {
-                            if (typeof y.play === 'function') {
-                              try { y.play(); } catch (e) { console.warn('[VideoItem] youtube play failed', e); }
-                            }
-                          }
-                        } else {
-                          console.warn('[VideoItem] play/pause requested but youtubeRef is null for video id', video.id);
-                        }
-                      } else {
-                        const v = videoRef.current;
-                        if (v) {
-                          if (newPaused) {
-                            try {
-                              if (typeof v.pauseAsync === 'function') v.pauseAsync().catch((e: any) => console.warn('[VideoItem] pauseAsync failed', e));
-                              else if (typeof v.pause === 'function') v.pause();
-                            } catch (e) { console.warn('[VideoItem] pause attempt threw', e); }
-                          } else {
-                            try {
-                              if (typeof v.playAsync === 'function') v.playAsync().catch((e: any) => console.warn('[VideoItem] playAsync failed', e));
-                              else if (typeof v.play === 'function') v.play().catch((e: any) => console.warn('[VideoItem] web play failed', e));
-                            } catch (e) { console.warn('[VideoItem] play attempt threw', e); }
-                          }
-                        } else {
-                          console.warn('[VideoItem] play/pause requested but videoRef is null for video id', video.id);
-                        }
-                      }
-                    } catch (err) {
-                      console.warn('[VideoItem] play/pause button handler error', err);
-                    }
-                  }}
-                  style={{ width: 44, height: 44, marginRight: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderRadius: 22, borderWidth: 1, borderColor: '#FFFFFF', zIndex: 10000, elevation: 20 }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  {/* Show original PNG colors; tintColor removed to ensure icon visible */}
-                  <Image source={localManuallyPaused ? require('./assets/play-button.png') : require('./assets/video-pause-button.png')} style={{ width: 24, height: 24, tintColor: '#FFFFFF' }} resizeMode="contain" />
-                </TouchableOpacity>
-
-                {/* Interactive progress bar - overlaps creator profile */}
-                <View
-                  style={{ flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}
-                onLayout={(e) => {
-                  try {
-                    const w = e.nativeEvent.layout?.width || (screenWidth - 16);
-                    progressWidthRef.current = w;
-                  } catch (err) {}
-                }}
-                onStartShouldSetResponder={() => true}
-                onMoveShouldSetResponder={() => true}
-                onResponderGrant={(e) => {
-                  try {
-                    const { locationX } = e.nativeEvent;
-                    const total = progressWidthRef.current || (screenWidth - 16);
-                    const pct = Math.max(0, Math.min(1, locationX / total));
-                    const seekMs = Math.floor((durationMillis || 1) * pct);
-                    console.log('🎯 [VideoFeed] onResponderGrant seekMs for video id', video.id, seekMs);
-                    // Seek platform-specific players (guard refs/methods)
-                    try {
-                      if (Platform.OS === 'web' && videoRef.current && !isYouTube) {
-                        const v = videoRef.current as HTMLVideoElement;
-                        try { if (typeof v.currentTime !== 'undefined') v.currentTime = (seekMs / 1000); } catch (err) { console.warn('[VideoItem] Web seek failed', err); }
-                      } else if (!isYouTube) {
-                        const v = videoRef.current;
-                        if (!v) {
-                          console.warn('[VideoItem] seek requested but videoRef is null for video id', video.id);
-                        } else {
-                          try {
-                            if (typeof v.setPositionAsync === 'function') {
-                              v.setPositionAsync(seekMs).catch((err: any) => console.warn('[VideoItem] setPositionAsync failed', err));
-                            } else if (typeof v.seek === 'function') {
-                              v.seek(seekMs / 1000);
-                            }
-                          } catch (err) { console.warn('[VideoItem] seek attempt threw', err); }
-                        }
-                      } else if (isYouTube) {
-                        const y = (youtubeRef.current as any);
-                        if (y && typeof y.seekTo === 'function') {
-                          try { y.seekTo(seekMs / 1000); } catch (err) { console.warn('[VideoItem] youtube seekTo failed', err); }
-                        } else {
-                          console.warn('[VideoItem] seek requested but youtubeRef or seekTo missing for video id', video.id);
-                        }
-                      }
-                    } catch (err) { console.warn('[VideoItem] seek error', err); }
-                    setPositionMillis(seekMs);
-                  } catch (err) {}
-                }}
-                onResponderMove={(e) => {
-                  try {
-                    const { locationX } = e.nativeEvent;
-                    const total = progressWidthRef.current || (screenWidth - 16);
-                    const pct = Math.max(0, Math.min(1, locationX / total));
-                    const seekMs = Math.floor((durationMillis || 1) * pct);
-                    setPositionMillis(seekMs);
-                  } catch (err) {}
-                }}
-                onResponderRelease={(e) => {
-                  try {
-                    const { locationX } = e.nativeEvent;
-                    const total = progressWidthRef.current || (screenWidth - 16);
-                    const pct = Math.max(0, Math.min(1, locationX / total));
-                    const seekMs = Math.floor((durationMillis || 1) * pct);
-                    console.log('🎯 [VideoFeed] onResponderRelease seekMs for video id', video.id, seekMs);
-                    try {
-                      if (Platform.OS === 'web' && videoRef.current && !isYouTube) {
-                        const v = videoRef.current as HTMLVideoElement;
-                        try { if (typeof v.currentTime !== 'undefined') v.currentTime = (seekMs / 1000); } catch (err) { console.warn('[VideoItem] Web seek failed', err); }
-                      } else if (!isYouTube) {
-                        const v = videoRef.current;
-                        if (!v) {
-                          console.warn('[VideoItem] seek requested but videoRef is null for video id', video.id);
-                        } else {
-                          try {
-                            if (typeof v.setPositionAsync === 'function') {
-                              v.setPositionAsync(seekMs).catch((err: any) => console.warn('[VideoItem] setPositionAsync failed', err));
-                            } else if (typeof v.seek === 'function') {
-                              v.seek(seekMs / 1000);
-                            }
-                          } catch (err) { console.warn('[VideoItem] seek attempt threw', err); }
-                        }
-                      } else if (isYouTube) {
-                        const y = (youtubeRef.current as any);
-                        if (y && typeof y.seekTo === 'function') {
-                          try { y.seekTo(seekMs / 1000); } catch (err) { console.warn('[VideoItem] youtube seekTo failed', err); }
-                        } else {
-                          console.warn('[VideoItem] seek requested but youtubeRef or seekTo missing for video id', video.id);
-                        }
-                      }
-                    } catch (err) { console.warn('[VideoItem] seek error', err); }
-                    setPositionMillis(seekMs);
-                  } catch (err) {}
-                }}
-              >
-                {/* Compute safe percent; show 0% until progress is ready to avoid initial full bar */}
-                {(() => {
-                  const durForPct = (durationMillis > 0) ? durationMillis : (estimatedDurationRef.current || 0);
-                  const pct = (durForPct > 0 && isProgressReady) ? Math.min(100, Math.round((positionMillis / durForPct) * 100)) : 0;
-                  return <View style={{ width: `${pct}%`, height: '100%', backgroundColor: '#FF3333' }} />;
-                })()}
-                </View>
-              </View>
-            </View>
-          )}
+          {/* Progress UI removed per request */}
 
           <View pointerEvents="box-none" style={{ position: 'absolute', left: 8, right: 8, bottom: (24 + (bottomCardHeight || 52) + 84), zIndex: 1300, elevation: 16 }}>
             <TouchableOpacity onPress={() => {
@@ -1769,20 +1690,23 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
 };
 
 export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
+  // Default to unmuted (audio ON) at app start. Persist '0' if no preference exists.
   const [isMutedGlobal, setIsMutedGlobal] = useState<boolean>(false);
 
-  // Load persisted mute preference on mount
+  // Load persisted mute preference on mount; if missing, explicitly persist '0' (unmuted)
   useEffect(() => {
     (async () => {
       try {
         const v = await AsyncStorage.getItem('video_muted');
         if (v !== null) {
           setIsMutedGlobal(v === '1');
+          console.log('🔊 [VideoFeed] loaded persisted mute:', v === '1');
         } else {
-          // Default: audio enabled on initial open. Persist this default so subsequent
-          // openings behave consistently unless the user toggles mute.
+          // No preference found: default to unmuted and persist this choice so next open
+          // reflects the same audio-on behavior.
           try {
             await AsyncStorage.setItem('video_muted', '0');
+            console.log('🔊 [VideoFeed] no persisted mute found - defaulting to UNMUTED and persisting');
           } catch (e) {
             console.warn('Failed to persist default mute preference', e);
           }
@@ -1826,6 +1750,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
     setIsMutedGlobal(muted);
     try {
       await AsyncStorage.setItem('video_muted', muted ? '1' : '0');
+      console.log('🔊 [VideoFeed] setMutedGlobally persisted:', muted);
     } catch (e) {
       console.warn('Failed to save mute preference', e);
     }
@@ -2135,6 +2060,7 @@ export default function VideoFeed({ onClose, isDarkMode }: VideoFeedProps) {
         <Animated.FlatList
           ref={flatListRef}
           data={videos}
+          extraData={[isMutedGlobal, currentIndex]}
           keyExtractor={(item) => `video-${item.id}`}
           pagingEnabled
           showsVerticalScrollIndicator={false}
