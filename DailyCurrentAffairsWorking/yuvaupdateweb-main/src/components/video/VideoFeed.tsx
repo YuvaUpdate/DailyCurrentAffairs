@@ -342,7 +342,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
       {/* Platform indicator for embedded videos */}
       {videoType !== 'direct' && (
         <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-          {video.platformInfo?.detectedPlatform || 'Embedded Video'}
+          Source
         </div>
       )}
 
@@ -354,7 +354,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, isActive, onNext, onPr
           {/* Source + time (clickable) */}
           <button onClick={openSource} className="flex items-center gap-2 min-w-0 text-white text-left truncate focus:outline-none" style={{ background: 'transparent', border: 'none', padding: 0 }}>
             <ExternalLink className="w-5 h-5 text-white/90 flex-shrink-0" />
-            <div className="font-medium text-sm truncate">{video.originalSource?.sourcePlatform || 'Source'}</div>
+            <div className="font-medium text-sm truncate">Source</div>
             <div className="text-white/80 text-xs flex items-center gap-1 ml-2">
               <Clock className="w-4 h-4 text-white/70" />
               <span className="whitespace-nowrap">{formatRelativeTime(video.timestamp)}</span>
