@@ -25,6 +25,30 @@ const s3 = new S3({
   region: process.env.R2_REGION || 'auto'
 });
 
+// Root and health routes
+app.get('/', (req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`
+    <html>
+      <head><title>R2 Upload Proxy</title></head>
+      <body style="font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; line-height:1.6; padding:24px;">
+        <h1>R2 Upload Proxy</h1>
+        <p>This service provides two main endpoints used by the app:</p>
+        <ul>
+          <li><strong>POST</strong> <code>/api/r2/upload</code> - multipart/form-data file upload (field name: <code>file</code>)</li>
+          <li><strong>GET</strong> <code>/api/r2/media?path=&lt;object-key&gt;</code> - proxy media with Range + CORS support</li>
+        </ul>
+        <p>Use <a href="/api/r2/media">/api/r2/media?path=... (example)</a> to stream objects (requires <code>path</code>).</p>
+        <p><a href="/health">Health check</a></p>
+      </body>
+    </html>
+  `);
+});
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'r2-proxy', timestamp: Date.now() });
+});
+
 app.post('/api/r2/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
