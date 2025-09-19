@@ -25,6 +25,19 @@ const s3 = new S3({
   region: process.env.R2_REGION || 'auto'
 });
 
+// Basic CORS middleware for API endpoints (adjust in production as needed)
+app.use((req, res, next) => {
+  // Allow a specific origin if provided, otherwise allow all (use cautiously)
+  const allowedOrigin = process.env.CORS_ORIGIN || '*';
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+  // Handle preflight
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // Root and health routes
 app.get('/', (req, res) => {
   res.setHeader('Content-Type', 'text/html');
