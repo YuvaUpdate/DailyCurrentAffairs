@@ -11,3 +11,8 @@ export const ADMIN_PASSWORD = 'YuvaAdmin2025!';
 
 // Toggle admin auto-login for convenience in admin builds.
 export const ENABLE_ADMIN_AUTO_LOGIN = true;
+
+// Optional runtime API base used by mobile/native builds to resolve proxied
+// playback URLs that start with `/api/...`. Set this in buildConfig for
+// production mobile builds or set `globalThis.API_BASE` at startup.
+export const API_BASE = '';

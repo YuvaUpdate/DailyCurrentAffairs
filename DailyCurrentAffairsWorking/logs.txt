@@ -1,483 +1,114 @@
-PS E:\DailyCurrentAffairs\DailyCurrentAffairsWorking> npx expo run:android --variant debug
-› Building app...
-Configuration on demand is an incubating feature.
-
-> Configure project :
-[ExpoRootProject] Using the following versions:
-  - buildTools:  35.0.0
-  - minSdk:      24
-  - compileSdk:  35
-  - targetSdk:   35
-  - ndk:         27.1.12297006
-  - kotlin:      2.0.21
-  - ksp:         2.0.21-1.0.28
-
-> Configure project :react-native-firebase_app
-:react-native-firebase_app package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\app\package.json
-:react-native-firebase_app:firebase.bom using default value: 34.1.0
-:react-native-firebase_app:play.play-services-auth using default value: 21.4.0
-:react-native-firebase_app package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\app\package.json
-:react-native-firebase_app:version set from package.json: 23.0.1 (23,0,1 - 23000001)
-:react-native-firebase_app:android.compileSdk using custom value: 35
-:react-native-firebase_app:android.targetSdk using custom value: 35
-:react-native-firebase_app:android.minSdk using custom value: 24
-:react-native-firebase_app:reactNativeAndroidDir E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\react-native\android    
-
-> Configure project :react-native-firebase_auth
-:react-native-firebase_auth package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\auth\package.json
-:react-native-firebase_app package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\app\package.json
-:react-native-firebase_auth:firebase.bom using default value: 34.1.0
-:react-native-firebase_auth package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\auth\package.json
-:react-native-firebase_auth:version set from package.json: 23.0.1 (23,0,1 - 23000001)
-:react-native-firebase_auth:android.compileSdk using custom value: 35
-:react-native-firebase_auth:android.targetSdk using custom value: 35
-:react-native-firebase_auth:android.minSdk using custom value: 24
-:react-native-firebase_auth:reactNativeAndroidDir E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\react-native\android   
-
-> Configure project :react-native-firebase_firestore
-:react-native-firebase_firestore package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\firestore\package.json
-:react-native-firebase_app package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\app\package.json
-:react-native-firebase_firestore:firebase.bom using default value: 34.1.0
-:react-native-firebase_firestore package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\firestore\package.json
-:react-native-firebase_firestore:version set from package.json: 23.0.1 (23,0,1 - 23000001)
-:react-native-firebase_firestore:android.compileSdk using custom value: 35
-:react-native-firebase_firestore:android.targetSdk using custom value: 35
-:react-native-firebase_firestore:android.minSdk using custom value: 24
-:react-native-firebase_firestore:reactNativeAndroidDir E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\react-native\android
-
-> Configure project :react-native-firebase_messaging
-:react-native-firebase_messaging package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\messaging\package.json
-:react-native-firebase_app package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\app\package.json
-:react-native-firebase_messaging:firebase.bom using default value: 34.1.0
-:react-native-firebase_messaging package.json found at E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\@react-native-firebase\messaging\package.json
-:react-native-firebase_messaging:version set from package.json: 23.0.1 (23,0,1 - 23000001)
-:react-native-firebase_messaging:android.compileSdk using custom value: 35
-:react-native-firebase_messaging:android.targetSdk using custom value: 35
-:react-native-firebase_messaging:android.minSdk using custom value: 24
-:react-native-firebase_messaging:reactNativeAndroidDir E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\node_modules\react-native\android
-
-> Configure project :expo
-
-Using expo modules
-  - expo-constants (17.1.7)
-  - expo-image-loader (5.1.0)
-  - expo-modules-core (2.5.0)
-  - [?] expo-application (6.1.5)
-  - [?] expo-asset (11.1.7)
-  - [?] expo-audio (0.4.9)
-  - [?] expo-av (15.1.7)
-  - [?] expo-device (7.1.4)
-  - [?] expo-file-system (18.1.11)
-  - [?] expo-font (13.3.2)
-  - [?] expo-image-picker (16.1.4)
-  - [?] expo-keep-awake (14.1.4)
-  - [?] expo-notifications (0.31.4)
-  - [?] expo-speech (13.1.7)
-  - [?] expo-video (2.2.2)
-
-
-[Incubating] Problems report is available at: file:///E:/DailyCurrentAffairs/DailyCurrentAffairsWorking/android/build/reports/problems/problems-report.html
-
-Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
-
-You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
-
-For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
-
-BUILD SUCCESSFUL in 13s
-373 actionable tasks: 9 executed, 364 up-to-date
-Starting Metro Bundler
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-█ ▄▄▄▄▄ ██▀▀▄▄▄██▄▄ ▄▀ ▄██▀ █ █ ▄▄▄▄▄ █
-█ █   █ █▀███ ▀ ▀ ▀▀▄█ ▄▀▀▀▄▀ █ █   █ █
-█ █▄▄▄█ █▄▄█▀▀▀▄█▀█▄▄▀█▀▄ █▀███ █▄▄▄█ █
-█▄▄▄▄▄▄▄█▄█ ▀▄█▄▀▄█▄█ █▄█▄█ ▀▄█▄▄▄▄▄▄▄█
-█▄ ▀██ ▄▄▀▄█▄▀▄█  ▄▄▀▀▀ ▀█ ▄▀ ██▀ ▄▀███
-██▀▄█ ▄▄█▄█▄█▀█▄ ▄▄ ██▄▀▀▄██  ▄▄▀▄▀█▄ █
-██ █▄▄▄▄▀ ▀▄▄▄█▄ █▄▀ ▀██▀▄█▀  █▄ █▄▀█▄█
-██▄▀█  ▄  ▀▀ ▄█▄▄ ▄▀██▄▄███▀ █▀ ▄▀▀▀ ▄█
-█ ▄▀ ▀▄▄▀  █▄▀▄▀ ▄▄ ▀ ▀▄▀▄ ▄▀▀▄▄▀▄  ███
-█  ▄█▀█▄▀█▄▄▄▀█   ▄█▄ ██▄██▀▄█ ▀ ▄ ▄▄ █
-██▄█▀▀▀▄▀█▀ █▄█ ▀▀▄▄▀▄█▄ ▄ ▀▀█ ▄  █▄▀▄█
-█▄██ ▄ ▄█ ▀█ ▄█▀▄▀▄ ██▄▄█ █  ▄█▄▀ ▀█▄ █
-█▀▄█▄▄ ▄ ▀▀██▀▀  █▄▀▀ ▀▄ ███▀ ▀▄ █▄█ ██
-█ █▀▀██▄▀█▄██▀█▀▄█▄▀█▄█▄▀██  ▀▀▄ ▀▀   █
-█▄██▄▄█▄█ █▄█▄▄▀ ▄▄▄ ▄▀▀ ▄▄▄  ▄▄▄ ▀▄▄▄█
-█ ▄▄▄▄▄ █  █▀▄▄▄ ▄▄▄▄ █▀▄▄▄▀▀ █▄█ ▀▄█ █
-█ █   █ ██▄ ▄  █  ▄▄ ██▄ ▄▄▄ ▄  ▄▄█ █▄█
-█ █▄▄▄█ █▀▀ █▀██ ▀█ ▀█▄ ██▄▄█  ▀▄▀ ▄▄ █
-█▄▄▄▄▄▄▄█▄█▄▄██▄█▄█▄▄███▄▄███▄██▄▄███▄█
-
-› Metro waiting on exp+dailycurrentaffairsworking://expo-development-client/?url=http%3A%2F%2F10.244.133.124%3A8081
-› Scan the QR code above to open the project in a development build. Learn more: https://expo.fyi/start
-
-› Web is waiting on http://localhost:8081
-
-› Using development build
-› Press s │ switch to Expo Go
-
-› Press a │ open Android
-› Press w │ open web
-
-› Press j │ open debugger
-› Press r │ reload app
-› Press m │ toggle menu
-› shift+m │ more tools
-› Press o │ open project code in your editor
-
-› Press ? │ show all commands
-
-› Installing E:\DailyCurrentAffairs\DailyCurrentAffairsWorking\android\app\build\outputs\apk\debug\app-debug.apk
-› Opening exp+dailycurrentaffairsworking://expo-development-client/?url=http%3A%2F%2F10.244.133.124%3A8081 on CPH2495
-
-› Logs for your project will appear below. Press Ctrl+C to exit.
-Android Bundled 1059ms index.ts (1009 modules)
- LOG  [firebaseInit] Module evaluation start. Existing apps count BEFORE: 1
- LOG  [firebaseInit] ✅ Existing Firebase app detected: yuvaupdate-3762b
- LOG  [firebaseInit] AFTER init apps count: 1
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `setBackgroundMessageHandler`. Please use `setBackgroundMessageHandler()` instead.
- LOG  ✅ Firebase background message handler registered
- LOG  ✅ [YouTubePlayer] Native YouTube player loaded successfully
- WARN  [expo-av]: Expo AV has been deprecated and will be removed in SDK 54. Use the `expo-audio` and `expo-video` packages to replace the required functionality.
- LOG  ✅ Native audio system initialized
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
- LOG  🚀 InitializationService: Starting service initialization...
- LOG  🔬 Firebase debug function exposed globally. Use: testFirebaseConnection()
- LOG  🎯 Waiting for services to initialize before onboarding...
- WARN  [2025-09-16T15:19:36.152Z]  @firebase/auth: Auth (12.1.0): 
-You are initializing Firebase Auth for React Native without providing
-AsyncStorage. Auth state will default to memory persistence and will not
-persist between sessions. In order to persist auth state, install the package
-"@react-native-async-storage/async-storage" and provide it to
-initializeAuth:
-
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-});
- WARN  [2025-09-16T15:19:36.185Z]  @firebase/analytics: Analytics: Firebase Analytics is not supported in this environment. Wrap initialization of analytics in analytics.isSupported() to prevent initialization in unsupported environments. Details: (1) Cookies are not available. (analytics/invalid-analytics-context).
- WARN  [2025-09-16T15:19:36.203Z]  @firebase/analytics: Analytics: IndexedDB unavailable or restricted in this environment. Wrap initialization of analytics in analytics.isSupported() to prevent initialization in unsupported environments. Details: IndexedDB is not available in this environment. (analytics/indexeddb-unavailable).
- LOG  🚀 App startup: FORCING immediate fresh article fetch...
- LOG  AppWrapper.checkAuthState: attaching onAuthStateChanged listener                                                                  
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
- DEBUG  🔐 auth state changed handler called - user: null
- LOG  AppWrapper.onAuthStateChanged callback, user= null
- LOG  ✅ InitializationService: Firebase Auth ready
- LOG  ✅ InitializationService: Image prefetch service ready
-Android Bundled 147ms FirebaseNewsService.ts (51 modules)
- LOG  📢 TTS Service initialized, voices available: 473                                                                                 
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
- DEBUG  Loading bookmarks for uid: Uwmzs1J8kkUdeAdsz1ngULLnzNj1
- LOG  AsyncStorage.ya_logged_in= true
- LOG  AsyncStorage.ya_user_uid= Uwmzs1J8kkUdeAdsz1ngULLnzNj1
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
- DEBUG  🔐 persisted ya_user_uid: Uwmzs1J8kkUdeAdsz1ngULLnzNj1 ya_logged_in: true
- INFO  🔐 Admin auto-login enabled; signing in...
-Android Bundled 503ms FirebaseNotificationService.ts (594 modules)
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
- LOG  � Setting up real-time subscription for ongoing updates...
- LOG  🚨 Emergency cleanup: Clearing ALL notification handlers
- LOG  🧹 Cleaning up all existing notification handlers...
- LOG  ✅ All notification handlers cleaned up
- LOG  🔍 Testing notification status...
- LOG  📱 Initialized: false
- LOG  🪙 Has Token: false
- LOG  ✅ Emergency cleanup complete
- LOG  🔔 Initializing Firebase messaging...
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
-Android Bundled 261ms node_modules\@react-native-firebase\messaging\lib\index.js (621 modules)
- LOG  🎉 InitializationService: All services initialized successfully
- LOG  ✅ All services ready, checking onboarding status
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `hasPermission`. Please use `hasPermission()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `requestPermission`. Please use `requestPermission()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `AuthorizationStatus`. Please use `AuthorizationStatus` instead.
- LOG  🔐 FCM Permission status: 1
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `getToken`. Please use `getToken()` instead.
- LOG  👍 Onboarding already seen, skipping
- LOG  🔐 Permission Status: 1
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `getToken`. Please use `getToken()` instead.
- LOG  📱 FCM Token obtained: fPf2mAJ2TvWFe2CtmEo9...
- LOG  📱 Current Token: fPf2mAJ2TvWFe2CtmEo9...
- DEBUG  Firebase notification status tested
- LOG  ✅ OnboardingCards: All services ready
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
- LOG  ✅ User bookmarks retrieved: 0
- DEBUG  Retrieved bookmarks from server: 0
- DEBUG  🔐 auth state changed handler called - user: Uwmzs1J8kkUdeAdsz1ngULLnzNj1
- DEBUG  🔐 persisted ya_user_uid: Uwmzs1J8kkUdeAdsz1ngULLnzNj1 ya_logged_in: true
- LOG  ✅ FORCED fresh articles loaded on startup: 82
- ERROR  Warning: Invalid prop `onLayout` supplied to `React.Fragment`. React.Fragment can only have `key` and `children` props.
-
-Call Stack
-  AndroidSwipeRefreshLayout (<anonymous>)
-  Wrapper (<anonymous>)
-  RNCSafeAreaProvider (<anonymous>)
-  Root (<anonymous>)
- LOG  🔥 Starting image cache warm-up for faster loading...
- LOG  🖼️ Warming up cache with 25 critical images
- LOG  🔥 Warming up cache with 25 critical images
- LOG  🔄 Real-time subscription received articles: 82
- LOG  ✅ Articles updated in state via subscription, filtered applied
- DEBUG  Bookmark ids loaded: []
- LOG  ✅ User logged in successfully: {"displayName": "Unnamed", "email": "admin@yuvaupdate.com", "isAdmin": true, "isVerified": false, "joinedAt": {"nanoseconds": 482000000, "seconds": 1758016652, "type": "firestore/timestamp/1.0"}, "role": "admin", "uid": "Uwmzs1J8kkUdeAdsz1ngULLnzNj1"}
- DEBUG  Loading bookmarks for uid: Uwmzs1J8kkUdeAdsz1ngULLnzNj1
- DEBUG  Image loaded successfully: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FCrime%2Fimages%2F1758032984206_image_search_1758032920676.jpg?alt=media&token=bb22dfc8-6753-4819-9ade-014bf192d16b
- LOG  AuthService.login: persisted ya_logged_in and ya_user_uid= Uwmzs1J8kkUdeAdsz1ngULLnzNj1
- DEBUG  Loading bookmarks for uid: Uwmzs1J8kkUdeAdsz1ngULLnzNj1
- LOG  ✅ User bookmarks retrieved: 0
- DEBUG  Retrieved bookmarks from server: 0
- LOG  ✅ User bookmarks retrieved: 0
- DEBUG  Retrieved bookmarks from server: 0
- DEBUG  Bookmark ids loaded: []
- DEBUG  Bookmark ids loaded: []
- LOG  🔄 [VideoFeed] Loading videos with optimization...
- LOG  📦 [VideoCache] Retrieved 3 cached video metadata entries
- LOG  ⚡ [VideoFeed] Using cached videos for instant display: 3
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FGeneral%2Fvideos%2F1758017905598_____________Watch_______1_.mp4?alt=media&token=2bb3dc70-5c88-45e4-9805-2f098ad8a47e -> YouTube: false
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FGeneral%2Fvideos%2F1758017905598_____________Watch_______1_.mp4?alt=media&token=2bb3dc70-5c88-45e4-9805-2f098ad8a47e -> YouTube: false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  ⚠️ [expo-av]: Video component from `expo-av` is deprecated in favor of `expo-video`. See the documentation at https://docs.expo.deev/versions/latest/sdk/video/ for the new API reference.
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FTechnology%2Fvideos%2F1758017773111_ssvid.net--There-s-a-quote-that-says-the-worst-mistake-entrepreneurs-and__1_.mp4?alt=media&token=1010182c-d8ab-44cd-844e-bf9fbe54c550 -> YouTube: false
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FTechnology%2Fvideos%2F1758017773111_ssvid.net--There-s-a-quote-that-says-the-worst-mistake-entrepreneurs-and__1_.mp4?alt=media&token=1010182c-d8ab-44cd-844e-bf9fbe54c550 -> YouTube: false
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FGeneral%2Fvideos%2F1758014233529_ssvid.net--The-Founders-Who-Made-Coffee-WITHOUT-Hot-Water__1_.mp4?alt=media&token=89298450-a186-4d59-ba3b-6d3b4f9f577f -> YouTube: false
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FGeneral%2Fvideos%2F1758014233529_ssvid.net--The-Founders-Who-Made-Coffee-WITHOUT-Hot-Water__1_.mp4?alt=media&token=89298450-a186-4d59-ba3b-6d3b4f9f577f -> YouTube: false
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FGeneral%2Fvideos%2F1758017905598_____________Watch_______1_.mp4?alt=media&token=2bb3dc70-5c88-45e4-9805-2f098ad8a47e -> YouTube: false
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FTechnology%2Fvideos%2F1758017773111_ssvid.net--There-s-a-quote-that-says-the-worst-mistake-entrepreneurs-and__1_.mp4?alt=media&token=1010182c-d8ab-44cd-844e-bf9fbe54c550 -> YouTube: false
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FGeneral%2Fvideos%2F1758014233529_ssvid.net--The-Founders-Who-Made-Coffee-WITHOUT-Hot-Water__1_.mp4?alt=media&token=89298450-a186-4d59-ba3b-6d3b4f9f577f -> YouTube: false
- LOG  📊 [VideoFeed] Video breakdown - YouTube: 0 Regular: 3
- LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: true, Ready: false, Platform: android
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  ⚡ [VideoItem] Force-play fallback requested but videoRef is null for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  🔁 [VideoItem] Requesting remount because videoRef is missing for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: false, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id uNp93INRPicBeVgNm0JW true
+ LOG  🔁 [VideoItem] Requesting remount because pause was requested but videoRef is missing for id uNp93INRPicBeVgNm0JW
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758215479329_9bc1768e-8782-4cc8-a667-00f53302592c.mp4 -> YouTube: false
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758214065150_9cfa3da3-10ca-4426-8a3d-9e52c61369a8.mp4 -> YouTube: false
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id VtRVbxaSHs8JcaLWP1ec false
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `batch`. Please use `writeBatch()` instead.
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `FieldValue`. Please use `FieldValue` instead.
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `increment`. Please use `increment()` instead.
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.
- LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: false, Loading: true, Ready: false, Platform: android
- LOG  � [VideoItem] "Test..." - YouTube: false, Iframe: false, Active: false, Loading: true, Ready: false, Platform: android
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: true, Ready: true, Platform: android
- LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: false, Loading: true, Ready: true, Platform: android
- LOG  � [VideoItem] "Test..." - YouTube: false, Iframe: false, Active: false, Loading: true, Ready: true, Platform: android
- LOG  🚀 [VideoFeed] Preloading video: test
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FGeneral%2Fvideos%2F1758017905598_____________Watch_______1_.mp4?alt=media&token=2bb3dc70-5c88-45e4-9805-2f098ad8a47e -> YouTube: false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  🚀 [VideoFeed] Preloading video: test
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FTechnology%2Fvideos%2F1758017773111_ssvid.net--There-s-a-quote-that-says-the-worst-mistake-entrepreneurs-and__1_.mp4?alt=media&token=1010182c-d8ab-44cd-844e-bf9fbe54c550 -> YouTube: false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  🚀 [VideoFeed] Preloading video: Test
- LOG  🔍 [VideoFeed] URL check: https://firebasestorage.googleapis.com/v0/b/yuvaupdate-3762b.firebasestorage.app/o/media%2FGeneral%2Fvideos%2F1758014233529_ssvid.net--The-Founders-Who-Made-Coffee-WITHOUT-Hot-Water__1_.mp4?alt=media&token=89298450-a186-4d59-ba3b-6d3b4f9f577f -> YouTube: false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  ⏰ Force hiding loading animation after timeout for video: test
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: false, Ready: true, Platform: android
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  ⏰ Force hiding loading animation after timeout for video: test
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  ⚡ [VideoItem] Force-play fallback requested but videoRef is null for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  🔁 [VideoItem] Requesting remount because videoRef is missing for video id VtRVbxaSHs8JcaLWP1ec
  LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: false, Loading: false, Ready: true, Platform: android
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  ⏰ Force hiding loading animation after timeout for video: Test
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  � [VideoItem] "Test..." - YouTube: false, Iframe: false, Active: false, Loading: false, Ready: true, Platform: android
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  👀 [VideoFeed] Current video: 0 undefined YouTube: false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
+ LOG  🔊 [VideoItem] isMuted prop for id uNp93INRPicBeVgNm0JW true
+ LOG  🔁 [VideoItem] Requesting remount because pause was requested but videoRef is missing for id uNp93INRPicBeVgNm0JW
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758215479329_9bc1768e-8782-4cc8-a667-00f53302592c.mp4 -> YouTube: false
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758214065150_9cfa3da3-10ca-4426-8a3d-9e52c61369a8.mp4 -> YouTube: false
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id VtRVbxaSHs8JcaLWP1ec false
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `batch`. Please use `writeBatch()` instead.
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
  WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
- WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `where`. Please use `where()` instead.
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  📹 Loaded 3 videos
- LOG  🔄 [VideoFeed] Refreshed with fresh videos: 3
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  📦 [VideoCache] Cached 3 video metadata entries
- LOG  📊 Video view tracked: kSW1k2RcYrUC5tmZknEB
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] play/pause pressed for mckwyj5GqUe0f8lqp7nY manuallyPaused= false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": true, "propsIsMuted": false}
- LOG  [VideoItem][DEV] play/pause pressed for mckwyj5GqUe0f8lqp7nY manuallyPaused= true
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] play/pause pressed for mckwyj5GqUe0f8lqp7nY manuallyPaused= false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": true, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": true, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": true, "propsIsMuted": false}
- LOG  [VideoItem][DEV] play/pause pressed for mckwyj5GqUe0f8lqp7nY manuallyPaused= true
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] mute button pressed for mckwyj5GqUe0f8lqp7nY currentMuted= false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] mute button pressed for mckwyj5GqUe0f8lqp7nY currentMuted= true
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] mute button pressed for mckwyj5GqUe0f8lqp7nY currentMuted= false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] mute button pressed for mckwyj5GqUe0f8lqp7nY currentMuted= true
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] mute button pressed for mckwyj5GqUe0f8lqp7nY currentMuted= false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": true}
- LOG  [VideoItem][DEV] mute button pressed for mckwyj5GqUe0f8lqp7nY currentMuted= true
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] play/pause pressed for mckwyj5GqUe0f8lqp7nY manuallyPaused= false
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for ILAPYiwp7SRh9BxBJuEY {"isActive": false, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for mckwyj5GqUe0f8lqp7nY {"isActive": false, "propsIsManuallyPaused": true, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
- LOG  [VideoItem][DEV] render controls for kSW1k2RcYrUC5tmZknEB {"isActive": true, "propsIsManuallyPaused": false, "propsIsMuted": false}
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `FieldValue`. Please use `FieldValue` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `increment`. Please use `increment()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  ⚡ [VideoItem] Force-play fallback requested but videoRef is null for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  🔁 [VideoItem] Requesting remount because videoRef is missing for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: false, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id uNp93INRPicBeVgNm0JW true
+ LOG  🔁 [VideoItem] Requesting remount because pause was requested but videoRef is missing for id uNp93INRPicBeVgNm0JW
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758215479329_9bc1768e-8782-4cc8-a667-00f53302592c.mp4 -> YouTube: false
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758214065150_9cfa3da3-10ca-4426-8a3d-9e52c61369a8.mp4 -> YouTube: false
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id VtRVbxaSHs8JcaLWP1ec false
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `batch`. Please use `writeBatch()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `FieldValue`. Please use `FieldValue` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `increment`. Please use `increment()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  ⚡ [VideoItem] Force-play fallback requested but videoRef is null for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  🔁 [VideoItem] Requesting remount because videoRef is missing for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: false, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id uNp93INRPicBeVgNm0JW true
+ LOG  🔁 [VideoItem] Requesting remount because pause was requested but videoRef is missing for id uNp93INRPicBeVgNm0JW
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758215479329_9bc1768e-8782-4cc8-a667-00f53302592c.mp4 -> YouTube: false
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758214065150_9cfa3da3-10ca-4426-8a3d-9e52c61369a8.mp4 -> YouTube: false
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id VtRVbxaSHs8JcaLWP1ec false
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `batch`. Please use `writeBatch()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `FieldValue`. Please use `FieldValue` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `increment`. Please use `increment()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  ⚡ [VideoItem] Force-play fallback requested but videoRef is null for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  🔁 [VideoItem] Requesting remount because videoRef is missing for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: false, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id uNp93INRPicBeVgNm0JW true
+ LOG  🔁 [VideoItem] Requesting remount because pause was requested but videoRef is missing for id uNp93INRPicBeVgNm0JW
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758215479329_9bc1768e-8782-4cc8-a667-00f53302592c.mp4 -> YouTube: false
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758214065150_9cfa3da3-10ca-4426-8a3d-9e52c61369a8.mp4 -> YouTube: false
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id VtRVbxaSHs8JcaLWP1ec false
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `batch`. Please use `writeBatch()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `FieldValue`. Please use `FieldValue` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `increment`. Please use `increment()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  ⚡ [VideoItem] Force-play fallback requested but videoRef is null for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  🔁 [VideoItem] Requesting remount because videoRef is missing for video id VtRVbxaSHs8JcaLWP1ec
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: false, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id uNp93INRPicBeVgNm0JW true
+ LOG  🔁 [VideoItem] Requesting remount because pause was requested but videoRef is missing for id uNp93INRPicBeVgNm0JW
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758215479329_9bc1768e-8782-4cc8-a667-00f53302592c.mp4 -> YouTube: false
+ LOG  🔍 [VideoFeed] URL check: /api/r2/media?path=General%2F1758214065150_9cfa3da3-10ca-4426-8a3d-9e52c61369a8.mp4 -> YouTube: false
+ LOG  � [VideoItem] "test..." - YouTube: false, Iframe: false, Active: true, Loading: false, Ready: true, Platform: android
+ LOG  🔊 [VideoItem] isMuted prop for id VtRVbxaSHs8JcaLWP1ec false
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `batch`. Please use `writeBatch()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22 Please use `getApp()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `collection`. Please use `collection()` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `doc`. Please use `doc()` instead.  
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `FieldValue`. Please use `FieldValue` instead.
+ WARN  This method is deprecated (as well as all React Native Firebase namespaced API) and will be removed in the next major release as part of move to match Firebase Web modular SDK API. Please see migration guide for more details: https://rnfirebase.io/migrating-to-v22. Method called was `increment`. Please use `increment()` instead.

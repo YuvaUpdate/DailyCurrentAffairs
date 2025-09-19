@@ -36,6 +36,33 @@ function safeRequire(name: string) {
   }
 }
 
+// Normalize playback URL for proxied R2 media paths so native apps can
+// resolve `/api/...` paths to an absolute URL when the backend is deployed
+// on a different origin. Priority:
+// 1. If VITE_API_BASE_URL is available at build time (web), use it.
+// 2. If `globalThis.API_BASE` is set at runtime (recommended for native builds), use it.
+// 3. Otherwise, return the original value unchanged.
+function normalizePlaybackUrl(rawUrl?: string): string | undefined {
+  if (!rawUrl) return rawUrl;
+  try {
+    // If already absolute, return as-is
+    if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+
+    // If it's already a proxied absolute path from server-side (e.g. /api/r2/media?...)
+    if (rawUrl.startsWith('/api/')) {
+        // Use runtime global if set by the app bootstrap (recommended).
+        // Support both `globalThis.API_BASE` and `window.__API_BASE__` injected by web admin.
+        const runtimeBase = (globalThis as any)?.API_BASE || (typeof window !== 'undefined' ? (window as any).__API_BASE__ : undefined);
+        if (runtimeBase && typeof runtimeBase === 'string' && runtimeBase.trim() !== '') {
+          return runtimeBase.replace(/\/$/, '') + rawUrl;
+        }
+    }
+  } catch (e) {
+    // ignore and return original
+  }
+  return rawUrl;
+}
+
 // Safe helper for keep-awake: prefer expo-keep-awake when available, otherwise noop functions
 function safeKeepAwake() {
   try {
@@ -691,6 +718,32 @@ interface VideoItemProps {
   isFirst?: boolean;
 }
 
+// Track remount requests per-id to avoid spamming logs and repeated remounts
+// Use a richer structure to implement attempt counting and exponential backoff
+const remountRequested: Record<string, boolean> = {};
+const remountAttemptsGlobal: Record<string, { attempts: number; lastAttemptTs: number }> = {};
+
+const MAX_REMOUNT_ATTEMPTS = 3;
+const shouldAttemptRemount = (id: string) => {
+  try {
+    const meta = remountAttemptsGlobal[id] || { attempts: 0, lastAttemptTs: 0 };
+    const now = Date.now();
+    const attempts = meta.attempts || 0;
+    // exponential backoff: wait 2^attempts * 1000 ms before next try
+    const backoffMs = Math.pow(2, attempts) * 1000;
+    if (attempts >= MAX_REMOUNT_ATTEMPTS) return false;
+    if (now - (meta.lastAttemptTs || 0) < backoffMs) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+const noteRemountAttempt = (id: string) => {
+  const meta = remountAttemptsGlobal[id] || { attempts: 0, lastAttemptTs: 0 };
+  remountAttemptsGlobal[id] = { attempts: (meta.attempts || 0) + 1, lastAttemptTs: Date.now() };
+};
+
 const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext, isDarkMode, isPreloaded = false, bottomCardHeight = 0, isManuallyPaused = false, onManualPauseChange, isMuted = false, onMuteChange, onBottomCardLayout, onShare: onShareProp, remountVersion = 0, onRequestRemount, isFirst = false }) => {
   const videoRef = useRef<any>(null);
   const youtubeRef = useRef<YouTubeVideoPlayerRef>(null);
@@ -716,7 +769,10 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
 
   const isYouTube = useMemo(() => isYouTubeUrl(video.videoUrl), [video.videoUrl]);
   const isIframeEmbeddable = useMemo(() => isIframeEmbeddableUrl(video.videoUrl), [video.videoUrl]);
-  const isValidUrl = useMemo(() => isValidVideoUrl(video.videoUrl), [video.videoUrl]);
+  // Normalize any proxied relative URLs (e.g. `/api/r2/media?...`) to absolute
+  // when possible so native players can load them. Then validate the normalized URL.
+  const normalizedUrl = useMemo(() => normalizePlaybackUrl(video.videoUrl), [video.videoUrl]);
+  const isValidUrl = useMemo(() => isValidVideoUrl(normalizedUrl || ''), [normalizedUrl]);
 
   // Instant loading state management for smooth scrolling
   const [isLoading, setIsLoading] = useState(!isYouTube && !isIframeEmbeddable && !isPreloaded && isValidUrl); // Preloaded videos skip loading
@@ -728,8 +784,8 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
     console.log(`� [VideoItem] "${video.title?.substring(0, 30)}..." - YouTube: ${isYouTube}, Iframe: ${isIframeEmbeddable}, Active: ${isActive}, Loading: ${isLoading}, Ready: ${isVideoReady}, Platform: ${Platform.OS}`);
 
     if (isIframeEmbeddable) {
-      console.log(`🖼️ [VideoItem] Iframe source detected:`, video.videoUrl);
-      console.log(`🖼️ [VideoItem] Will use embed URL:`, convertToEmbedUrl(video.videoUrl));
+      console.log(`🖼️ [VideoItem] Iframe source detected:`, normalizedUrl || video.videoUrl);
+      console.log(`🖼️ [VideoItem] Will use embed URL:`, convertToEmbedUrl(normalizedUrl || video.videoUrl));
     }
   }, [isYouTube, isIframeEmbeddable, isActive, isLoading, isVideoReady, video.title, video.videoUrl]);
 
@@ -839,14 +895,19 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
         const tryStart = (attempt = 0) => {
           setTimeout(async () => {
             const v = videoRef.current;
-            if (!v) {
-              if (attempt < 8) {
-                tryStart(attempt + 1);
-              } else {
-                console.warn('[VideoItem] play requested but videoRef is null for video id', video.id);
+              if (!v) {
+                if (attempt < 8) {
+                  tryStart(attempt + 1);
+                } else {
+                  // Avoid spamming the logs and remount requests for the same id
+                  if (!remountRequested[video.id]) {
+                    console.warn('[VideoItem] play requested but videoRef is null for video id', video.id);
+                    remountRequested[video.id] = true;
+                    try { onRequestRemount && onRequestRemount(video.id); } catch (e) {}
+                  }
+                }
+                return;
               }
-              return;
-            }
 
             // If using react-native-video, attempt to nudge the player via native props
             if (useReactNativeVideo && Platform.OS !== 'web') {
@@ -929,7 +990,16 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
       else if (!isYouTube) {
         const v = videoRef.current;
         if (!v) {
-          console.warn('[VideoItem] pause requested but videoRef is null for video id', video.id);
+          // videoRef missing - may be unmounted or not yet attached; request a remount once if configured
+          if (typeof onRequestRemount === 'function' && remountAttemptsRef.current < 1) {
+            remountAttemptsRef.current += 1;
+            console.log('🔁 [VideoItem] Requesting remount because pause was requested but videoRef is missing for id', video.id);
+            try { onRequestRemount(video.id); } catch (e) {}
+          } else {
+            // Avoid noisy repeated warnings
+            // console.warn('[VideoItem] pause requested but videoRef is null for video id', video.id);
+          }
+          return;
         } else {
           try {
             if (Platform.OS === 'web') {
@@ -1184,6 +1254,15 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
       const v = videoRef.current;
       if (!v) {
         console.warn('⚡ [VideoItem] Force-play fallback requested but videoRef is null for video id', video.id);
+        // Backoff-aware remount
+        if (shouldAttemptRemount(String(video.id))) {
+          noteRemountAttempt(String(video.id));
+          console.log('🔁 [VideoItem] Requesting remount (backoff) because videoRef is missing for video id', video.id);
+          try { onRequestRemount && onRequestRemount(video.id); } catch (e) {}
+        } else {
+          console.warn('⚡ [VideoItem] Remount attempts exhausted for video id', video.id, '-> marking error');
+          setHasError(true);
+        }
         forcePlayDoneRef.current = true;
         return;
       }
@@ -1366,7 +1445,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
               <YouTubeVideoPlayer
                 key={`youtube-${video.id}`} // Stable key to prevent recreation
                 ref={youtubeRef}
-                videoUrl={video.videoUrl}
+                videoUrl={normalizedUrl || video.videoUrl}
                 isActive={isActive}
                 style={styles.video}
                 onLoadStart={() => {
@@ -1391,7 +1470,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
             {Platform.OS === 'web' && IframeVideo ? (
               <IframeVideo
                 key={`iframe-${video.id}`}
-                source={{ uri: convertToEmbedUrl(video.videoUrl) }}
+                source={{ uri: convertToEmbedUrl(normalizedUrl || video.videoUrl) }}
                 style={styles.video}
                 onLoadStart={() => {
                   console.log('🖼️ [VideoItem] Iframe onLoadStart for:', video.title?.substring(0, 30));
@@ -1447,8 +1526,8 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
               <Text style={[styles.errorSubtext, { color: theme.subText }]}>
                 This video cannot be played due to an unsupported or blocked source
               </Text>
-              <Text style={[styles.errorUrl, { color: theme.subText }]}>
-                {video.videoUrl.length > 50 ? video.videoUrl.substring(0, 50) + '...' : video.videoUrl}
+                <Text style={[styles.errorUrl, { color: theme.subText }]}> 
+                {(normalizedUrl || video.videoUrl).length > 50 ? (normalizedUrl || video.videoUrl).substring(0, 50) + '...' : (normalizedUrl || video.videoUrl)}
               </Text>
             </View>
           </View>
@@ -1460,10 +1539,30 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
             activeOpacity={1}
             onPress={toggleControls}
           >
+            {/* If we have unrecoverable remount attempts for this id, show placeholder UI instead of trying to mount repeatedly */}
+            {remountAttemptsGlobal[String(video.id)] && remountAttemptsGlobal[String(video.id)].attempts >= MAX_REMOUNT_ATTEMPTS && hasError ? (
+              <View style={[styles.videoPlaceholder, { backgroundColor: '#000' }]}> 
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Video unavailable</Text>
+                <Text style={{ color: '#ccc', fontSize: 12, marginTop: 8, paddingHorizontal: 20, textAlign: 'center' }}>This video could not be loaded automatically. You can retry manually.</Text>
+                <TouchableOpacity onPress={() => {
+                  // Clear remount attempts and request remount again
+                  try {
+                    remountAttemptsGlobal[String(video.id)] = { attempts: 0, lastAttemptTs: 0 };
+                    remountRequested[video.id] = false;
+                    setHasError(false);
+                    setIsLoading(true);
+                    // bump remount map so child will re-create
+                    try { onRequestRemount && onRequestRemount(video.id); } catch (e) {}
+                  } catch (e) { console.warn('Retry click failed', e); }
+                }} style={{ marginTop: 12, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#007AFF', borderRadius: 8 }}>
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
             <VideoComponent
               key={`video-component-${video.id}`}
               ref={videoRef}
-              source={{ uri: video.videoUrl }}
+              source={{ uri: normalizedUrl || video.videoUrl }}
               style={styles.video}
               onLoadStart={() => {
                 // Only show loading for non-preloaded videos
@@ -1472,53 +1571,71 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, isActive, onPress, onNext,
                 }
               }}
               onLoad={() => {
-                if (loadingTimeoutRef.current) {
-                  clearTimeout(loadingTimeoutRef.current);
-                }
-                setIsLoading(false);
-                setIsVideoReady(true);
-                console.log('🛬 [VideoItem] onLoad fired for video id', video.id, 'isActive:', isActive, 'videoRef current:', !!videoRef.current);
-
-                // For preloaded videos, ensure instant playback
-                if (isPreloaded && Platform.OS === 'web') {
-                  const videoElement = videoRef.current;
-                  if (videoElement && isActive) {
-                    videoElement.play().catch(() => {
-                      console.log('Instant play failed, retrying...');
-                      videoElement.muted = true;
-                      videoElement.play();
-                    });
-                  }
-                }
-
-                // Enforce mute/unmute according to parent prop immediately when video is ready
                 try {
-                  const desiredMuted = !!isMuted;
-                  const v = videoRef.current;
-                  if (v) {
-                    if (Platform.OS === 'web') {
-                      try {
-                        v.muted = desiredMuted;
-                        // If unmuted is desired and autoplay may have started muted, attempt a short unmute/play
-                        if (!desiredMuted && isActive) {
-                          try { v.muted = false; } catch (e) {}
-                          // try to play with sound if allowed
-                          try { v.play && v.play().catch(() => {}); } catch (e) {}
-                        }
-                      } catch (e) { console.warn('[VideoItem] apply web muted failed', e); }
-                    } else {
-                      try {
-                        if (typeof v.setIsMutedAsync === 'function') {
-                          v.setIsMutedAsync(desiredMuted).catch((err: any) => console.warn('[VideoItem] setIsMutedAsync failed', err));
-                        } else if (typeof v.setNativeProps === 'function') {
-                          try { v.setNativeProps({ muted: desiredMuted }); } catch (e) {}
-                        } else if (typeof v.muted !== 'undefined') {
-                          try { v.muted = desiredMuted; } catch (e) {}
-                        }
-                      } catch (e) { console.warn('[VideoItem] apply native muted failed', e); }
+                  if (loadingTimeoutRef.current) {
+                    clearTimeout(loadingTimeoutRef.current);
+                    loadingTimeoutRef.current = null;
+                  }
+                  setIsLoading(false);
+                  setIsVideoReady(true);
+                  console.log('🛬 [VideoItem] onLoad fired for video id', video.id, 'isActive:', isActive, 'videoRef current:', !!videoRef.current);
+
+                  // For preloaded videos, ensure instant playback on web
+                  if (isPreloaded && Platform.OS === 'web') {
+                    const videoElement = videoRef.current;
+                    if (videoElement && isActive) {
+                      videoElement.play().catch(() => {
+                        console.log('Instant play failed, retrying...');
+                        videoElement.muted = true;
+                        videoElement.play().catch(() => {});
+                      });
                     }
                   }
-                } catch (e) {}
+
+                  // Apply mute/unmute according to parent prop
+                  const desiredMuted = !!isMuted;
+                  const v = videoRef.current;
+                  if (!v) {
+                    // Do backoff-aware remount attempts. If exhausted, mark unrecoverable so we show a placeholder instead of looping.
+                    if (!shouldAttemptRemount(String(video.id))) {
+                      console.warn('⚡ [VideoItem] onLoad: videoRef missing and remount attempts exhausted for video id', video.id);
+                      remountRequested[video.id] = true;
+                      forcePlayDoneRef.current = true;
+                      setHasError(true);
+                      setIsVideoReady(false);
+                      return;
+                    }
+
+                    console.warn('⚡ [VideoItem] onLoad: videoRef is null for video id', video.id, '-> requesting remount');
+                    noteRemountAttempt(String(video.id));
+                    remountRequested[video.id] = true;
+                    try { onRequestRemount && onRequestRemount(video.id); } catch (e) {}
+                    forcePlayDoneRef.current = true;
+                    return;
+                  }
+
+                  if (Platform.OS === 'web') {
+                    try {
+                      // Set muted flag first then attempt play if desired
+                      v.muted = !!desiredMuted;
+                      if (!desiredMuted && isActive) {
+                        try { v.play && v.play().catch(() => {}); } catch (e) {}
+                      }
+                    } catch (e) { console.warn('[VideoItem] apply web muted failed', e); }
+                  } else {
+                    try {
+                      if (typeof v.setIsMutedAsync === 'function') {
+                        v.setIsMutedAsync(desiredMuted).catch((err: any) => console.warn('[VideoItem] setIsMutedAsync failed', err));
+                      } else if (typeof v.setNativeProps === 'function') {
+                        try { v.setNativeProps({ muted: desiredMuted }); } catch (e) {}
+                      } else if (typeof v.muted !== 'undefined') {
+                        try { v.muted = desiredMuted; } catch (e) {}
+                      }
+                    } catch (e) { console.warn('[VideoItem] apply native muted failed', e); }
+                  }
+                } catch (e) {
+                  console.warn('[VideoItem] onLoad handler failed', e);
+                }
               }}
               onError={(error: any) => {
                 console.error('Video error:', error);

@@ -26,6 +26,17 @@ const SOURCEURL_MAX = 1000;
 const SOURCE_NAME_MAX = 100;
 
 export default function AdminPanel() {
+  // Ensure runtime global API base is set for any embedded components that
+  // run in mixed environments. For web builds, Vite provides `VITE_API_BASE_URL`.
+  try {
+    const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || window.location.origin;
+    (globalThis as any).API_BASE = apiBase.replace(/\/$/, '');
+    // Also expose to window for debugging
+    (window as any).__API_BASE__ = (globalThis as any).API_BASE;
+  } catch (e) {
+    // import.meta may not be available in some environments; ignore.
+  }
+
   // Ref for scrolling to form on edit
   const formRef = useRef<HTMLFormElement | null>(null);
   const [activeTab, setActiveTab] = useState<'manual' | 'api' | 'manage' | 'categories' | 'notifications' | 'analytics' | 'videos'>('manual');
@@ -40,6 +51,7 @@ export default function AdminPanel() {
   const [uploadedMedia, setUploadedMedia] = useState<UploadResult | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadTarget, setUploadTarget] = useState<'firebase' | 'r2'>('firebase');
   const [readTime, setReadTime] = useState("");
   const [source, setSource] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -255,7 +267,8 @@ export default function AdminPanel() {
     e.preventDefault();
     let parsedVideoInfo: VideoUrlInfo;
     try {
-      new URL(videoUrl); // Basic URL validation
+  // Accept both absolute and relative (proxied) URLs by providing a base
+  new URL(videoUrl, window.location.origin); // Basic URL validation
       parsedVideoInfo = VideoUrlUtils.parseVideoUrl(videoUrl);
       if (!parsedVideoInfo.isSupported) {
         const confirmContinue = window.confirm(
@@ -268,28 +281,26 @@ export default function AdminPanel() {
       }
       // Validate other URLs
       if (originalSourceUrl) {
-        new URL(originalSourceUrl);
+        new URL(originalSourceUrl, window.location.origin);
       }
       if (thumbnailUrl) {
-        new URL(thumbnailUrl);
+        new URL(thumbnailUrl, window.location.origin);
       }
-    } catch (error) {
-      alert("Please enter valid URLs. Video URL must be a complete URL (e.g., https://youtube.com/shorts/VIDEO_ID or https://example.com/video.mp4)");
-      return;
-    }
+    
+  const detectedPlatform = parsedVideoInfo.platform;
+  const finalThumbnailUrl = thumbnailUrl?.trim() || parsedVideoInfo.thumbnailUrl || 'https://via.placeholder.com/720x1280.png?text=Video+Thumbnail';
+  // Resolve playback URL (may return proxied path like `/api/r2/media?...`).
+  // Ensure we save an absolute URL so mobile/native clients can reach it.
+  let resolvedPlayback = webFileUploadService.getPlaybackUrl(videoUrl.trim());
+  if (resolvedPlayback.startsWith('/api')) {
+    const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || window.location.origin;
+    resolvedPlayback = `${apiBase}${resolvedPlayback}`;
+  }
 
-    setIsAddingVideo(true);
-    try {
-      // Use parsed video info to enhance the data
-      const detectedPlatform = parsedVideoInfo.platform;
-      const finalThumbnailUrl = thumbnailUrl?.trim() ||
-        parsedVideoInfo.thumbnailUrl ||
-        'https://via.placeholder.com/720x1280.png?text=Video+Thumbnail';
-
-      const videoData = {
+  const videoData = {
         title: videoTitle.trim(),
         description: videoDescription.trim(),
-        videoUrl: videoUrl.trim(),
+        videoUrl: resolvedPlayback,
         embedUrl: parsedVideoInfo.embedUrl, // Add embed URL for supported platforms
         thumbnailUrl: finalThumbnailUrl,
         category: videoCategory,
@@ -559,7 +570,7 @@ export default function AdminPanel() {
 
     setIsUploading(true);
     try {
-      const uploadResult = await webFileUploadService.uploadFile(selectedFile, category || 'general');
+      const uploadResult = await webFileUploadService.uploadFileToTarget(selectedFile, category || 'general', uploadTarget);
       setUploadedMedia(uploadResult);
       setImageUrl(uploadResult.url); // Set the image URL to the uploaded file URL
       setSelectedFile(null);
@@ -903,6 +914,16 @@ export default function AdminPanel() {
 
                 {mediaSource === 'upload' && (
                   <div className="space-y-3">
+                    <div className="flex items-center gap-3 mb-2">
+                      <label className="inline-flex items-center">
+                        <input type="radio" name="uploadTarget" checked={uploadTarget === 'firebase'} onChange={() => setUploadTarget('firebase')} />
+                        <span className="ml-2">Firebase</span>
+                      </label>
+                      <label className="inline-flex items-center">
+                        <input type="radio" name="uploadTarget" checked={uploadTarget === 'r2'} onChange={() => setUploadTarget('r2')} />
+                        <span className="ml-2">Cloudflare R2</span>
+                      </label>
+                    </div>
                     {!selectedFile && !uploadedMedia && (
                       <Button
                         type="button"
@@ -1791,6 +1812,16 @@ export default function AdminPanel() {
                             Select Video File
                           </Button>
                         )}
+                        <div className="flex items-center gap-3">
+                          <label className="inline-flex items-center">
+                            <input type="radio" name="uploadTargetVideos" checked={uploadTarget === 'firebase'} onChange={() => setUploadTarget('firebase')} />
+                            <span className="ml-2">Firebase</span>
+                          </label>
+                          <label className="inline-flex items-center">
+                            <input type="radio" name="uploadTargetVideos" checked={uploadTarget === 'r2'} onChange={() => setUploadTarget('r2')} />
+                            <span className="ml-2">Cloudflare R2</span>
+                          </label>
+                        </div>
                         {selectedFile && !uploadedMedia && (
                           <div className="border rounded p-3 bg-muted">
                             <div className="flex items-center justify-between mb-2">
@@ -1814,7 +1845,7 @@ export default function AdminPanel() {
                               onClick={async () => {
                                 setIsUploading(true);
                                 try {
-                                  const uploadResult = await webFileUploadService.uploadFile(selectedFile, videoCategory || 'general');
+                                  const uploadResult = await webFileUploadService.uploadFileToTarget(selectedFile, videoCategory || 'general', uploadTarget);
                                   setUploadedMedia(uploadResult);
                                   setVideoUrl(uploadResult.url);
                                 } catch (error) {

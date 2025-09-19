@@ -55,6 +55,7 @@ import TextToSpeechService from './TextToSpeechService';
 import { ArticleActions } from './ArticleActions';
 import { authService, UserProfile } from './AuthService';
 import { INCLUDE_ADMIN_PANEL, ENABLE_ADMIN_AUTO_LOGIN, ADMIN_EMAIL, ADMIN_PASSWORD } from './buildConfig';
+import { API_BASE as BUILD_API_BASE } from './buildConfig';
 import { userService } from './UserService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthScreen } from './AuthScreen';
@@ -81,6 +82,36 @@ interface AppProps {
 }
 
 export default function App(props: AppProps) {
+  // Ensure runtime API base is available for native builds so VideoFeed can
+  // normalize proxied `/api/...` paths to absolute URLs when needed.
+  try {
+    const runtimeApiBase = BUILD_API_BASE || (typeof window !== 'undefined' ? (window as any).__API_BASE__ : undefined) || (globalThis as any).API_BASE;
+    if (runtimeApiBase && typeof runtimeApiBase === 'string' && runtimeApiBase.trim() !== '') {
+      (globalThis as any).API_BASE = runtimeApiBase.replace(/\/$/, '');
+    }
+    // If running in development on an Android emulator and no API_BASE was set,
+    // map localhost to the special emulator host `10.0.2.2` so ExoPlayer can reach
+    // the dev server that was used to upload the video (common case when you
+    // uploaded media from the browser to localhost). Only apply when in dev.
+    if (!((globalThis as any).API_BASE) && __DEV__) {
+      try {
+        // For Android emulator, 10.0.2.2 maps to host loopback.
+        if (Platform.OS === 'android') {
+          (globalThis as any).API_BASE = 'http://10.0.2.2:8080';
+        } else {
+          // iOS simulator and desktop can usually reach localhost directly
+          (globalThis as any).API_BASE = 'http://localhost:8080';
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  } catch (e) {}
+  // Debug: log runtime API base so we can verify native apps have it set
+  try {
+    const dbg = (globalThis as any).API_BASE || (typeof window !== 'undefined' ? (window as any).__API_BASE__ : undefined) || BUILD_API_BASE;
+    console.log('🔧 [App] runtime API_BASE =', dbg);
+  } catch (e) {}
   const { currentUser, onArticlesReady } = props;
   const insets = useSafeAreaInsets();
   // NOTE: SHOW_BOOKMARKS and SHOW_SIDEBAR are imported from uiConfig.ts
