@@ -10,23 +10,28 @@ export class VideoCleanupService {
   /**
    * Request server to delete an object from R2. Returns true on success.
    */
-  static async deleteR2Object(objectKey: string): Promise<boolean> {
+  // Return a rich result so callers can report errors back to the admin UI
+  static async deleteR2Object(objectKey: string): Promise<{ ok: boolean; status?: number; body?: string; url?: string; error?: string }> {
     try {
-      const apiBase = (import.meta.env.VITE_API_BASE_URL as string) || (window as any).__API_BASE__ || '';
-      const url = `${apiBase.replace(/\/$/, '')}/api/r2/delete`;
+      const runtimeGlobal = (window as any).__API_BASE__ || (globalThis as any).API_BASE;
+      const viteBase = (import.meta.env.VITE_API_BASE_URL as string) || '';
+      const svcBase = ((webFileUploadService as any).API_BASE as string) || '';
+      const apiBase = (runtimeGlobal || viteBase || svcBase || '').replace(/\/$/, '');
+      const url = apiBase ? `${apiBase}/api/r2/delete` : `/api/r2/delete`;
       const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: objectKey })
       });
       if (!resp.ok) {
-        console.error('Failed to delete R2 object', await resp.text());
-        return false;
+        const txt = await resp.text().catch(() => '<no body>');
+        console.error('Failed to delete R2 object', { url, status: resp.status, body: txt });
+        return { ok: false, status: resp.status, body: txt, url };
       }
-      return true;
-    } catch (e) {
+      return { ok: true, status: resp.status, url };
+    } catch (e: any) {
       console.error('deleteR2Object error', e);
-      return false;
+      return { ok: false, error: e && e.message ? e.message : String(e) };
     }
   }
 
@@ -59,26 +64,86 @@ export class VideoCleanupService {
         try {
           // Attempt to delete storage object if possible
           const url = v.videoUrl || '';
-          if (url.includes('/api/r2/media')) {
-            // extract path param
-            const m = url.match(/path=([^&]+)/);
-            if (m && m[1]) {
-              const key = decodeURIComponent(m[1]);
-              const ok = await this.deleteR2Object(key);
-              if (!ok) console.warn('Failed to delete R2 object:', key);
+          // Try multiple strategies to find the R2 object key:
+          // 1) proxied path: /api/r2/media?path=<key> (may be absolute or relative)
+          // 2) Cloudflare R2 public URL: https://<account>.r2.cloudflarestorage.com/<bucket>/<key>
+          // 3) Custom domain pointing directly to object: https://cdn.example.com/<key>
+          let attemptedR2Delete = false;
+          try {
+            // Strategy A: proxied path param (works for absolute and relative URLs)
+            const proxiedMatch = url.match(/[?&]path=([^&]+)/);
+            if (proxiedMatch && proxiedMatch[1]) {
+              const key = decodeURIComponent(proxiedMatch[1]);
+              attemptedR2Delete = true;
+              const result = await this.deleteR2Object(key);
+              if (!result.ok) {
+                console.warn('Failed to delete R2 object (proxied):', key, result);
+                errors.push({ id: v.id, key, reason: result });
+              }
+            } else {
+              // Strategy B: parse as URL and attempt to extract object key
+              try {
+                const baseForParse = (import.meta.env.VITE_API_BASE_URL as string) || (window as any).__API_BASE__ || window.location?.origin;
+                const u = new URL(url, baseForParse);
+                // If hostname looks like Cloudflare R2 account host
+                if (u.hostname && u.hostname.includes('.r2.cloudflarestorage.com')) {
+                  const segments = u.pathname.split('/').filter(Boolean);
+                  if (segments.length >= 2) {
+                    // pattern: /<bucket>/<key...>
+                    const key = segments.slice(1).join('/');
+                    attemptedR2Delete = true;
+                    const result = await this.deleteR2Object(decodeURIComponent(key));
+                    if (!result.ok) {
+                      console.warn('Failed to delete R2 object (public url):', key, result);
+                      errors.push({ id: v.id, key, reason: result });
+                    }
+                  } else if (segments.length === 1) {
+                    // fallback: treat entire path as key
+                    const key = segments[0];
+                    attemptedR2Delete = true;
+                    const result = await this.deleteR2Object(decodeURIComponent(key));
+                    if (!result.ok) {
+                      console.warn('Failed to delete R2 object (public url fallback):', key, result);
+                      errors.push({ id: v.id, key, reason: result });
+                    }
+                  }
+                } else {
+                  // Strategy C: custom domain or CDN - assume pathname (without leading slash) is the key
+                  const pathnameKey = u.pathname.replace(/^\//, '');
+                  if (pathnameKey) {
+                    attemptedR2Delete = true;
+                    const result = await this.deleteR2Object(decodeURIComponent(pathnameKey));
+                    if (!result.ok) {
+                      console.warn('Failed to delete R2 object (custom domain path):', pathnameKey, result);
+                      errors.push({ id: v.id, key: pathnameKey, reason: result });
+                    }
+                  }
+                }
+              } catch (err) {
+                // URL parsing failed - skip R2 delete attempt for this URL
+                console.warn('VideoCleanupService: failed parsing URL for R2 deletion', url, err);
+              }
             }
+          } catch (err) {
+            console.error('Error attempting R2 deletion for url', url, err);
+            errors.push({ id: v.id, url, error: String(err) });
           }
-          if (v.mediaPath && v.mediaPath.length > 0) {
+
+          if (!attemptedR2Delete) {
+            console.log('No R2 object detected for video, skipping R2 delete for:', v.id);
+          }
+          const mediaPath = (v as any).mediaPath as string | undefined;
+          if (mediaPath && mediaPath.length > 0) {
             // delete from Firebase Storage via existing helper (client side)
             try {
-              await webFileUploadService.deleteFile(v.mediaPath);
+              await webFileUploadService.deleteFile(mediaPath);
             } catch (e) {
-              console.warn('Failed to delete Firebase storage path:', v.mediaPath, e);
+              console.warn('Failed to delete Firebase storage path:', mediaPath, e);
             }
           }
 
           // Delete Firestore document
-          await VideoService.deleteVideo(v.id);
+          await VideoService.deleteVideo(String(v.id));
           deleted++;
         } catch (e) {
           console.error('Failed to delete video', v.id, e);
