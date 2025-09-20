@@ -13,6 +13,7 @@ import { auth } from "@/services/firebase.config";
 import { signOut } from "firebase/auth";
 import { WebAnalyticsService, AnalyticsData } from "../services/WebAnalyticsService";
 import { VideoService } from "../services/VideoService";
+import ArticleCleanupService from "../services/ArticleCleanupService";
 import { VideoReel } from "../types/types";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
@@ -60,6 +61,10 @@ export default function AdminPanel() {
   // Manage News
   const [newsList, setNewsList] = useState<any[]>([]);
   const [isLoadingNews, setIsLoadingNews] = useState(false);
+  const [cleanupArticlesCount, setCleanupArticlesCount] = useState<number>(0);
+  const [isCleaningArticles, setIsCleaningArticles] = useState(false);
+  const [oldestFive, setOldestFive] = useState<any[] | null>(null);
+  const [isLoadingOldestFive, setIsLoadingOldestFive] = useState(false);
   // Categories
   const [newCategory, setNewCategory] = useState("");
   // Analytics
@@ -1194,10 +1199,105 @@ export default function AdminPanel() {
         )}
         {activeTab === 'manage' && (
           <div>
-            <Button onClick={fetchNews} className="mb-2 sm:mb-4 w-full sm:w-auto">Reload News</Button>
+            <div className="flex items-center gap-2 mb-2 sm:mb-4">
+              <Button onClick={fetchNews} className="w-auto">Reload News</Button>
+              <Button onClick={async () => {
+                // handleShowOldestFive inline to avoid adding extra named function
+                setIsLoadingOldestFive(true);
+                try {
+                  const articles = await firebaseNewsService.getArticlesWithDocIds();
+                  // normalize timestamp values into ms for sorting
+                  const normalized = articles.map((a: any) => ({
+                    ...a,
+                    _tsMs: (() => {
+                      try {
+                        const t = (a.timestamp as any);
+                        if (t == null) return 0;
+                        // Firestore Timestamp has toMillis / toDate
+                        if (typeof t === 'object' && typeof t.toMillis === 'function') return t.toMillis();
+                        if (typeof t === 'object' && typeof t.toDate === 'function') return t.toDate().getTime();
+                        if (typeof t === 'number') return Math.floor(t);
+                        if (typeof t === 'string') {
+                          const parsed = Date.parse(t);
+                          return Number.isNaN(parsed) ? 0 : parsed;
+                        }
+                        return 0;
+                      } catch (e) {
+                        return 0;
+                      }
+                    })()
+                  }));
+                  normalized.sort((x: any, y: any) => (x._tsMs || 0) - (y._tsMs || 0));
+                  setOldestFive(normalized.slice(0, 5));
+                } catch (e) {
+                  console.error('Failed to fetch oldest five articles', e);
+                  alert('Failed to fetch oldest articles. Check console for details.');
+                } finally {
+                  setIsLoadingOldestFive(false);
+                }
+              }} className="w-auto">{isLoadingOldestFive ? 'Loading...' : 'Show Oldest 5'}</Button>
+              <div className="flex items-center gap-2 ml-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={cleanupArticlesCount}
+                  onChange={e => {
+                    const raw = e.target.value;
+                    if (raw === '') { setCleanupArticlesCount(0); return; }
+                    const num = Number(raw);
+                    if (Number.isNaN(num)) return;
+                    setCleanupArticlesCount(Math.max(0, Math.floor(num)));
+                  }}
+                  className="w-20 text-sm px-2 py-1 rounded border"
+                  title="Number of oldest articles to delete"
+                />
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={async () => {
+                    if (cleanupArticlesCount <= 0) return;
+                    if (!window.confirm(`Delete the oldest ${cleanupArticlesCount} articles? This will remove Firestore documents and stored images.`)) return;
+                    setIsCleaningArticles(true);
+                    try {
+                      const res = await ArticleCleanupService.deleteOldestN(cleanupArticlesCount);
+                      alert(`Deleted ${res.deleted} articles. ${res.errors.length} errors.`);
+                      await fetchNews();
+                    } catch (err) {
+                      console.error('Article cleanup failed', err);
+                      alert('Article cleanup failed: ' + (err instanceof Error ? err.message : String(err)));
+                    } finally {
+                      setIsCleaningArticles(false);
+                    }
+                  }}
+                  disabled={isCleaningArticles || cleanupArticlesCount <= 0}
+                >
+                  {isCleaningArticles ? 'Deleting...' : `Delete Oldest ${cleanupArticlesCount}`}
+                </Button>
+              </div>
+            </div>
             {isLoadingNews ? <Loader2 className="animate-spin w-6 h-6 mx-auto my-8" /> : (
               <div className="space-y-3 sm:space-y-4">
                 {newsList.length === 0 && <div className="text-muted-foreground">No news articles found.</div>}
+                {/* Oldest 5 preview panel */}
+                {oldestFive && (
+                  <div className="border rounded p-3 bg-yellow-50 dark:bg-yellow-900/10 mb-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="font-semibold">Oldest 5 Articles (Preview)</div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setOldestFive(null)}>Clear Preview</Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {oldestFive.map(a => (
+                        <div key={a.docId || a.id || JSON.stringify(a)} className="bg-white dark:bg-card p-2 rounded border">
+                          <div className="font-medium text-sm break-words">{a.headline || a.title || '(no headline)'}</div>
+                          <div className="text-xs text-muted-foreground">docId: {a.docId || a.id || 'n/a'}</div>
+                          <div className="text-xs text-muted-foreground">ts: {new Date(a._tsMs || 0).toLocaleString()}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {newsList.map(article => (
                   <div key={article.docId || article.id} className="border rounded p-2 sm:p-4 bg-card flex flex-col md:flex-row md:items-center gap-2 sm:gap-4 w-full overflow-x-auto">
                     <div className="flex-1 min-w-0">
