@@ -78,9 +78,11 @@ app.post('/api/r2/delete', async (req, res) => {
       Key: String(key)
     };
 
-    await s3.deleteObject(params).promise();
-    // respond with success
-    res.json({ ok: true, path: key });
+    console.log('R2 delete request received for key:', params.Key, 'bucket:', params.Bucket);
+    const deleteResp = await s3.deleteObject(params).promise();
+    console.log('R2 delete response for', params.Key, deleteResp);
+    // respond with success and aws response for debugging
+    res.json({ ok: true, path: key, s3: deleteResp });
   } catch (err) {
     console.error('R2 delete error:', err);
     res.status(500).json({ error: 'Delete failed', details: err && err.message });
