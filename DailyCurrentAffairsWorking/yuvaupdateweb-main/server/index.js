@@ -6,6 +6,8 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
 const app = express();
+// enable JSON body parsing for delete and other API calls
+app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 const R2_BUCKET = process.env.R2_BUCKET;
@@ -60,6 +62,29 @@ app.get('/', (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'r2-proxy', timestamp: Date.now() });
+});
+
+/**
+ * Delete an object from R2
+ * Body: { path: '<object-key>' }
+ */
+app.post('/api/r2/delete', async (req, res) => {
+  try {
+    const key = req.body && (req.body.path || req.body.key);
+    if (!key) return res.status(400).json({ error: 'Missing path in request body' });
+
+    const params = {
+      Bucket: R2_BUCKET,
+      Key: String(key)
+    };
+
+    await s3.deleteObject(params).promise();
+    // respond with success
+    res.json({ ok: true, path: key });
+  } catch (err) {
+    console.error('R2 delete error:', err);
+    res.status(500).json({ error: 'Delete failed', details: err && err.message });
+  }
 });
 
 app.post('/api/r2/upload', upload.single('file'), async (req, res) => {

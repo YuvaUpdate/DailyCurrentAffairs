@@ -81,6 +81,8 @@ export default function AdminPanel() {
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [isAddingVideo, setIsAddingVideo] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoReel | null>(null);
+  const [cleanupCount, setCleanupCount] = useState<number>(0);
+  const [isCleaning, setIsCleaning] = useState(false);
   const [videoUrlInfo, setVideoUrlInfo] = useState<VideoUrlInfo | null>(null);
   const [isFetchingThumbnail, setIsFetchingThumbnail] = useState(false);
   // Notification states
@@ -522,6 +524,24 @@ export default function AdminPanel() {
     } catch (error) {
       console.error('Error deleting video:', error);
       alert(`❌ Failed to delete video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Cleanup: delete oldest N videos
+  async function handleDeleteOldestN() {
+    if (!window.confirm(`Delete the oldest ${cleanupCount} videos? This will remove Firestore documents and stored media.`)) return;
+    setIsCleaning(true);
+    try {
+      const { default: VideoCleanupService } = await import('../services/VideoCleanupService');
+      const res = await VideoCleanupService.deleteOldestN(cleanupCount);
+      alert(`Deleted ${res.deleted} videos. ${res.errors.length} errors.`);
+      // refresh list
+      await fetchVideos();
+    } catch (e) {
+      console.error('Cleanup failed', e);
+      alert('Cleanup failed: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setIsCleaning(false);
     }
   }
 
@@ -1650,7 +1670,7 @@ export default function AdminPanel() {
               </div>
 
               {/* Debug Section */}
-              <div className="flex flex-wrap gap-2 mt-4">
+              <div className="flex flex-wrap gap-2 mt-4 items-center">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1691,6 +1711,35 @@ export default function AdminPanel() {
                 >
                   🔥 Enable Firebase
                 </Button>
+                {/* Cleanup oldest N videos control */}
+                <div className="flex items-center gap-2 ml-2">
+                  <input
+                    type="number"
+                    min={0}
+                    value={cleanupCount}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      // Allow empty input while typing; treat empty as 0
+                      if (raw === '') {
+                        setCleanupCount(0);
+                        return;
+                      }
+                      const num = Number(raw);
+                      if (Number.isNaN(num)) return;
+                      setCleanupCount(Math.max(0, Math.floor(num)));
+                    }}
+                    className="w-20 text-sm px-2 py-1 rounded border"
+                    title="Number of oldest videos to delete"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteOldestN}
+                    disabled={isCleaning || cleanupCount <= 0}
+                  >
+                    {isCleaning ? 'Deleting...' : `Delete Oldest ${cleanupCount}`}
+                  </Button>
+                </div>
               </div>
             </div>
 
