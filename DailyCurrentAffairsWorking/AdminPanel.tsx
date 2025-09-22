@@ -255,8 +255,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       } else {
         console.log(`➕ Adding new article: ${articlePayload.headline}`);
         result = await onAddNews(articlePayload);
-        console.log(`✅ Article added with result:`, result);
-        Alert.alert('Success', 'News article added successfully!');
+  console.log(`✅ Article added with result:`, result);
+  // In-app success alert suppressed by request — notifications are still sent to the system notification panel.
+  console.log('In-app success Alert suppressed (notifications will still be sent).');
         // Send push notification (non-blocking with rate limiting)
         (async () => {
           try {

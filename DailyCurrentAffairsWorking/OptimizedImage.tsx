@@ -1,5 +1,5 @@
-import React, { memo, useState, useEffect } from 'react';
-import { Image, View, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { memo, useState, useEffect, useRef } from 'react';
+import { Image, View, ActivityIndicator, StyleSheet, AppState, AppStateStatus } from 'react-native';
 import ImagePrefetchService from './ImagePrefetchService';
 import ImageAlignmentHelper from './ImageAlignmentHelper';
 
@@ -31,10 +31,13 @@ const OptimizedImage = memo(({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [imageSource, setImageSource] = useState(source);
+  const appState = useRef(AppState.currentState);
   const [showImage, setShowImage] = useState(false);
   const prefetchService = ImagePrefetchService.getInstance();
 
   useEffect(() => {
+    // Ensure local imageSource follows the latest prop when articles change
+    setImageSource(source);
     const imageUrl = source.uri;
     if (!imageUrl) {
       setHasError(true);
@@ -58,6 +61,59 @@ const OptimizedImage = memo(({
       });
     }
   }, [source.uri]);
+
+  // When the app comes back to the foreground, some platforms may return a cached image
+  // for the same URL. Append a short-lived cache-busting query param to force reload
+  // only when the app transitions to 'active'. This avoids touching server or web code.
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        try {
+          const url = source?.uri;
+          if (url) {
+            // Preserve existing query params
+            const separator = url.includes('?') ? '&' : '?';
+            const busted = `${url}${separator}_r=${Date.now()}`;
+            // Only update if the busted URL is different to avoid re-render loops
+            if (busted !== imageSource.uri) {
+              setImageSource({ uri: busted });
+              // Allow prefetch service to register the new URL as cached after load
+              // and then remove the param so other parts of the app still use canonical URL
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+      appState.current = nextAppState;
+    };
+
+    // Register listener in a way that's compatible across RN versions
+    let subscription: any = null;
+    if (typeof (AppState as any).addEventListener === 'function') {
+      // Newer RN: returns subscription with remove()
+      subscription = (AppState as any).addEventListener('change', handleAppStateChange);
+    } else {
+      // Older RN: addEventListener exists but typings may differ; use old API
+      try {
+        (AppState as any).addEventListener('change', handleAppStateChange);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return () => {
+      try {
+        if (subscription && typeof subscription.remove === 'function') {
+          subscription.remove();
+        } else if (typeof (AppState as any).removeEventListener === 'function') {
+          (AppState as any).removeEventListener('change', handleAppStateChange);
+        }
+      } catch (e) {
+        // ignore cleanup errors
+      }
+    };
+  }, [source, imageSource.uri]);
 
   const handleLoad = () => {
     setIsLoading(false);

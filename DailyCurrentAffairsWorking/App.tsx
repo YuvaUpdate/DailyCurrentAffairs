@@ -1567,12 +1567,25 @@ export default function App(props: AppProps) {
               }}>
                 <View>
                   {article.readTime && (
-                    <Text 
+                    <Text
                       style={[styles.reelsMetaText, { color: currentTheme.subText, fontSize: 12 }]}
                       maxFontSizeMultiplier={1.2}
                       allowFontScaling={false}
                     >
-                      {article.readTime}
+                      {/* Add explicit space after colon and emphasize the value */}
+                      Read time: {' '}
+                      <Text
+                        style={{
+                          color: isDarkMode ? currentTheme.text : currentTheme.accent,
+                          fontWeight: '600',
+                          fontSize: 12,
+                          letterSpacing: 0.2,
+                        }}
+                        maxFontSizeMultiplier={1.2}
+                        allowFontScaling={false}
+                      >
+                        {article.readTime}
+                      </Text>
                     </Text>
                   )}
                 </View>
@@ -1592,22 +1605,60 @@ export default function App(props: AppProps) {
                 <View
                   style={[
                     styles.reelsTapButton,
-                    { 
-                      backgroundColor: isDarkMode ? 'rgba(37,99,235,0.2)' : 'rgba(37,99,235,0.12)',
-                      borderColor: isDarkMode ? 'rgba(37,99,235,0.4)' : 'rgba(37,99,235,0.25)',
-                      borderWidth: 1,
-                      elevation: 3,
-                      shadowColor: '#000',
-                      shadowOpacity: 0.15,
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowRadius: 3,
-                      minHeight: 42,
-                      paddingVertical: 10
-                    }
+                    (() => {
+                      // Keep dark-mode visuals unchanged. For Android + light mode use a filled
+                      // background and no border to avoid native outline/ripple artifacts.
+                      if (isDarkMode) {
+                        return {
+                          backgroundColor: 'rgba(37,99,235,0.2)',
+                          borderColor: 'rgba(37,99,235,0.4)',
+                          borderWidth: 1,
+                          elevation: 3,
+                          shadowColor: '#000',
+                          shadowOpacity: 0.15,
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowRadius: 3,
+                          minHeight: 42,
+                          paddingVertical: 10,
+                        };
+                      }
+
+                      // Light mode
+                      if (Platform.OS === 'android') {
+                        // Use a slightly stronger filled color on Android to visually hide
+                        // any subtle outline/ripple the platform may draw in standalone builds.
+                        return {
+                          backgroundColor: currentTheme.accent,
+                          borderWidth: 0,
+                          borderColor: 'transparent',
+                          elevation: 3,
+                          shadowColor: '#000',
+                          shadowOpacity: 0.12,
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowRadius: 2,
+                          minHeight: 42,
+                          paddingVertical: 10,
+                        };
+                      }
+
+                      // Light mode - non-Android (web/ios)
+                      return {
+                        backgroundColor: currentTheme.accent,
+                        borderColor: 'transparent',
+                        borderWidth: 0,
+                        elevation: 3,
+                        shadowColor: '#000',
+                        shadowOpacity: 0.15,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowRadius: 3,
+                        minHeight: 42,
+                        paddingVertical: 10,
+                      };
+                    })()
                   ]}
                 >
                   <Text 
-                    style={[styles.reelsTapText, { color: currentTheme.text, fontSize: 14, fontWeight: '600' }]}
+                    style={[styles.reelsTapText, { color: isDarkMode ? currentTheme.text : '#fff', fontSize: 14, fontWeight: '600' }]}
                     maxFontSizeMultiplier={1.2}
                     allowFontScaling={false}
                   >
@@ -2388,8 +2439,10 @@ const styles = StyleSheet.create({
   justifyContent: 'center',
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.15,
-  shadowRadius: 3,
+  borderWidth: 0,
+  borderColor: 'transparent',
+  // Clip native ripple/focus outlines on Android so they don't draw outside the rounded pill
+  overflow: 'hidden',
   elevation: 4,
   marginLeft: 6,
   },
@@ -2618,7 +2671,9 @@ const styles = StyleSheet.create({
   paddingHorizontal: 16,
   paddingVertical: 10,
   borderRadius: 12,
-  borderWidth: 1,
+  // Default to no border; dark-mode will add border via inline styles
+  borderWidth: 0,
+  borderColor: 'transparent',
   alignSelf: 'stretch',
   width: '100%',
   marginTop: 8,
