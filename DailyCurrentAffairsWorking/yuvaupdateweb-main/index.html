@@ -12,20 +12,63 @@
     <meta property="og:title" content="YuvaUpdate - Professional News & Current Affairs" />
     <meta property="og:description" content="Stay informed with YuvaUpdate - your trusted source for professional news coverage and current affairs." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.yuvaupdate.in/" />
+  <meta property="og:url" content="https://yuvaupdate.in/" />
     <meta property="og:site_name" content="YuvaUpdate" />
+  <meta property="og:image" content="/placeholder.svg" />
+  <meta property="og:image:alt" content="YuvaUpdate logo" />
     
     <!-- Twitter Card Meta Tags -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="YuvaUpdate - Professional News & Current Affairs" />
-    <meta name="twitter:description" content="Stay informed with YuvaUpdate - your trusted source for professional news coverage and current affairs." />
+  <meta name="twitter:description" content="Stay informed with YuvaUpdate - your trusted source for professional news coverage and current affairs." />
+  <meta name="twitter:site" content="@YuvaUpdate" />
+  <meta name="twitter:image" content="/placeholder.svg" />
     
     <!-- Additional SEO Meta Tags -->
     <meta name="robots" content="index, follow" />
     <meta name="language" content="English" />
     <meta name="revisit-after" content="1 days" />
     <meta name="theme-color" content="#2563EB" />
-    <link rel="canonical" href="https://www.yuvaupdate.in/" />
+    <link rel="canonical" href="https://yuvaupdate.in/" />
+    <!-- Early redirect to handle malformed URLs like /hello-world/https://yuvaupdate.in/home/ -->
+    <script>
+      (function(){
+        try{
+          var p = window.location.pathname || '';
+          // If the path contains a protocol (malformed concatenated URL) redirect to homepage
+          if (/https?:\/\//i.test(p) || p.indexOf('http') !== -1 && p.split('/').length > 2) {
+            // Use replace so back button doesn't return to the malformed URL
+            window.location.replace('https://yuvaupdate.in/');
+          }
+        }catch(e){
+          // fail silently
+        }
+      })();
+    </script>
+
+    <!-- Structured data (Organization + WebSite) for better search appearance -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "name": "YuvaUpdate",
+            "url": "https://yuvaupdate.in",
+            "logo": "https://yuvaupdate.in/placeholder.svg"
+          },
+          {
+            "@type": "WebSite",
+            "url": "https://yuvaupdate.in/",
+            "name": "YuvaUpdate",
+            "publisher": {
+              "@type": "Organization",
+              "name": "YuvaUpdate"
+            }
+          }
+        ]
+      }
+    </script>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png" />

@@ -14,7 +14,7 @@ export class SitemapGenerator {
 
       // Add each article as a URL in the sitemap
       articles.forEach((article, index) => {
-        const articleUrl = `https://www.yuvaupdate.in/article/${article.id}`;
+  const articleUrl = `https://yuvaupdate.in/article/${article.id}`;
         const lastmod = new Date().toISOString();
         
         sitemap += `
@@ -41,11 +41,11 @@ export class SitemapGenerator {
    */
   static async generateCompleteSitemap(): Promise<string> {
     const staticPages = [
-      { url: 'https://www.yuvaupdate.in/', priority: '1.0', changefreq: 'daily' },
-      { url: 'https://www.yuvaupdate.in/about', priority: '0.8', changefreq: 'monthly' },
-      { url: 'https://www.yuvaupdate.in/privacy', priority: '0.6', changefreq: 'monthly' },
-      { url: 'https://www.yuvaupdate.in/terms', priority: '0.6', changefreq: 'monthly' },
-      { url: 'https://www.yuvaupdate.in/support', priority: '0.7', changefreq: 'monthly' }
+  { url: 'https://yuvaupdate.in/', priority: '1.0', changefreq: 'daily' },
+  { url: 'https://yuvaupdate.in/about', priority: '0.8', changefreq: 'monthly' },
+  { url: 'https://yuvaupdate.in/privacy', priority: '0.6', changefreq: 'monthly' },
+  { url: 'https://yuvaupdate.in/terms', priority: '0.6', changefreq: 'monthly' },
+  { url: 'https://yuvaupdate.in/support', priority: '0.7', changefreq: 'monthly' }
     ];
 
     try {
@@ -68,7 +68,7 @@ export class SitemapGenerator {
 
       // Add articles
       articles.forEach((article) => {
-        const articleUrl = `https://www.yuvaupdate.in/article/${article.id}`;
+  const articleUrl = `https://yuvaupdate.in/article/${article.id}`;
         
         sitemap += `
   <url>

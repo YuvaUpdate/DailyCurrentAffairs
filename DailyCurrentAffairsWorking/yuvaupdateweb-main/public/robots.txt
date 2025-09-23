@@ -3,7 +3,7 @@ Allow: /
 Disallow: /admin
 
 # Sitemap
-Sitemap: https://www.yuvaupdate.in/sitemap.xml
+Sitemap: https://yuvaupdate.in/sitemap.xml
 
 # Crawl delay (optional - helps prevent server overload)
 Crawl-delay: 1

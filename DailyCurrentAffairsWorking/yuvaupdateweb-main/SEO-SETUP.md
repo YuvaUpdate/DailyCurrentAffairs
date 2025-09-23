@@ -11,7 +11,7 @@
 - ✅ Points to sitemap location
 - ✅ Sets respectful crawl delay
 
-**Access**: `https://www.yuvaupdate.in/robots.txt`
+**Access**: `https://yuvaupdate.in/robots.txt`
 
 ### 2. sitemap.xml (`/public/sitemap.xml`)
 **Purpose**: Helps search engines discover and index all your pages efficiently.
@@ -23,7 +23,7 @@
 - ✅ Terms page (priority 0.6, monthly updates)
 - ✅ Support page (priority 0.7, monthly updates)
 
-**Access**: `https://www.yuvaupdate.in/sitemap.xml`
+**Access**: `https://yuvaupdate.in/sitemap.xml`
 
 ### 3. Enhanced HTML Meta Tags (`/index.html`)
 **Purpose**: Improves SEO and social media sharing.
@@ -55,14 +55,14 @@ npm run build
 
 ### 2. Verify Files Are Live
 Check that these URLs work:
-- `https://www.yuvaupdate.in/robots.txt`
-- `https://www.yuvaupdate.in/sitemap.xml`
+- `https://yuvaupdate.in/robots.txt`
+- `https://yuvaupdate.in/sitemap.xml`
 
 ### 3. Google Search Console Setup
 1. Go to [Google Search Console](https://search.google.com/search-console)
-2. Add your website: `https://www.yuvaupdate.in`
+2. Add your website: `https://yuvaupdate.in`
 3. Verify ownership (DNS, HTML file, or HTML tag method)
-4. Submit your sitemap: `https://www.yuvaupdate.in/sitemap.xml`
+4. Submit your sitemap: `https://yuvaupdate.in/sitemap.xml`
 
 ### 4. Request Indexing
 1. In Google Search Console, use "URL Inspection" tool

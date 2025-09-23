@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Article } from "@/types/article";
 import { formatDistanceToNow } from "date-fns";
+import SEO from '@/components/SEO';
 
 interface ArticleModalProps {
   article: Article | null;
@@ -20,6 +21,15 @@ export function ArticleModal({ article, isOpen, onClose, onOpenLink }: ArticleMo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
+      <SEO
+        isArticle
+        title={article.title}
+        description={article.summary}
+        url={`https://yuvaupdate.in/article/${article.id}`}
+        image={article.imageUrl}
+        publishedAt={article.publishedAt instanceof Date ? article.publishedAt.toISOString() : String(article.publishedAt)}
+        tags={article.tags}
+      />
       <DialogContent className="max-w-4xl h-[90vh] p-0 bg-card">
         <DialogHeader className="p-4 border-b border-border flex flex-row items-center justify-between">
           <div className="flex items-center gap-4 flex-1">

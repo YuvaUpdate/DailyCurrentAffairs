@@ -3,7 +3,7 @@
   
   <!-- Homepage -->
   <url>
-    <loc>https://www.yuvaupdate.in/</loc>
+  <loc>https://yuvaupdate.in/</loc>
     <lastmod>2025-09-10T12:00:00+00:00</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -11,7 +11,7 @@
   
   <!-- About Page -->
   <url>
-    <loc>https://www.yuvaupdate.in/about</loc>
+  <loc>https://yuvaupdate.in/about</loc>
     <lastmod>2025-09-10T12:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
@@ -19,7 +19,7 @@
   
   <!-- Privacy Policy -->
   <url>
-    <loc>https://www.yuvaupdate.in/privacy</loc>
+  <loc>https://yuvaupdate.in/privacy</loc>
     <lastmod>2025-09-10T12:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -27,7 +27,7 @@
   
   <!-- Terms of Service -->
   <url>
-    <loc>https://www.yuvaupdate.in/terms</loc>
+  <loc>https://yuvaupdate.in/terms</loc>
     <lastmod>2025-09-10T12:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -35,7 +35,7 @@
   
   <!-- Support Page -->
   <url>
-    <loc>https://www.yuvaupdate.in/support</loc>
+  <loc>https://yuvaupdate.in/support</loc>
     <lastmod>2025-09-10T12:00:00+00:00</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

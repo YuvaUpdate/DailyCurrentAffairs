@@ -12,6 +12,8 @@ import Terms from "./pages/Terms";
 import About from "./pages/About";
 import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
+import ArticlePage from "./pages/ArticlePage";
+import CategoryPage from "./pages/CategoryPage";
 import { initImageOptimizations } from "@/services/ImagePreloadService";
 import { WebAnalyticsService } from "@/services/WebAnalyticsService";
 import { VideoFeedProvider, useVideoFeed } from "@/contexts/VideoFeedContext";
@@ -56,6 +58,8 @@ const AppContent = () => {
             <Route path="/about" element={<About />} />
             <Route path="/support" element={<Support />} />
             <Route path="/admin" element={<AdminPageLazy />} />
+            <Route path="/article/:id" element={<ArticlePage />} />
+            <Route path="/category/:slug" element={<CategoryPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
