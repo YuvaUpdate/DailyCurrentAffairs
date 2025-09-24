@@ -123,7 +123,45 @@ export class TestNotificationService {
   static async sendBreakingNewsNotification(headline: string): Promise<boolean> {
     try {
       console.log('🚨 Sending breaking news notification:', headline);
-      
+      // Attach platform-specific options so mobile clients can play a
+      // distinctive breaking-news sound and treat it as high priority.
+      // These fields are optional and are forwarded as-is by NotificationSender
+      // to the Cloud Function which should map them to FCM fields.
+      const options = {
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'breaking_news',
+            sound: 'breaking_sound', // requires mobile app/channel setup
+            defaultSound: false,
+            tag: 'breaking_news',
+            // For Android 8+, channel-based importance is required; channelId
+            // should be pre-configured in the mobile app to use the custom sound.
+          }
+        },
+        apns: {
+          headers: {
+            'apns-priority': '10'
+          },
+          payload: {
+            aps: {
+              sound: 'breaking_sound.caf',
+              'content-available': 1,
+              category: 'BREAKING'
+            }
+          }
+        },
+        webpush: {
+          headers: {
+            Urgency: 'high'
+          },
+          notification: {
+            renotify: true,
+            tag: 'breaking_news'
+          }
+        }
+      };
+
       const success = await NotificationSender.sendCustomNotification(
         '🚨 BREAKING NEWS',
         headline,
@@ -131,8 +169,10 @@ export class TestNotificationService {
           type: 'breaking_news',
           priority: 'high',
           timestamp: new Date().toISOString(),
-          source: 'web_admin'
-        }
+          source: 'web_admin',
+          breaking: true
+        },
+        options
       );
 
       if (success) {

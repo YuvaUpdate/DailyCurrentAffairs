@@ -13,17 +13,21 @@ export class NotificationSender {
    * Send notification to all users via Firebase Cloud Function
    * This creates notifications that appear in the notification tray
    */
+  // `options` may contain platform-specific overrides that are forwarded to
+  // the FCM send function (android, apns, webpush, etc). This keeps
+  // backwards compatibility with existing calls which don't provide options.
   static async sendNotificationToAllUsers(notification: {
     title: string;
     body: string;
     data?: any;
-  }): Promise<boolean> {
+  }, options?: any): Promise<boolean> {
     try {
       this.callCounter++;
       const uniqueId = Math.random().toString(36).substr(2, 9);
       console.log(`📤 [Call #${this.callCounter}] [${uniqueId}] Sending notification to all users:`, notification);
 
-      const payload = {
+      // Build base payload and merge any platform-specific options if provided.
+      const payload: any = {
         topic: 'news-updates',
         notification: {
           title: notification.title,
@@ -34,6 +38,13 @@ export class NotificationSender {
           clientRequestId: uniqueId // Add unique ID to track duplicates
         },
       };
+
+      // Merge top-level options (android, apns, webpush, etc.) so callers can
+      // request custom sounds, priority or renotify behavior. We deliberately
+      // do a shallow merge so existing payload structure is preserved.
+      if (options && typeof options === 'object') {
+        Object.assign(payload, options);
+      }
 
       console.log(`📤 [${uniqueId}] Notification payload:`, payload);
 
@@ -138,12 +149,14 @@ export class NotificationSender {
   /**
    * Send custom notification with title and body
    */
-  static async sendCustomNotification(title: string, body: string, data?: any): Promise<boolean> {
+  // Send a custom notification. `data` becomes the message data payload and
+  // `options` may include platform specific fields (android, apns, webpush).
+  static async sendCustomNotification(title: string, body: string, data?: any, options?: any): Promise<boolean> {
     return await this.sendNotificationToAllUsers({
       title,
       body,
       data
-    });
+    }, options);
   }
 
   /**
