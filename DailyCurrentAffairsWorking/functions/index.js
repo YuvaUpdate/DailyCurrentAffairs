@@ -37,7 +37,7 @@ exports.sendNotificationToTopic = onRequest({cors: true}, async (req, res) => {
   }
 
   try {
-    const {topic, notification, data} = req.body;
+  const {topic, notification, data, android: incomingAndroid, apns: incomingApns, webpush: incomingWebpush} = req.body;
 
     if (!topic || !notification) {
       res.status(400).json({
@@ -54,6 +54,7 @@ exports.sendNotificationToTopic = onRequest({cors: true}, async (req, res) => {
         body: notification.body || "",
       },
       data: data || {},
+      // Default android options which can be overridden by incoming payload
       android: {
         priority: "high",
         notification: {
@@ -62,6 +63,55 @@ exports.sendNotificationToTopic = onRequest({cors: true}, async (req, res) => {
         },
       },
     };
+
+    // Merge incoming platform-specific overrides if provided. We merge nested
+    // `notification` objects carefully to preserve defaults while allowing
+    // admin to request channelId/sound/priority.
+    if (incomingAndroid && typeof incomingAndroid === 'object') {
+      // Merge top-level android keys
+      message.android = {
+        ...(message.android || {}),
+        ...incomingAndroid,
+      };
+      // Ensure nested notification object is merged
+      message.android.notification = {
+        ...(message.android.notification || {}),
+        ...((incomingAndroid && incomingAndroid.notification) || {}),
+      };
+    }
+
+    if (incomingApns && typeof incomingApns === 'object') {
+      // If caller provided full apns object, use it (it should contain headers and payload)
+      message.apns = {
+        ...(message.apns || {}),
+        ...incomingApns,
+      };
+      // If an aps payload is provided, ensure we don't accidentally overwrite required fields
+      if (incomingApns.payload && incomingApns.payload.aps) {
+        message.apns.payload = {
+          ...(message.apns.payload || {}),
+          ...incomingApns.payload,
+        };
+        message.apns.payload.aps = {
+          ...(message.apns.payload.aps || {}),
+          ...(incomingApns.payload.aps || {}),
+        };
+      }
+    }
+
+    if (incomingWebpush && typeof incomingWebpush === 'object') {
+      message.webpush = {
+        ...(message.webpush || {}),
+        ...incomingWebpush,
+      };
+      // Merge nested notification if present
+      if (incomingWebpush.notification) {
+        message.webpush.notification = {
+          ...(message.webpush.notification || {}),
+          ...incomingWebpush.notification,
+        };
+      }
+    }
 
     logger.info("🚀 Sending message:", message);
 

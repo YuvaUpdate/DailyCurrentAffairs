@@ -27,16 +27,33 @@ export class NotificationSender {
       console.log(`📤 [Call #${this.callCounter}] [${uniqueId}] Sending notification to all users:`, notification);
 
       // Build base payload and merge any platform-specific options if provided.
+      // Ensure data payload only contains string values because FCM (and
+      // our Cloud Function validation) often requires `data` to be strings.
+      const rawData = { ...(notification.data || {}), clientRequestId: uniqueId };
+      const stringifiedData: Record<string, string> = {};
+      Object.keys(rawData).forEach((k) => {
+        const v = (rawData as any)[k];
+        if (v === undefined || v === null) return;
+        // Keep strings as-is, otherwise stringify (booleans, numbers, objects)
+        if (typeof v === 'string') {
+          stringifiedData[k] = v;
+        } else {
+          try {
+            stringifiedData[k] = typeof v === 'object' ? JSON.stringify(v) : String(v);
+          } catch (e) {
+            // Fallback to String conversion
+            stringifiedData[k] = String(v);
+          }
+        }
+      });
+
       const payload: any = {
         topic: 'news-updates',
         notification: {
           title: notification.title,
           body: notification.body,
         },
-        data: {
-          ...notification.data || {},
-          clientRequestId: uniqueId // Add unique ID to track duplicates
-        },
+        data: stringifiedData,
       };
 
       // Merge top-level options (android, apns, webpush, etc.) so callers can
