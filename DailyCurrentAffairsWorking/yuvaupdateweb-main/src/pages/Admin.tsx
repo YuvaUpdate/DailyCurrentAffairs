@@ -401,8 +401,14 @@ export default function AdminPanel() {
         sourceUrl: sourceUrl.slice(0, SOURCEURL_MAX),
         mediaType: youtubeUrl ? 'youtube' : (uploadedMedia?.type || 'image'),
         mediaPath: uploadedMedia?.path,
-        timestamp: new Date().toISOString(),
+        // Do not overwrite `timestamp` when editing an existing article.
+        // Only new articles receive a new timestamp so that edit operations
+        // don't move articles to the top of chronological lists.
       };
+      // Only add timestamp for new articles
+      if (!editingArticle) {
+        payload.timestamp = new Date().toISOString();
+      }
       Object.keys(payload).forEach((key) => {
         if (payload[key] === undefined) delete payload[key];
       });
