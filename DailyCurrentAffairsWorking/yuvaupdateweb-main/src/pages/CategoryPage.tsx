@@ -17,6 +17,17 @@ const CategoryPage: React.FC = () => {
       setLoading(true);
       try {
         const list: NewsArticle[] = await firebaseNewsService.getArticlesByCategory(slug || '');
+        const toDateSafe = (ts: any): Date => {
+          if (!ts) return new Date();
+          try {
+            if (ts?.toDate && typeof ts.toDate === 'function') return ts.toDate();
+            if (typeof ts === 'object' && typeof ts.seconds === 'number') return new Date(ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds/1e6) : 0));
+            if (typeof ts === 'number') return new Date(ts);
+            if (typeof ts === 'string') return new Date(ts);
+            return new Date(String(ts));
+          } catch { return new Date(); }
+        };
+
         const mapped = list.map(n => ({
           id: String((n as any).docId ?? n.id),
           title: n.headline || n.description || 'Untitled',
@@ -27,7 +38,7 @@ const CategoryPage: React.FC = () => {
           videoUrl: undefined,
           source: n.source || '',
           sourceUrl: (n as any).sourceUrl || n.link || '',
-          publishedAt: n.timestamp ? new Date(n.timestamp) : new Date(),
+          publishedAt: toDateSafe((n as any).timestamp),
           category: n.category,
           tags: (n as any).tags || [],
           readTime: n.readTime,

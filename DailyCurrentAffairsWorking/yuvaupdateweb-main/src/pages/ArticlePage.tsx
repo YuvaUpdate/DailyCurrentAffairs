@@ -21,6 +21,16 @@ const ArticlePage: React.FC = () => {
         // Try to find by docId or id (both may be used in the codebase)
         const found = articles.find(a => String((a as any).docId ?? a.id) === String(id));
         if (found) {
+          const toDateSafe = (ts: any): Date => {
+            if (!ts) return new Date();
+            try {
+              if (ts?.toDate && typeof ts.toDate === 'function') return ts.toDate();
+              if (typeof ts === 'object' && typeof ts.seconds === 'number') return new Date(ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds/1e6) : 0));
+              if (typeof ts === 'number') return new Date(ts);
+              if (typeof ts === 'string') return new Date(ts);
+              return new Date(String(ts));
+            } catch { return new Date(); }
+          };
           // Map NewsArticle -> ArticleType
           const mapped: ArticleType = {
             id: String((found as any).docId ?? found.id),
@@ -32,7 +42,7 @@ const ArticlePage: React.FC = () => {
             videoUrl: undefined,
             source: found.source || '',
             sourceUrl: (found as any).sourceUrl || found.link || '',
-            publishedAt: found.timestamp ? new Date(found.timestamp) : new Date(),
+            publishedAt: toDateSafe((found as any).timestamp),
             category: found.category,
             tags: (found as any).tags || [],
             readTime: found.readTime,

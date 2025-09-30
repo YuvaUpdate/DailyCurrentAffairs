@@ -128,10 +128,42 @@ export class FirebaseNewsService {
     try {
       const q = query(collection(db, this.collectionName), orderBy('timestamp', 'desc'));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data(),
-        docId: doc.id,
-      }));
+
+      const normalized = querySnapshot.docs.map((doc) => {
+        const data = doc.data() as any;
+
+        // compute millis from mixed timestamp shapes
+        let tsMillis = 0;
+        const ts = data.timestamp;
+        try {
+          if (ts == null) {
+            tsMillis = 0;
+          } else if (typeof ts === 'object' && typeof ts.seconds === 'number') {
+            tsMillis = ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds / 1e6) : 0);
+          } else if (typeof ts === 'number') {
+            tsMillis = ts;
+          } else if (typeof ts === 'string') {
+            const parsed = Date.parse(ts);
+            tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+          } else {
+            const parsed = Date.parse(String(ts));
+            tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+          }
+        } catch (e) {
+          tsMillis = 0;
+        }
+
+        return {
+          ...data,
+          docId: doc.id,
+          __tsMillis: tsMillis,
+        };
+      });
+
+      // ensure newest-first ordering
+      normalized.sort((a, b) => (b.__tsMillis || 0) - (a.__tsMillis || 0));
+
+      return normalized;
     } catch (error) {
       console.error('Error getting articles with doc IDs:', error);
       return [];
@@ -260,11 +292,40 @@ export class FirebaseNewsService {
       );
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map((doc, index) => ({
-        id: index + 1, // Use index-based ID for display
-        ...doc.data(),
-        timestamp: this.formatTimestamp(doc.data().timestamp)
-      })) as NewsArticle[];
+      // Normalize timestamps to millis for stable sorting, but return the same shape (timestamp as formatted string)
+      const normalized = querySnapshot.docs.map((doc, index) => {
+        const data = doc.data() as any;
+
+        // compute millis
+        let tsMillis = 0;
+        const ts = data.timestamp;
+        try {
+          if (ts == null) tsMillis = 0;
+          else if (typeof ts === 'object' && typeof ts.seconds === 'number') tsMillis = ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds / 1e6) : 0);
+          else if (typeof ts === 'number') tsMillis = ts;
+          else if (typeof ts === 'string') {
+            const parsed = Date.parse(ts);
+            tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+          } else {
+            const parsed = Date.parse(String(ts));
+            tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+          }
+        } catch (e) {
+          tsMillis = 0;
+        }
+
+        return {
+          id: index + 1,
+          ...data,
+          timestamp: this.formatTimestamp(data.timestamp),
+          __tsMillis: tsMillis,
+        };
+      });
+
+      normalized.sort((a, b) => (b.__tsMillis || 0) - (a.__tsMillis || 0));
+
+      // Strip internal __tsMillis before returning to keep shape stable
+      return normalized.map(({ __tsMillis, ...rest }) => rest) as NewsArticle[];
     } catch (error: any) {
       console.error('Error getting articles:', error);
       // If Firestore rules deny access OR network issues, return local fallback so app isn't empty
@@ -288,11 +349,35 @@ export class FirebaseNewsService {
       );
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map((doc, index) => ({
-        id: index + 1, // Use index-based ID for display
-        ...doc.data(),
-        timestamp: this.formatTimestamp(doc.data().timestamp)
-      })) as NewsArticle[];
+      const normalized = querySnapshot.docs.map((doc, index) => {
+        const data = doc.data() as any;
+        let tsMillis = 0;
+        const ts = data.timestamp;
+        try {
+          if (ts == null) tsMillis = 0;
+          else if (typeof ts === 'object' && typeof ts.seconds === 'number') tsMillis = ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds / 1e6) : 0);
+          else if (typeof ts === 'number') tsMillis = ts;
+          else if (typeof ts === 'string') {
+            const parsed = Date.parse(ts);
+            tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+          } else {
+            const parsed = Date.parse(String(ts));
+            tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+          }
+        } catch (e) {
+          tsMillis = 0;
+        }
+
+        return {
+          id: index + 1,
+          ...data,
+          timestamp: this.formatTimestamp(data.timestamp),
+          __tsMillis: tsMillis,
+        };
+      });
+
+      normalized.sort((a, b) => (b.__tsMillis || 0) - (a.__tsMillis || 0));
+      return normalized.map(({ __tsMillis, ...rest }) => rest) as NewsArticle[];
     } catch (error: any) {
       console.error('Error getting articles by category:', error);
       if (error && error.code === 'permission-denied') {
@@ -313,12 +398,35 @@ export class FirebaseNewsService {
     try {
       const unsub = onSnapshot(q, (snapshot) => {
         try {
-          const articles = snapshot.docs.map((doc, index) => ({
-            id: index + 1, // Use index-based ID for display
-            ...doc.data(),
-            timestamp: this.formatTimestamp(doc.data().timestamp)
-          })) as NewsArticle[];
-          callback(articles);
+          const normalized = snapshot.docs.map((doc, index) => {
+            const data = doc.data() as any;
+            let tsMillis = 0;
+            const ts = data.timestamp;
+            try {
+              if (ts == null) tsMillis = 0;
+              else if (typeof ts === 'object' && typeof ts.seconds === 'number') tsMillis = ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds / 1e6) : 0);
+              else if (typeof ts === 'number') tsMillis = ts;
+              else if (typeof ts === 'string') {
+                const parsed = Date.parse(ts);
+                tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+              } else {
+                const parsed = Date.parse(String(ts));
+                tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+              }
+            } catch (e) {
+              tsMillis = 0;
+            }
+
+            return {
+              id: index + 1,
+              ...data,
+              timestamp: this.formatTimestamp(data.timestamp),
+              __tsMillis: tsMillis,
+            } as any;
+          });
+
+          normalized.sort((a, b) => (b.__tsMillis || 0) - (a.__tsMillis || 0));
+          callback(normalized.map(({ __tsMillis, ...rest }) => rest) as NewsArticle[]);
         } catch (inner) {
           console.warn('Error processing snapshot data, sending fallback articles', inner);
           callback(this.fallbackArticles);

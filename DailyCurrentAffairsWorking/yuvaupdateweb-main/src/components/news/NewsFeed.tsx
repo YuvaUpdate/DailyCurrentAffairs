@@ -17,7 +17,9 @@ const COLLECTION_NAME = "news_articles";
 
 export function NewsFeed() {
   const { isVideoFeedOpen, openVideoFeed } = useVideoFeed();
-  const [articles, setArticles] = useState<ArticleType[]>([]);
+  // LocalArticle extends ArticleType with a computed numeric ms value for stable sorting
+  type LocalArticle = ArticleType & { _publishedMs?: number };
+  const [articles, setArticles] = useState<LocalArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
@@ -25,6 +27,7 @@ export function NewsFeed() {
   const [hasMore, setHasMore] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const { toast } = useToast();
 
   // Fetch initial articles from Firestore
@@ -38,8 +41,24 @@ export function NewsFeed() {
           limit(ARTICLES_PER_PAGE)
         );
         const snapshot = await getDocs(q);
-        const fetchedArticles: ArticleType[] = snapshot.docs.map(doc => {
+        // Helper: compute millis from various timestamp shapes
+        const toMillis = (ts: any): number => {
+          if (ts == null) return 0;
+          try {
+            if (ts?.toDate && typeof ts.toDate === 'function') return ts.toDate().getTime();
+            if (typeof ts === 'object' && typeof ts.seconds === 'number') return ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds / 1e6) : 0);
+            if (typeof ts === 'number') return ts;
+            if (typeof ts === 'string') {
+              const p = Date.parse(ts); return Number.isNaN(p) ? 0 : p;
+            }
+            const p = Date.parse(String(ts)); return Number.isNaN(p) ? 0 : p;
+          } catch { return 0; }
+        };
+
+        const fetchedArticles: LocalArticle[] = snapshot.docs.map(doc => {
           const data = doc.data();
+          const publishedAt = data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : (data.timestamp && typeof data.timestamp === 'string' ? new Date(data.timestamp) : new Date()));
+          const _publishedMs = toMillis(data.timestamp ?? publishedAt);
           return {
             id: doc.id,
             title: data.headline || data.title || "",
@@ -48,16 +67,22 @@ export function NewsFeed() {
             youtubeUrl: data.youtubeUrl || "",
             source: data.source || "",
             sourceUrl: data.sourceUrl || data.source_url || data.link || "",
-            publishedAt: data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date()),
+            publishedAt,
             category: data.category,
             readTime: data.readTime || data.read_time || "",
             tags: data.tags || [],
             mediaType: data.mediaType || 'image',
             mediaPath: data.mediaPath || "",
+            _publishedMs,
           };
         });
+
+        // Sort client-side to be defensive against mixed timestamp formats
+        fetchedArticles.sort((a, b) => (b._publishedMs || 0) - (a._publishedMs || 0));
+
         setArticles(fetchedArticles);
         setHasMore(snapshot.docs.length === ARTICLES_PER_PAGE);
+        setLastVisible(snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null);
         
         // Preload images for first few articles for faster loading
         if (fetchedArticles.length > 0) {
@@ -86,11 +111,11 @@ export function NewsFeed() {
     if (loadingMore || !hasMore || articles.length === 0) return;
     try {
       setLoadingMore(true);
-      const lastArticle = articles[articles.length - 1];
+      if (!lastVisible) return;
       const q = query(
         collection(db, COLLECTION_NAME),
         orderBy("timestamp", "desc"),
-        startAfter(lastArticle.publishedAt),
+        startAfter(lastVisible),
         limit(ARTICLES_PER_PAGE)
       );
       const snapshot = await getDocs(q);
@@ -112,8 +137,31 @@ export function NewsFeed() {
           mediaPath: data.mediaPath || "",
         };
       });
-      setArticles(prev => [...prev, ...newArticles]);
+      // Normalize and merge then re-sort defensively
+      const toMillis = (ts: any): number => {
+        if (ts == null) return 0;
+        try {
+          if (ts?.toDate && typeof ts.toDate === 'function') return ts.toDate().getTime();
+          if (typeof ts === 'object' && typeof ts.seconds === 'number') return ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds / 1e6) : 0);
+          if (typeof ts === 'number') return ts;
+          if (typeof ts === 'string') {
+            const p = Date.parse(ts); return Number.isNaN(p) ? 0 : p;
+          }
+          const p = Date.parse(String(ts)); return Number.isNaN(p) ? 0 : p;
+        } catch { return 0; }
+      };
+
+      const newLocal: LocalArticle[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const publishedAt = data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : (data.timestamp && typeof data.timestamp === 'string' ? new Date(data.timestamp) : new Date()));
+        return { ...( { id: doc.id, title: data.headline || data.title || "", summary: data.description || data.summary || "", imageUrl: data.image || data.imageUrl || "", youtubeUrl: data.youtubeUrl || "", source: data.source || "", sourceUrl: data.sourceUrl || data.source_url || data.link || "", publishedAt, category: data.category, readTime: data.readTime || data.read_time || "", tags: data.tags || [], mediaType: data.mediaType || 'image', mediaPath: data.mediaPath || "" } as any ), _publishedMs: toMillis(data.timestamp ?? publishedAt) } as LocalArticle;
+      });
+
+      const merged = [...articles, ...newLocal];
+      merged.sort((a, b) => (b._publishedMs || 0) - (a._publishedMs || 0));
+      setArticles(merged);
       setHasMore(snapshot.docs.length === ARTICLES_PER_PAGE);
+      setLastVisible(snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : lastVisible);
       
       // Preload images for newly loaded articles
       if (newArticles.length > 0) {
@@ -188,8 +236,23 @@ export function NewsFeed() {
         limit(ARTICLES_PER_PAGE)
       );
       const snapshot = await getDocs(q);
-      const refreshedArticles: ArticleType[] = snapshot.docs.map(doc => {
+      // Refresh: normalize and sort defensively
+      const toMillis = (ts: any): number => {
+        if (ts == null) return 0;
+        try {
+          if (ts?.toDate && typeof ts.toDate === 'function') return ts.toDate().getTime();
+          if (typeof ts === 'object' && typeof ts.seconds === 'number') return ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds / 1e6) : 0);
+          if (typeof ts === 'number') return ts;
+          if (typeof ts === 'string') {
+            const p = Date.parse(ts); return Number.isNaN(p) ? 0 : p;
+          }
+          const p = Date.parse(String(ts)); return Number.isNaN(p) ? 0 : p;
+        } catch { return 0; }
+      };
+
+      const refreshedArticles: LocalArticle[] = snapshot.docs.map(doc => {
         const data = doc.data();
+        const publishedAt = data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : (data.timestamp && typeof data.timestamp === 'string' ? new Date(data.timestamp) : new Date()));
         return {
           id: doc.id,
           title: data.headline || data.title || "",
@@ -198,16 +261,19 @@ export function NewsFeed() {
           youtubeUrl: data.youtubeUrl || "",
           source: data.source || "",
           sourceUrl: data.sourceUrl || data.source_url || data.link || "",
-          publishedAt: data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date()),
+          publishedAt,
           category: data.category,
           readTime: data.readTime || data.read_time || "",
           tags: data.tags || [],
           mediaType: data.mediaType || 'image',
           mediaPath: data.mediaPath || "",
+          _publishedMs: toMillis(data.timestamp ?? publishedAt),
         };
       });
+  refreshedArticles.sort((a, b) => (b._publishedMs || 0) - (a._publishedMs || 0));
   setArticles(refreshedArticles);
   setHasMore(snapshot.docs.length === ARTICLES_PER_PAGE);
+  setLastVisible(snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null);
   
   // Preload images for refreshed articles while preserving user position
   if (refreshedArticles.length > 0) {

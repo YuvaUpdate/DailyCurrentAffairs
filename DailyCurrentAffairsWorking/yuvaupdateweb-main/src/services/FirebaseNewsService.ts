@@ -126,12 +126,50 @@ export class FirebaseNewsService {
   // Get all articles with Firestore doc IDs (for deletion/editing)
   async getArticlesWithDocIds(): Promise<any[]> {
     try {
+      // Query by timestamp on Firestore to avoid a full collection scan in most cases,
+      // but be defensive: documents may contain timestamps in different formats
+      // (Firestore Timestamp, ISO string, number). We'll normalize to millis and
+      // re-sort in-memory to guarantee correct newest-first ordering.
       const q = query(collection(db, this.collectionName), orderBy('timestamp', 'desc'));
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) => ({
-        ...doc.data(),
-        docId: doc.id,
-      }));
+
+      const normalized = querySnapshot.docs.map((doc) => {
+        const data = doc.data() as any;
+
+        // Normalize timestamp to milliseconds since epoch for robust sorting
+        let tsMillis = 0;
+        const ts = data.timestamp;
+        try {
+          if (ts == null) {
+            tsMillis = 0;
+          } else if (typeof ts === 'object' && typeof ts.seconds === 'number') {
+            // Firestore Timestamp
+            tsMillis = ts.seconds * 1000 + (typeof ts.nanoseconds === 'number' ? Math.floor(ts.nanoseconds / 1e6) : 0);
+          } else if (typeof ts === 'number') {
+            tsMillis = ts;
+          } else if (typeof ts === 'string') {
+            const parsed = Date.parse(ts);
+            tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+          } else {
+            // Fallback: try Date.parse on string coercion
+            const parsed = Date.parse(String(ts));
+            tsMillis = Number.isNaN(parsed) ? 0 : parsed;
+          }
+        } catch (e) {
+          tsMillis = 0;
+        }
+
+        return {
+          ...data,
+          docId: doc.id,
+          __tsMillis: tsMillis,
+        };
+      });
+
+      // Ensure stable newest-first ordering using the normalized millis value.
+      normalized.sort((a, b) => (b.__tsMillis || 0) - (a.__tsMillis || 0));
+
+      return normalized;
     } catch (error) {
       console.error('Error getting articles with doc IDs:', error);
       return [];
