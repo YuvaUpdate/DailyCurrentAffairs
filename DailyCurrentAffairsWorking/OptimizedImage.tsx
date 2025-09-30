@@ -62,24 +62,34 @@ const OptimizedImage = memo(({
     }
   }, [source.uri]);
 
-  // When the app comes back to the foreground, some platforms may return a cached image
-  // for the same URL. Append a short-lived cache-busting query param to force reload
-  // only when the app transitions to 'active'. This avoids touching server or web code.
+  // When the app comes back to the foreground, prefer using the prefetch cache
+  // instead of forcing a reload. If the image is already cached, show it immediately.
+  // Otherwise trigger a prefetch for this image so it appears quickly.
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         try {
           const url = source?.uri;
-          if (url) {
-            // Preserve existing query params
-            const separator = url.includes('?') ? '&' : '?';
-            const busted = `${url}${separator}_r=${Date.now()}`;
-            // Only update if the busted URL is different to avoid re-render loops
-            if (busted !== imageSource.uri) {
-              setImageSource({ uri: busted });
-              // Allow prefetch service to register the new URL as cached after load
-              // and then remove the param so other parts of the app still use canonical URL
-            }
+          if (!url) return;
+
+          // If image cached, show immediately; otherwise prefetch on resume
+          const isCached = prefetchService.isImageCached(url);
+          if (isCached) {
+            // If cached we can show immediately without any cache-busting
+            setImageSource({ uri: url });
+            setIsLoading(false);
+            setShowImage(true);
+          } else {
+            // Prefetch in background and show once ready
+            prefetchService.prefetchImage(url).then((ok) => {
+              if (ok) {
+                setImageSource({ uri: url });
+                setIsLoading(false);
+                setShowImage(true);
+              }
+            }).catch(() => {
+              // keep existing behavior on failure
+            });
           }
         } catch (e) {
           // ignore
@@ -88,13 +98,10 @@ const OptimizedImage = memo(({
       appState.current = nextAppState;
     };
 
-    // Register listener in a way that's compatible across RN versions
     let subscription: any = null;
     if (typeof (AppState as any).addEventListener === 'function') {
-      // Newer RN: returns subscription with remove()
       subscription = (AppState as any).addEventListener('change', handleAppStateChange);
     } else {
-      // Older RN: addEventListener exists but typings may differ; use old API
       try {
         (AppState as any).addEventListener('change', handleAppStateChange);
       } catch (e) {
@@ -113,7 +120,7 @@ const OptimizedImage = memo(({
         // ignore cleanup errors
       }
     };
-  }, [source, imageSource.uri]);
+  }, [source, imageSource.uri, prefetchService]);
 
   const handleLoad = () => {
     setIsLoading(false);

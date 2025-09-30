@@ -24,6 +24,7 @@ import {
   FlatList,
   Animated,
 } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import FastTouchable from './FastTouchable';
 import AdminPanel from './AdminPanel';
 import Sidebar from './Sidebar';
@@ -730,6 +731,45 @@ export default function App(props: AppProps) {
       cacheWarmer.smartPrefetch(filteredNews, currentIndex);
     }
   }, [currentIndex, filteredNews]);
+
+  // When the app returns from background, re-warm the cache and smart-prefetch
+  useEffect(() => {
+    const handleAppStateChange = (next: AppStateStatus) => {
+      if (next === 'active') {
+        try {
+          const cacheWarmer = ImageCacheWarmer.getInstance();
+          // Re-warm critical images (no-op if already warmed)
+          cacheWarmer.warmUpCache(filteredNews).catch(console.warn);
+          // Smart prefetch around current index
+          cacheWarmer.smartPrefetch(filteredNews, currentIndex).catch(console.warn);
+        } catch (e) {
+          console.warn('Error warming image cache on resume', e);
+        }
+      }
+    };
+
+    let sub: any = null;
+    if (typeof (AppState as any).addEventListener === 'function') {
+      sub = (AppState as any).addEventListener('change', handleAppStateChange);
+    } else {
+      try {
+        (AppState as any).addEventListener('change', handleAppStateChange);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return () => {
+      try {
+        if (sub && typeof sub.remove === 'function') sub.remove();
+        else if (typeof (AppState as any).removeEventListener === 'function') {
+          (AppState as any).removeEventListener('change', handleAppStateChange);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, [filteredNews, currentIndex]);
 
   // Reset current index when filtered news changes
   useEffect(() => {
