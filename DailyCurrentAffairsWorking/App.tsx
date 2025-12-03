@@ -32,6 +32,7 @@ import VideoPlayerComponent from './VideoPlayerComponent';
 import YouTubePlayer from './YouTubePlayer';
 import VideoFeed from './VideoFeed';
 import { NewsArticle } from './types';
+import { VIDEOS_ENABLED, COMMENTS_ENABLED } from './featureFlags';
 // Lazy-load FirebaseNewsService at runtime to reduce startup parsing/execution
 let _firebaseNewsService: any = null;
 async function getFirebaseNewsService() {
@@ -1804,7 +1805,8 @@ export default function App(props: AppProps) {
         </View>
       )}
         <View style={styles.headerButtons}>
-          {/* Video Button */}
+          {/* Video Button - Only visible when VIDEOS_ENABLED feature flag is true */}
+          {VIDEOS_ENABLED && (
           <FastTouchable 
             style={[styles.headerVideoButton, { backgroundColor: currentTheme.accent }]}
             onPress={() => setVideoFeedVisible(true)}
@@ -1812,6 +1814,7 @@ export default function App(props: AppProps) {
           >
             <Text style={[styles.headerVideoButtonText, { color: '#FFFFFF' }]}>VIDEO</Text>
           </FastTouchable>
+          )}
           {/* Admin Button - Only visible for admin users and when included in this build */}
           {INCLUDE_ADMIN_PANEL && userProfile && authService.isAdminUser(userProfile) && (
             <FastTouchable 
@@ -1928,7 +1931,8 @@ export default function App(props: AppProps) {
 
 
 
-      {/* Video Feed Modal */}
+      {/* Video Feed Modal - Only rendered when VIDEOS_ENABLED feature flag is true */}
+      {VIDEOS_ENABLED && (
       <Modal
         visible={videoFeedVisible}
         animationType="slide"
@@ -1940,6 +1944,7 @@ export default function App(props: AppProps) {
           isDarkMode={isDarkMode}
         />
       </Modal>
+      )}
 
       {/* Auth Screen Modal for login/register when not authenticated */}
       <Modal

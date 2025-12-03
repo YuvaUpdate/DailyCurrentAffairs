@@ -13,6 +13,7 @@ import { authService } from './AuthService';
 import { userService } from './UserService';
 import { Comments } from './Comments';
 import { SHOW_BOOKMARKS } from './uiConfig';
+import { COMMENTS_ENABLED } from './featureFlags';
 
 interface ArticleActionsProps {
   article: NewsArticle;
@@ -175,11 +176,13 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
           <Text style={[styles.actionText, { color: theme.subText }]}>Share</Text>
         </FastTouchable>
 
-        {/* Comments Button */}
+        {/* Comments Button - Only visible when COMMENTS_ENABLED feature flag is true */}
+        {COMMENTS_ENABLED && (
         <FastTouchable style={[styles.actionButton, { backgroundColor: theme.surface }]} onPress={handleComments}>
           <Text style={[styles.actionIcon, { color: theme.text }]}>◉</Text>
           <Text style={[styles.actionText, { color: theme.subText }]}>Comments</Text>
         </FastTouchable>
+        )}
 
         {/* Audio Button */}
         <FastTouchable
@@ -203,8 +206,8 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ article, isDarkM
         </FastTouchable>
       </View>
 
-      {/* Comments Modal */}
-      {showComments && (
+      {/* Comments Modal - Only rendered when COMMENTS_ENABLED feature flag is true */}
+      {COMMENTS_ENABLED && showComments && (
         <Comments 
           article={article} 
           onClose={() => setShowComments(false)}
