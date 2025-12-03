@@ -97,7 +97,7 @@ export default function PrivacyPolicy({ onClose, isDarkMode }: PrivacyPolicyProp
         <Text style={[styles.section, { color: theme.text }]}>
           <Text style={styles.sectionTitle}>7. Children's Privacy</Text>
           {'\n\n'}
-          Our service is not intended for children under 13. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us.
+          Our service is intended for users aged 18 and older. We do not knowingly collect personal information from children under 18. If you are a parent or guardian and believe your child has provided us with personal information, please contact us immediately, and we will take steps to delete such information.
         </Text>
 
         <Text style={[styles.section, { color: theme.text }]}>

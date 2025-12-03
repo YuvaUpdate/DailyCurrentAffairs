@@ -15,7 +15,7 @@ export default function Privacy() {
         <main className="flex-1">
           <div className="max-w-2xl mx-auto px-4 py-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Privacy Policy</h1>
-            <p className="text-xs text-muted-foreground mb-8">Last updated: September 6, 2025</p>
+            <p className="text-xs text-muted-foreground mb-8">Last updated: December 3, 2025</p>
 
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-2">1. Information We Collect</h2>
@@ -68,7 +68,7 @@ export default function Privacy() {
 
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-2">7. Children's Privacy</h2>
-              <p className="text-muted-foreground">Our service is not intended for children under 13. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us.</p>
+              <p className="text-muted-foreground"><strong>Our service is intended for users aged 18 and older.</strong> We do not knowingly collect personal information from children under 18. If you are a parent or guardian and believe your child has provided us with personal information, please contact us immediately, and we will take steps to delete such information.</p>
             </section>
 
             <section className="mb-8">
