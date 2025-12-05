@@ -30,12 +30,12 @@ export default function Support() {
                   <p className="text-muted-foreground text-sm">Tap the heart icon on any article card to bookmark it. You can view all saved articles in the sidebar under "Saved".</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-foreground mb-1">Can I customize my news categories?</h4>
+                  <h4 className="font-semibold text-foreground mb-1">Can I customize my content categories?</h4>
                   <p className="text-muted-foreground text-sm">Yes! Use the sidebar to filter articles by categories like Politics, Technology, Sports, and more.</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-foreground mb-1">How often is the news updated?</h4>
-                  <p className="text-muted-foreground text-sm">Our news feed is updated continuously throughout the day. Pull down on the main screen to refresh and get the latest articles.</p>
+                  <h4 className="font-semibold text-foreground mb-1">How often is the content updated?</h4>
+                  <p className="text-muted-foreground text-sm">Our content feed is updated continuously throughout the day. Pull down on the main screen to refresh and get the latest articles.</p>
                 </div>
                 <div>
                   <h4 className="font-semibold text-foreground mb-1">Why am I not receiving notifications?</h4>
@@ -75,7 +75,7 @@ export default function Support() {
 
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-2">Feedback</h2>
-              <p className="text-muted-foreground">Your feedback helps us improve YuvaUpdate. Share your suggestions, report bugs, or let us know what features you'd like to see next. We read every message and appreciate your input in making YuvaUpdate the best news app for current affairs.</p>
+              <p className="text-muted-foreground">Your feedback helps us improve YuvaUpdate. Share your suggestions, report bugs, or let us know what features you'd like to see next. We read every message and appreciate your input in making YuvaUpdate the best app for current affairs and education.</p>
             </section>
 
             <section className="mb-8">

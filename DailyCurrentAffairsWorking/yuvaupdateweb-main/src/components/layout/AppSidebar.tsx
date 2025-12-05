@@ -44,7 +44,7 @@ export function AppSidebar() {
             {!collapsed && (
               <div>
                 <h2 className="font-bold text-card-foreground">YuvaUpdate</h2>
-                <p className="text-xs text-muted-foreground">Professional News</p>
+                <p className="text-xs text-muted-foreground">Current Affairs</p>
               </div>
             )}
           </div>

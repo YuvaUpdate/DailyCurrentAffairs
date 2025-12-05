@@ -248,7 +248,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
         const updateId = (editingNews as any).docId ? (editingNews as any).docId : editingNews.id;
         await firebaseNewsService.updateArticle(updateId, articlePayload);
         result = updateId;
-        Alert.alert('Success', 'News article updated successfully!');
+        Alert.alert('Success', 'Article updated successfully!');
         // Refresh admin list quickly
         const refreshed = await firebaseNewsService.getArticlesWithDocIds();
         setAllNews(refreshed);
@@ -383,12 +383,12 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       setAllNews(news);
       
       if (news.length === 0) {
-        Alert.alert('Info', 'No news articles found in Firebase');
+        Alert.alert('Info', 'No articles found in Firebase');
       } else {
-        Alert.alert('Success', `Loaded ${news.length} news articles successfully!`);
+        Alert.alert('Success', `Loaded ${news.length} articles successfully!`);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to load news articles');
+      Alert.alert('Error', 'Failed to load articles');
       console.error('Error loading news:', error);
     } finally {
       setIsLoadingNews(false);
@@ -406,7 +406,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     setReadTime(article.readTime || '');
     setSourceUrl(article.sourceUrl || '');
     setActiveTab('manual');
-    Alert.alert('Info', 'Article loaded for editing. You can now modify it in the "Add News" tab.');
+    Alert.alert('Info', 'Article loaded for editing. You can now modify it in the "Add Article" tab.');
   };
 
   const handleDeleteNews = (article: NewsArticle) => {
@@ -429,16 +429,16 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       const updatedNews = await firebaseNewsService.getArticlesWithDocIds();
       setAllNews(updatedNews);
       
-      Alert.alert('Success', 'News article deleted successfully!');
+      Alert.alert('Success', 'Article deleted successfully!');
       console.log('🗑️ Articles reloaded, current count:', updatedNews.length);
     } catch (error: any) {
-      console.error('🗑️ Error deleting news:', error);
+      console.error('🗑️ Error deleting article:', error);
       console.error('🗑️ Error details:', {
         message: error?.message,
         code: error?.code,
         stack: error?.stack
       });
-      Alert.alert('Error', `Failed to delete news article: ${error?.message || 'Unknown error'}`);
+      Alert.alert('Error', `Failed to delete article: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -448,8 +448,8 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
     switch (type) {
       case 'breaking':
         quickArticle = {
-          headline: 'Breaking: Major News Update',
-          description: 'This is a breaking news story that just happened. More details will be updated as the story develops.',
+          headline: 'Important: Major Current Affairs Update',
+          description: 'This is an important current affairs update. More details will be updated as the story develops.',
           category: 'Breaking',
           readTime: '1 min read',
         };
@@ -482,7 +482,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
 
     try {
       await onAddNews(article);
-      Alert.alert('Success', `${type.charAt(0).toUpperCase() + type.slice(1)} news added!`);
+      Alert.alert('Success', `${type.charAt(0).toUpperCase() + type.slice(1)} article added!`);
     } catch (error) {
       console.error('AdminPanel: Quick add failed:', error);
       Alert.alert('Error', 'Failed to add quick article');
@@ -539,7 +539,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
       if (onBulkAddNews && articles.length > 0) {
         try {
           await onBulkAddNews(articles);
-          Alert.alert('Success', `Added ${articles.length} news articles from API!`);
+          Alert.alert('Success', `Added ${articles.length} articles from API!`);
         } catch (error) {
           console.error('AdminPanel: Bulk add failed:', error);
           Alert.alert('Error', 'Failed to add bulk articles. See console for details.');
@@ -548,7 +548,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
         Alert.alert('Info', 'No new articles found for this category. Try a different category or check your internet connection.');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch news from API. Please check your internet connection and API key.');
+      Alert.alert('Error', 'Failed to fetch articles from API. Please check your internet connection and API key.');
       console.error('API Error:', error);
     } finally {
       setIsLoading(false);
@@ -572,7 +572,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
         Alert.alert('Info', `No articles found for "${query}"`);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to search news. Please check your connection.');
+      Alert.alert('Error', 'Failed to search articles. Please check your connection.');
       console.error('Search Error:', error);
     } finally {
       setIsLoading(false);
@@ -680,7 +680,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
               ]}
               onPress={() => setActiveTab('manual')}
             >
-              <Text style={[styles.tabText, activeTab === 'manual' && styles.activeTabText, isSmallScreen ? styles.tabSmallText : undefined]}>Add News</Text>
+              <Text style={[styles.tabText, activeTab === 'manual' && styles.activeTabText, isSmallScreen ? styles.tabSmallText : undefined]}>Add Article</Text>
             </FastTouchable>
 
             <FastTouchable
@@ -705,7 +705,7 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
                 loadAllNews();
               }}
             >
-              <Text style={[styles.tabText, activeTab === 'manage' && styles.activeTabText, isSmallScreen ? styles.tabSmallText : undefined]}>Manage News</Text>
+              <Text style={[styles.tabText, activeTab === 'manage' && styles.activeTabText, isSmallScreen ? styles.tabSmallText : undefined]}>Manage Articles</Text>
             </FastTouchable>
 
             <FastTouchable
@@ -896,9 +896,9 @@ export default function AdminPanel({ visible, onClose, onAddNews, onBulkAddNews,
           {activeTab === 'manage' && (
             <View>
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Manage News</Text>
+                <Text style={styles.sectionTitle}>Manage Articles</Text>
                 <FastTouchable style={[styles.apiButton, { marginVertical: 10 }]} onPress={loadAllNews}>
-                  <Text style={styles.apiButtonText}>Reload News From Firebase</Text>
+                  <Text style={styles.apiButtonText}>Reload Articles From Firebase</Text>
                 </FastTouchable>
 
                 {isLoadingNews ? (

@@ -14,7 +14,7 @@ const Index = () => {
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-  <SEO description={`Latest news and updates from Yuva Update`} url={`https://yuvaupdate.in/`} />
+  <SEO description={`Latest current affairs and educational updates from Yuva Update`} url={`https://yuvaupdate.in/`} />
       <AppSidebar />
       <SidebarInset>
         <Header />

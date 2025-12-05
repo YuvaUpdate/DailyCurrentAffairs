@@ -48,13 +48,13 @@ export default function Support({ onClose, isDarkMode }: SupportProps) {
           {'\n'}
           A: Tap the heart icon on any article card to bookmark it. You can view all saved articles in the sidebar under "Saved".
           {'\n\n'}
-          <Text style={styles.faqQuestion}>Q: Can I customize my news categories?</Text>
+          <Text style={styles.faqQuestion}>Q: Can I customize my content categories?</Text>
           {'\n'}
           A: Yes! Use the sidebar to filter articles by categories like Politics, Technology, Sports, and more.
           {'\n\n'}
-          <Text style={styles.faqQuestion}>Q: How often is the news updated?</Text>
+          <Text style={styles.faqQuestion}>Q: How often is the content updated?</Text>
           {'\n'}
-          A: Our news feed is updated continuously throughout the day. Pull down on the main screen to refresh and get the latest articles.
+          A: Our current affairs feed is updated continuously throughout the day. Pull down on the main screen to refresh and get the latest articles.
           {'\n\n'}
           <Text style={styles.faqQuestion}>Q: Why am I not receiving notifications?</Text>
           {'\n'}
@@ -112,7 +112,7 @@ export default function Support({ onClose, isDarkMode }: SupportProps) {
           {'\n\n'}
           Your feedback helps us improve YuvaUpdate. Share your suggestions, report bugs, or let us know what features you'd like to see next.
           {'\n\n'}
-          We read every message and appreciate your input in making YuvaUpdate the best news app for current affairs.
+          We read every message and appreciate your input in making YuvaUpdate the best app for current affairs and education.
         </Text>
 
         <Text style={[styles.section, { color: theme.text }]}>

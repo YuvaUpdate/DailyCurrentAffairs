@@ -278,7 +278,7 @@ class FirebaseNotificationService {
   private showLocalNotification(remoteMessage: any): void {
     if (remoteMessage.notification) {
       Alert.alert(
-        remoteMessage.notification.title || 'News Update',
+        remoteMessage.notification.title || 'Current Affairs Update',
         remoteMessage.notification.body || '',
         [
           { text: 'Dismiss', style: 'cancel' },

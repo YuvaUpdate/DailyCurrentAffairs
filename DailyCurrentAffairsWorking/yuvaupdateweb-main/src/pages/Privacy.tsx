@@ -31,7 +31,7 @@ export default function Privacy() {
               <ul className="list-disc list-inside text-muted-foreground space-y-2">
                 <li>Provide, maintain, and improve our services</li>
                 <li>Personalize content based on your interests</li>
-                <li>Send you relevant notifications about news updates</li>
+                <li>Send you relevant notifications about current affairs updates</li>
                 <li>Ensure the security and integrity of our services</li>
               </ul>
             </section>
@@ -53,7 +53,7 @@ export default function Privacy() {
 
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-2">5. Third-Party Services</h2>
-              <p className="text-muted-foreground">Our app uses Firebase for authentication and data storage. Firebase's privacy policy applies to their handling of your data. We also use external news sources for content, and their respective privacy policies apply when you visit their websites.</p>
+              <p className="text-muted-foreground">Our app uses Firebase for authentication and data storage. Firebase's privacy policy applies to their handling of your data. We also use external content sources for educational content, and their respective privacy policies apply when you visit their websites.</p>
             </section>
 
             <section className="mb-8">

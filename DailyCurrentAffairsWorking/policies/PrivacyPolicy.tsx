@@ -51,7 +51,7 @@ export default function PrivacyPolicy({ onClose, isDarkMode }: PrivacyPolicyProp
           {'\n\n'}
           • Personalize content based on your interests
           {'\n\n'}
-          • Send you relevant notifications about news updates
+          • Send you relevant notifications about current affairs updates
           {'\n\n'}
           • Ensure the security and integrity of our services
         </Text>

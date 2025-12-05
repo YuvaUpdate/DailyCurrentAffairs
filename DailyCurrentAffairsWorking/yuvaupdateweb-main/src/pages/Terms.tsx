@@ -24,7 +24,7 @@ export default function Terms() {
 
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-2">2. Description of Service</h2>
-              <p className="text-muted-foreground">YuvaUpdate is a news aggregation mobile application that provides current affairs and news content to users. We curate and present news from various sources to keep you informed about current events.</p>
+              <p className="text-muted-foreground">YuvaUpdate is an educational mobile application that provides current affairs and educational content to users. We curate and present current affairs from various sources to keep you informed about important topics.</p>
             </section>
 
             <section className="mb-8">
@@ -51,7 +51,7 @@ export default function Terms() {
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-2">5. Content and Intellectual Property</h2>
               <ul className="list-disc list-inside text-muted-foreground space-y-2">
-                <li>News content is sourced from third-party providers and remains the property of the respective publishers</li>
+                <li>Educational content is sourced from third-party providers and remains the property of the respective publishers</li>
                 <li>The YuvaUpdate application design, features, and functionality are owned by us</li>
                 <li>You may not reproduce, distribute, or create derivative works from our content without permission</li>
               </ul>
@@ -59,7 +59,7 @@ export default function Terms() {
 
             <section className="mb-8">
               <h2 className="text-xl font-bold mb-2">6. Third-Party Content</h2>
-              <p className="text-muted-foreground">Our service displays content from third-party news sources. We do not endorse or take responsibility for the accuracy, completeness, or reliability of third-party content. Users access external links at their own discretion.</p>
+              <p className="text-muted-foreground">Our service displays content from third-party content sources. We do not endorse or take responsibility for the accuracy, completeness, or reliability of third-party content. Users access external links at their own discretion.</p>
             </section>
 
             <section className="mb-8">
@@ -71,7 +71,7 @@ export default function Terms() {
               <h2 className="text-xl font-bold mb-2">8. Disclaimers</h2>
               <ul className="list-disc list-inside text-muted-foreground space-y-2">
                 <li>The service is provided "as is" without warranties of any kind</li>
-                <li>We do not guarantee the accuracy, completeness, or timeliness of news content</li>
+                <li>We do not guarantee the accuracy, completeness, or timeliness of educational content</li>
                 <li>We are not responsible for any decisions made based on information from our service</li>
               </ul>
             </section>

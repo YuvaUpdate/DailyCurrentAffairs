@@ -421,7 +421,7 @@ export default function AdminPanel() {
         setEditingArticle(null);
       } else {
         result = await firebaseNewsService.addArticle(payload);
-        alert("News article added!");
+        alert("Article added!");
 
         // Send push notification (non-blocking with rate limiting)
         (async () => {
@@ -733,7 +733,7 @@ export default function AdminPanel() {
 
   async function handleBreakingNewsNotification() {
     if (!headline.trim()) {
-      alert("Please enter a headline first, then use this button to send it as breaking news.");
+      alert("Please enter a headline first, then use this button to send it as an important update.");
       return;
     }
 
@@ -742,16 +742,16 @@ export default function AdminPanel() {
       const success = await TestNotificationService.sendBreakingNewsNotification(headline);
 
       if (success) {
-        alert("Breaking news notification sent successfully!");
+        alert("Important update notification sent successfully!");
         // Update notification stats
         const stats = NotificationSender.getNotificationStats();
         setNotificationStats(stats);
       } else {
-        alert("Breaking news notification failed. Check console for details.");
+        alert("Important update notification failed. Check console for details.");
       }
     } catch (error) {
       console.error('Breaking news notification error:', error);
-      alert("Breaking news notification failed with error. Check console for details.");
+      alert("Important update notification failed with error. Check console for details.");
     } finally {
       setIsNotificationSending(false);
     }
@@ -860,9 +860,9 @@ export default function AdminPanel() {
           </Button>
         </div>
         <div className="flex flex-wrap gap-2 mb-4 sm:mb-6 justify-center">
-          <Button variant={activeTab === 'manual' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manual')}>Add/Edit News</Button>
+          <Button variant={activeTab === 'manual' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manual')}>Add/Edit Article</Button>
           <Button variant={activeTab === 'videos' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('videos')}>Videos</Button>
-          <Button variant={activeTab === 'manage' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manage')}>Manage News</Button>
+          <Button variant={activeTab === 'manage' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('manage')}>Manage Articles</Button>
           <Button variant={activeTab === 'categories' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('categories')}>Categories</Button>
           <Button variant={activeTab === 'notifications' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('notifications')}>Notifications</Button>
           <Button variant={activeTab === 'analytics' ? 'default' : 'outline'} className="flex-1 min-w-[120px]" onClick={() => setActiveTab('analytics')}>Analytics</Button>
@@ -1283,7 +1283,7 @@ export default function AdminPanel() {
             </div>
             {isLoadingNews ? <Loader2 className="animate-spin w-6 h-6 mx-auto my-8" /> : (
               <div className="space-y-3 sm:space-y-4">
-                {newsList.length === 0 && <div className="text-muted-foreground">No news articles found.</div>}
+                {newsList.length === 0 && <div className="text-muted-foreground">No articles found.</div>}
                 {/* Oldest 5 preview panel */}
                 {oldestFive && (
                   <div className="border rounded p-3 bg-yellow-50 dark:bg-yellow-900/10 mb-3">

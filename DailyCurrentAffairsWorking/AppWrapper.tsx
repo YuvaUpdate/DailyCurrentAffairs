@@ -110,7 +110,7 @@ export default function AppWrapper() {
     
     // Progressive loading messages (professional tone, no emojis)
     const messageTimers = [
-      setTimeout(() => setLoadingMessage('Preparing your personalized news feed'), 600),
+      setTimeout(() => setLoadingMessage('Preparing your personalized current affairs feed'), 600),
       setTimeout(() => setLoadingMessage('Connecting to trusted sources'), 1400),
       setTimeout(() => setLoadingMessage('Finalizing your feed preferences'), 2200),
       setTimeout(() => setLoadingMessage('Ready to explore'), 2800),
@@ -216,7 +216,7 @@ export default function AppWrapper() {
           {loadingMessage}
         </Text>
         <Text style={{ color: '#999', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-          Setting up your personalized news experience
+          Setting up your personalized learning experience
         </Text>
       </View>
     </Animated.View>

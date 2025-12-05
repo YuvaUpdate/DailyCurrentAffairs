@@ -26,7 +26,7 @@ export function Header() {
               </div>
               <div>
                 <h1 className="font-bold text-card-foreground">YuvaUpdate</h1>
-                <p className="text-xs text-muted-foreground">Latest News & Updates</p>
+                <p className="text-xs text-muted-foreground">Current Affairs & Updates</p>
               </div>
             </div>
           </div>
@@ -54,7 +54,7 @@ export function Header() {
             </a>
 
             <div className="text-xs text-muted-foreground hidden sm:block">
-              Professional News Platform
+              Education & Current Affairs
             </div>
           </div>
         </div>

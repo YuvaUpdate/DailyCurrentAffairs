@@ -39,7 +39,7 @@ export default function TermsOfService({ onClose, isDarkMode }: TermsOfServicePr
         <Text style={[styles.section, { color: theme.text }]}>
           <Text style={styles.sectionTitle}>2. Description of Service</Text>
           {'\n\n'}
-          YuvaUpdate is a news aggregation mobile application that provides current affairs and news content to users. We curate and present news from various sources to keep you informed about current events.
+          YuvaUpdate is an educational mobile application that provides current affairs and educational content to users. We curate and present current affairs from various sources to keep you informed about important topics.
         </Text>
 
         <Text style={[styles.section, { color: theme.text }]}>
@@ -73,7 +73,7 @@ export default function TermsOfService({ onClose, isDarkMode }: TermsOfServicePr
         <Text style={[styles.section, { color: theme.text }]}>
           <Text style={styles.sectionTitle}>5. Content and Intellectual Property</Text>
           {'\n\n'}
-          • News content is sourced from third-party providers and remains the property of the respective publishers
+          • Educational content is sourced from third-party providers and remains the property of the respective publishers
           {'\n\n'}
           • The YuvaUpdate application design, features, and functionality are owned by us
           {'\n\n'}
@@ -83,7 +83,7 @@ export default function TermsOfService({ onClose, isDarkMode }: TermsOfServicePr
         <Text style={[styles.section, { color: theme.text }]}>
           <Text style={styles.sectionTitle}>6. Third-Party Content</Text>
           {'\n\n'}
-          Our service displays content from third-party news sources. We do not endorse or take responsibility for the accuracy, completeness, or reliability of third-party content. Users access external links at their own discretion.
+          Our service displays content from third-party content sources. We do not endorse or take responsibility for the accuracy, completeness, or reliability of third-party content. Users access external links at their own discretion.
         </Text>
 
         <Text style={[styles.section, { color: theme.text }]}>
@@ -97,7 +97,7 @@ export default function TermsOfService({ onClose, isDarkMode }: TermsOfServicePr
           {'\n\n'}
           • The service is provided "as is" without warranties of any kind
           {'\n\n'}
-          • We do not guarantee the accuracy, completeness, or timeliness of news content
+          • We do not guarantee the accuracy, completeness, or timeliness of educational content
           {'\n\n'}
           • We are not responsible for any decisions made based on information from our service
         </Text>

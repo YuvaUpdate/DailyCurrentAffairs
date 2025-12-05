@@ -1214,7 +1214,7 @@ export default function App(props: AppProps) {
       const svc = await getFirebaseNewsService();
       const docId = await svc.addArticle(newArticle);
   logger.info('✅ Article added to Firebase with ID:', docId);
-      Alert.alert('Success', 'News article added successfully!');
+      Alert.alert('Success', 'Article added successfully!');
       return docId;
     } catch (error: any) {
       console.error('❌ Detailed Error adding article:', error);

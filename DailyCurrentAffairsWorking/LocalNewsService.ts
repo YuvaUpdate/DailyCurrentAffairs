@@ -127,7 +127,7 @@ export class LocalNewsService {
       {
         id: 1,
         headline: "Welcome to YuvaUpdate!",
-        description: "Stay updated with the latest news and current affairs. This is your personalized news feed where you can read, save, and share articles that matter to you.",
+        description: "Stay updated with the latest current affairs and educational updates. This is your personalized learning feed where you can read, save, and share articles that matter to you.",
         image: "https://picsum.photos/400/300?random=18",
         category: "General",
         readTime: "2 min read",

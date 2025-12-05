@@ -42,21 +42,21 @@ export default function About({ onClose, isDarkMode }: AboutProps) {
         <Text style={[styles.section, { color: theme.text }]}>
           <Text style={styles.sectionTitle}>Our Mission</Text>
           {'\n\n'}
-          YuvaUpdate is dedicated to keeping young minds informed about current affairs and important news that shapes our world. We believe that staying informed is the first step toward making a positive impact in society.
+          YuvaUpdate is dedicated to keeping young minds informed about current affairs and important educational updates that shape our world. We believe that staying informed is the first step toward making a positive impact in society.
         </Text>
 
         <Text style={[styles.section, { color: theme.text }]}>
           <Text style={styles.sectionTitle}>What We Offer</Text>
           {'\n\n'}
-          • <Text style={styles.highlight}>Curated News:</Text> Hand-picked articles from reliable sources across various categories
+          • <Text style={styles.highlight}>Curated Content:</Text> Hand-picked articles from reliable sources across various categories
           {'\n\n'}
           • <Text style={styles.highlight}>Current Affairs:</Text> Stay updated with the latest developments in politics, technology, sports, and more
           {'\n\n'}
           • <Text style={styles.highlight}>Clean Interface:</Text> Distraction-free reading experience with intuitive navigation
           {'\n\n'}
-          • <Text style={styles.highlight}>Personalization:</Text> Save articles, filter by categories, and customize your news feed
+          • <Text style={styles.highlight}>Personalization:</Text> Save articles, filter by categories, and customize your learning feed
           {'\n\n'}
-          • <Text style={styles.highlight}>Real-time Updates:</Text> Get the latest news as it happens with push notifications
+          • <Text style={styles.highlight}>Real-time Updates:</Text> Get the latest current affairs as they happen with push notifications
         </Text>
 
         <Text style={[styles.section, { color: theme.text }]}>
@@ -68,7 +68,7 @@ export default function About({ onClose, isDarkMode }: AboutProps) {
           {'\n\n'}
           💾 <Text style={styles.featureTitle}>Offline Reading:</Text> Save articles to read even without internet
           {'\n\n'}
-          🔔 <Text style={styles.featureTitle}>Smart Notifications:</Text> Get notified about breaking news and updates
+          🔔 <Text style={styles.featureTitle}>Smart Notifications:</Text> Get notified about important updates
           {'\n\n'}
           🏷️ <Text style={styles.featureTitle}>Category Filters:</Text> Focus on topics that matter to you
         </Text>
@@ -82,7 +82,7 @@ export default function About({ onClose, isDarkMode }: AboutProps) {
           {'\n\n'}
           • <Text style={styles.highlight}>Privacy:</Text> Your data is protected and never shared without consent
           {'\n\n'}
-          • <Text style={styles.highlight}>Accessibility:</Text> News should be accessible to everyone, everywhere
+          • <Text style={styles.highlight}>Accessibility:</Text> Current affairs should be accessible to everyone, everywhere
         </Text>
 
         <Text style={[styles.section, { color: theme.text }]}>
